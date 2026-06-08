@@ -1,0 +1,122 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.0'
+    id 'org.jetbrains.intellij.platform' version '2.16.0'
+    id 'org.jetbrains.grammarkit' version '2023.3.0.1'
+}
+
+group = 'com.bwsl.jetbrains_plugin'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
+dependencies {
+    intellijPlatform {
+        intellijIdea('2026.1.2')
+        testFramework(TestFrameworkType.JUnit5.INSTANCE)
+    }
+
+    testCompileOnly 'org.junit.jupiter:junit-jupiter-api:5.11.4'
+    testRuntimeOnly 'junit:junit:4.13.2'
+}
+
+
+intellijPlatform {
+    //noinspection GroovyAssignabilityCheck
+    pluginConfiguration {
+        ideaVersion {
+            sinceBuild = '261'
+        }
+        changeNotes = 'Initial version'
+    }
+}
+
+generateLexer {
+    sourceFile = file('src/main/resources/BwslLexer.flex')
+    targetOutputDir = layout.projectDirectory.dir('generated/com/bwsl/plugin')
+    purgeOldFiles = true
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'generated'
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn generateLexer
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+compileKotlin {
+    dependsOn generateLexer
+}
+
+def bwslTestSubdirs = ['equivalence', 'unsorted']
+
+tasks.register('fetchBwslTests') {
+    def outputDir = file('src/test/resources/bwsl_test_files')
+    def tempDir = layout.buildDirectory.dir('bwsl-checkout').get().asFile
+
+    onlyIf { !new File(outputDir, bwslTestSubdirs[0]).isDirectory() }
+
+    doLast {
+        def run = { List<String> cmd, File dir = null ->
+            def proc = new ProcessBuilder(cmd).with {
+                if (dir) directory(dir)
+                inheritIO()
+                start()
+            }
+            def exit = proc.waitFor()
+            if (exit != 0) throw new GradleException("Command failed (exit $exit): ${cmd.join(' ')}")
+        }
+
+        if (tempDir.exists()) {
+            // git sets some files read-only, so we need to make them writable before deletion
+            // otherwise deleteDir() silently ignores them on windows.
+            tempDir.eachFileRecurse { it.setWritable(true) }
+            tempDir.deleteDir()
+        }
+
+        run(['git', 'clone', '--filter=blob:none', '--sparse', '--depth=1',
+             'https://github.com/BWSL-Lang/BWSL', tempDir.absolutePath])
+        run(['git', 'sparse-checkout', 'set', 'tests'], tempDir)
+
+        def src = new File(tempDir, 'tests')
+        bwslTestSubdirs.each { subdir ->
+            new File(src, subdir).eachFileRecurse { f ->
+                if (f.isFile()) {
+                    def dest = new File(outputDir, src.toURI().relativize(f.toURI()).toString())
+                    dest.parentFile.mkdirs()
+                    dest.bytes = f.bytes
+                }
+            }
+        }
+        tempDir.deleteDir()
+    }
+}
+
+processTestResources.dependsOn fetchBwslTests
+
+test {
+    useJUnitPlatform()
+    systemProperty 'bwsl.test.subdirs', bwslTestSubdirs.join(',')
+    systemProperty 'java.util.logging.config.file', file('src/test/resources/test-log.properties').canonicalPath
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
+buildSearchableOptions {
+    enabled = false
+}
