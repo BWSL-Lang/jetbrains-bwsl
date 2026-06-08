@@ -2,7 +2,7 @@ name: JetBrains Plugin
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 concurrency:
