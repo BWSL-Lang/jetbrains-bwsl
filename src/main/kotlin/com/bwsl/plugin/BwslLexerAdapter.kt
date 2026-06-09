@@ -44,10 +44,13 @@ class BwslLexerAdapter : LexerBase() {
         if (raw.type != BwslTokenTypes.IDENTIFIER) { current = raw; return }
 
         val name = bufSeq.substring(raw.start, raw.end)
-        current = if (nextNonWhitespace()?.type == BwslTokenTypes.LPAREN)
-            raw.copy(type = if (name in INTRINSIC_NAMES) BwslTokenTypes.INTRINSIC_CALL
-                            else BwslTokenTypes.FUNCTION_CALL)
-        else raw
+        current = when (nextNonWhitespace()?.type) {
+            BwslTokenTypes.COLONCOLON -> raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
+            BwslTokenTypes.LPAREN    -> raw.copy(type = if (name in INTRINSIC_NAMES)
+                                                            BwslTokenTypes.INTRINSIC_CALL
+                                                        else BwslTokenTypes.FUNCTION_CALL)
+            else -> raw
+        }
     }
 
     private fun nextNonWhitespace(): Tok? {

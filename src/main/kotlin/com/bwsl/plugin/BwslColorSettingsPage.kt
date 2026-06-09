@@ -12,7 +12,7 @@ class BwslColorSettingsPage : ColorSettingsPage {
     private val descriptors = arrayOf(
         AttributesDescriptor("Decorator//@flat, @location, @instance, …",          BwslSyntaxHighlighter.DECORATOR),
         AttributesDescriptor("Block keyword//pipeline, pass, vertex, fragment, …", BwslSyntaxHighlighter.BLOCK_KEYWORD),
-        AttributesDescriptor("Function name",                                       BwslSyntaxHighlighter.FUNCTION_NAME),
+        AttributesDescriptor("Function declaration",                               BwslSyntaxHighlighter.FUNCTION_DECLARATION),
         AttributesDescriptor("Control flow keyword//if, return, for, import, …",   BwslSyntaxHighlighter.KEYWORD),
         AttributesDescriptor("Type keyword//float3, mat4, texture2D, …",           BwslSyntaxHighlighter.TYPE_KEYWORD),
         AttributesDescriptor("Number",                BwslSyntaxHighlighter.NUMBER),

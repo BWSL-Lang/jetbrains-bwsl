@@ -25,6 +25,18 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
+    fun functionDeclarationNamesAreTokenizedCorrectly() {
+        val tokens = tokenizeResource("lexer_test_files/module.bwsl")
+        listOf(2 to "rotate", 11 to "rotate90DegreesAroundOrigo").forEach { (line, name) ->
+            val token = tokens.firstOrNull { it.line == line && it.text == name }
+            assertNotNull(token) { "Expected '$name' token on line $line" }
+            assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, token!!.type) {
+                "'$name' on line $line should be FUNCTION_DECLARATION"
+            }
+        }
+    }
+
+    @Test
     fun cosAndSinAreIntrinsicCalls() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val intrinsics = tokens.filter { it.text == "cos" || it.text == "sin" }

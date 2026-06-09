@@ -15,7 +15,7 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
     companion object {
         @JvmField val DECORATOR    = createTextAttributesKey("BWSL_DECORATOR",    DefaultLanguageHighlighterColors.METADATA)
         @JvmField val BLOCK_KEYWORD= createTextAttributesKey("BWSL_BLOCK_KEYWORD",DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
-        @JvmField val FUNCTION_NAME= createTextAttributesKey("BWSL_FUNCTION_NAME",DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
+        @JvmField val FUNCTION_DECLARATION = createTextAttributesKey("BWSL_FUNCTION_DECLARATION",DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
         @JvmField val KEYWORD      = createTextAttributesKey("BWSL_KEYWORD",      DefaultLanguageHighlighterColors.KEYWORD)
         @JvmField val TYPE_KEYWORD = createTextAttributesKey("BWSL_TYPE_KEYWORD", DefaultLanguageHighlighterColors.CLASS_REFERENCE)
         @JvmField val NUMBER       = createTextAttributesKey("BWSL_NUMBER",       DefaultLanguageHighlighterColors.NUMBER)
@@ -85,8 +85,9 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         private val LINE_COMMENT_KEYS  = arrayOf(LINE_COMMENT)
         private val BLOCK_COMMENT_KEYS = arrayOf(BLOCK_COMMENT)
         private val OPERATOR_KEYS       = arrayOf(OPERATOR)
-        private val FUNCTION_CALL_KEYS  = arrayOf(FUNCTION_CALL)
-        private val INTRINSIC_KEYS      = arrayOf(INTRINSIC)
+        private val FUNCTION_DECLARATION_KEYS = arrayOf(FUNCTION_DECLARATION)
+        private val FUNCTION_CALL_KEYS        = arrayOf(FUNCTION_CALL)
+        private val INTRINSIC_KEYS            = arrayOf(INTRINSIC)
         private val IDENTIFIER_KEYS     = arrayOf(IDENTIFIER)
         private val BAD_CHARACTER_KEYS = arrayOf(BAD_CHARACTER)
         private val EMPTY              = emptyArray<TextAttributesKey>()
@@ -103,7 +104,8 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         tokenType == BwslTokenTypes.STRING_LIT     -> STRING_KEYS
         tokenType == BwslTokenTypes.LINE_COMMENT   -> LINE_COMMENT_KEYS
         tokenType == BwslTokenTypes.BLOCK_COMMENT  -> BLOCK_COMMENT_KEYS
-        tokenType == BwslTokenTypes.FUNCTION_CALL  -> FUNCTION_CALL_KEYS
+        tokenType == BwslTokenTypes.FUNCTION_DECLARATION -> FUNCTION_DECLARATION_KEYS
+        tokenType == BwslTokenTypes.FUNCTION_CALL        -> FUNCTION_CALL_KEYS
         tokenType == BwslTokenTypes.INTRINSIC_CALL -> INTRINSIC_KEYS
         tokenType == BwslTokenTypes.IDENTIFIER     -> IDENTIFIER_KEYS
         tokenType == TokenType.BAD_CHARACTER  -> BAD_CHARACTER_KEYS
