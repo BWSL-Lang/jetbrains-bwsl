@@ -7,7 +7,9 @@ object BwslTokenTypes {
     @JvmField val STRING_LIT    = BwslElementType("STRING_LIT")
     @JvmField val NUMBER_LIT    = BwslElementType("NUMBER_LIT")
     @JvmField val DECORATOR     = BwslElementType("DECORATOR")
-    @JvmField val IDENTIFIER    = BwslElementType("IDENTIFIER")
+    @JvmField val IDENTIFIER     = BwslElementType("IDENTIFIER")
+    @JvmField val FUNCTION_CALL  = BwslElementType("FUNCTION_CALL")
+    @JvmField val INTRINSIC_CALL = BwslElementType("INTRINSIC_CALL")
 
     // Block-structure keywords
     @JvmField val KW_MODULE        = BwslElementType("KW_MODULE")

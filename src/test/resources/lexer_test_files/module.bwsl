@@ -1,0 +1,17 @@
+module Test1 {
+    rotate :: (float2 pos, float2 center, float angle) -> float2 {
+        float2 normalized = pos - center;
+        float2 result = float2(
+            normalized.x * cos(angle) + normalized.y * sin(angle),
+            -normalized.x * sin(angle) + normalized.y * cos(angle)
+        );
+        return center + result;
+    }
+
+    rotate90DegreesAroundOrigo :: (float2 pos) -> float2 {
+        if (pos == 0) {
+            return pos;
+        }
+        return rotate(pos, float2(0), 3.14*0.5);
+    }
+}

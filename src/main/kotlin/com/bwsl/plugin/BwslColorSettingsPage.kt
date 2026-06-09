@@ -19,6 +19,8 @@ class BwslColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor("String",                BwslSyntaxHighlighter.STRING),
         AttributesDescriptor("Line comment",          BwslSyntaxHighlighter.LINE_COMMENT),
         AttributesDescriptor("Block comment",         BwslSyntaxHighlighter.BLOCK_COMMENT),
+        AttributesDescriptor("Function call",          BwslSyntaxHighlighter.FUNCTION_CALL),
+        AttributesDescriptor("Intrinsic call//sin, cos, normalize, …", BwslSyntaxHighlighter.INTRINSIC),
         AttributesDescriptor("Operator / punctuation", BwslSyntaxHighlighter.OPERATOR),
         AttributesDescriptor("Identifier",            BwslSyntaxHighlighter.IDENTIFIER),
         AttributesDescriptor("Bad character",         BwslSyntaxHighlighter.BAD_CHARACTER),
@@ -41,6 +43,10 @@ module MathUtils {
 
     dot :: (float3 a, float3 b) -> float {
         return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    blend :: (float4 a, float4 b, float t) -> float4 {
+        return a + (b - a) * t;
     }
 
     enum BlendMode {
@@ -91,7 +97,8 @@ pipeline PBR {
             @flat float3 n = normalize(normal);
             float4 col     = albedo.sample(samp, uv);
             if (col.a < 0.01f) { discard; }
-            color = float4(n * 0.5f + 0.5f, 1.0f) * col;
+            float wave = sin(uv.x * PI) * cos(uv.y * PI);
+            color = blend(float4(n * 0.5f + 0.5f, 1.0f) * col, float4(wave), 0.1f);
         }
     }
 }

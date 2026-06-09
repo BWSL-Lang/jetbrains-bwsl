@@ -36,6 +36,7 @@ STRING_LIT   = \" ( [^\"\\\r\n] | \\ [^\r\n] )* \"
 LINE_CMT     = "//" [^\r\n]*
 BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
 
+
 %%
 
 <YYINITIAL> {

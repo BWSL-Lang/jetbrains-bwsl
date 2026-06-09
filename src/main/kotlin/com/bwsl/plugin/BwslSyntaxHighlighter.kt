@@ -22,9 +22,10 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         @JvmField val STRING       = createTextAttributesKey("BWSL_STRING",       DefaultLanguageHighlighterColors.STRING)
         @JvmField val LINE_COMMENT = createTextAttributesKey("BWSL_LINE_COMMENT", DefaultLanguageHighlighterColors.LINE_COMMENT)
         @JvmField val BLOCK_COMMENT= createTextAttributesKey("BWSL_BLOCK_COMMENT",DefaultLanguageHighlighterColors.BLOCK_COMMENT)
-        @JvmField val OPERATOR     = createTextAttributesKey("BWSL_OPERATOR",     DefaultLanguageHighlighterColors.OPERATION_SIGN)
-        @JvmField val INTRINSIC    = createTextAttributesKey("BWSL_INTRINSIC",    DefaultLanguageHighlighterColors.GLOBAL_VARIABLE)
-        @JvmField val IDENTIFIER   = createTextAttributesKey("BWSL_IDENTIFIER",   DefaultLanguageHighlighterColors.IDENTIFIER)
+        @JvmField val OPERATOR       = createTextAttributesKey("BWSL_OPERATOR",       DefaultLanguageHighlighterColors.OPERATION_SIGN)
+        @JvmField val FUNCTION_CALL  = createTextAttributesKey("BWSL_FUNCTION_CALL",  DefaultLanguageHighlighterColors.FUNCTION_CALL)
+        @JvmField val INTRINSIC      = createTextAttributesKey("BWSL_INTRINSIC",      DefaultLanguageHighlighterColors.FUNCTION_CALL)
+        @JvmField val IDENTIFIER     = createTextAttributesKey("BWSL_IDENTIFIER",     DefaultLanguageHighlighterColors.IDENTIFIER)
         @JvmField val BAD_CHARACTER= createTextAttributesKey("BWSL_BAD_CHARACTER",HighlighterColors.BAD_CHARACTER)
 
         // pipeline, pass, vertex, fragment, attributes, resources, …
@@ -83,8 +84,10 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         private val STRING_KEYS        = arrayOf(STRING)
         private val LINE_COMMENT_KEYS  = arrayOf(LINE_COMMENT)
         private val BLOCK_COMMENT_KEYS = arrayOf(BLOCK_COMMENT)
-        private val OPERATOR_KEYS      = arrayOf(OPERATOR)
-        private val IDENTIFIER_KEYS    = arrayOf(IDENTIFIER)
+        private val OPERATOR_KEYS       = arrayOf(OPERATOR)
+        private val FUNCTION_CALL_KEYS  = arrayOf(FUNCTION_CALL)
+        private val INTRINSIC_KEYS      = arrayOf(INTRINSIC)
+        private val IDENTIFIER_KEYS     = arrayOf(IDENTIFIER)
         private val BAD_CHARACTER_KEYS = arrayOf(BAD_CHARACTER)
         private val EMPTY              = emptyArray<TextAttributesKey>()
     }
@@ -100,6 +103,8 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         tokenType == BwslTokenTypes.STRING_LIT     -> STRING_KEYS
         tokenType == BwslTokenTypes.LINE_COMMENT   -> LINE_COMMENT_KEYS
         tokenType == BwslTokenTypes.BLOCK_COMMENT  -> BLOCK_COMMENT_KEYS
+        tokenType == BwslTokenTypes.FUNCTION_CALL  -> FUNCTION_CALL_KEYS
+        tokenType == BwslTokenTypes.INTRINSIC_CALL -> INTRINSIC_KEYS
         tokenType == BwslTokenTypes.IDENTIFIER     -> IDENTIFIER_KEYS
         tokenType == TokenType.BAD_CHARACTER  -> BAD_CHARACTER_KEYS
         isOperator(tokenType)                 -> OPERATOR_KEYS
