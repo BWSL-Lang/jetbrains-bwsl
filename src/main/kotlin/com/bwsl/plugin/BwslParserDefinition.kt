@@ -22,9 +22,26 @@ class BwslParserDefinition : ParserDefinition {
     override fun createLexer(project: Project?): Lexer = BwslLexerAdapter()
 
     override fun createParser(project: Project?): PsiParser = PsiParser { root, builder ->
-        val marker = builder.mark()
-        while (!builder.eof()) builder.advanceLexer()
-        marker.done(root)
+        fun parseElement() {
+            val type = builder.tokenType ?: return
+            if (type == BwslTokenTypes.FUNCTION_CALL || type == BwslTokenTypes.INTRINSIC_CALL) {
+                val marker = builder.mark()
+                builder.advanceLexer() // consume function name
+                while (builder.tokenType == com.intellij.psi.TokenType.WHITE_SPACE) builder.advanceLexer()
+                if (builder.tokenType == BwslTokenTypes.LPAREN) {
+                    builder.advanceLexer() // consume (
+                    while (!builder.eof() && builder.tokenType != BwslTokenTypes.RPAREN) parseElement()
+                    if (!builder.eof()) builder.advanceLexer() // consume )
+                }
+                marker.done(BwslTokenTypes.CALL_EXPRESSION)
+            } else {
+                builder.advanceLexer()
+            }
+        }
+
+        val rootMarker = builder.mark()
+        while (!builder.eof()) parseElement()
+        rootMarker.done(root)
         builder.treeBuilt
     }
 

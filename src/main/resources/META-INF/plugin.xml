@@ -55,6 +55,14 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslExternalAnnotator"/>
 
+        <externalAnnotator
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslAstAnnotator"/>
+
+        <codeInsight.parameterInfo
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslParameterInfoHandler"/>
+
     </extensions>
 
     <actions>
