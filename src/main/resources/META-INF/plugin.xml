@@ -36,6 +36,9 @@
             language="BWSL"
             extensions="bwsl"/>
 
+        <fileIconProvider
+            implementation="com.bwsl.plugin.BwslFileIconProvider"/>
+
         <lang.parserDefinition
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslParserDefinition"/>
