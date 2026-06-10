@@ -54,7 +54,13 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         context.setupUIComponentPresentation(fullText, hlStart, hlEnd, false, false, false, context.defaultParameterColor)
     }
 
-    private fun findEnclosingCallExpression(file: PsiFile, offset: Int): PsiElement? {
+    fun signaturesAt(file: PsiFile, offset: Int): List<BwslFunctionSignature> {
+        val callExpr = findEnclosingCallExpression(file, offset) ?: return emptyList()
+        val nameToken = callExpr.firstChild ?: return emptyList()
+        return findSignatures(file, nameToken.text, nameToken.node.elementType)
+    }
+
+    fun findEnclosingCallExpression(file: PsiFile, offset: Int): PsiElement? {
         var element: PsiElement? = file.findElementAt(offset)
             ?: file.findElementAt(maxOf(0, offset - 1))
             ?: return null
@@ -65,7 +71,7 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         return null
     }
 
-    private fun findSignatures(file: PsiFile, name: String, tokenType: com.intellij.psi.tree.IElementType): List<BwslFunctionSignature> {
+    fun findSignatures(file: PsiFile, name: String, tokenType: com.intellij.psi.tree.IElementType): List<BwslFunctionSignature> {
         if (tokenType == BwslTokenTypes.INTRINSIC_CALL) {
             return BwslIntrinsics.ALL.filter { it.name == name }.map { fn ->
                 BwslFunctionSignature(fn.name, fn.params.map { "${it.type} ${it.name}" }, fn.returnType)

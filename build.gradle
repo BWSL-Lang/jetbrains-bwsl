@@ -21,10 +21,11 @@ dependencies {
     intellijPlatform {
         intellijIdea('2026.1.2')
         testFramework(TestFrameworkType.JUnit5.INSTANCE)
+        testFramework(TestFrameworkType.Platform.INSTANCE)
     }
 
     testCompileOnly 'org.junit.jupiter:junit-jupiter-api:5.11.4'
-    testRuntimeOnly 'junit:junit:4.13.2'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 
