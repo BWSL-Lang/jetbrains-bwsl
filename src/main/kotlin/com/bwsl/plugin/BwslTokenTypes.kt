@@ -12,6 +12,7 @@ object BwslTokenTypes {
     @JvmField val FUNCTION_CALL        = BwslElementType("FUNCTION_CALL")
     @JvmField val INTRINSIC_CALL       = BwslElementType("INTRINSIC_CALL")
     @JvmField val CALL_EXPRESSION      = BwslElementType("CALL_EXPRESSION")
+    @JvmField val REFERENCE            = BwslElementType("REFERENCE")
 
     // Block-structure keywords
     @JvmField val KW_MODULE        = BwslElementType("KW_MODULE")

@@ -18,7 +18,7 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
             log.warn("findElementForParameterInfo: no enclosing CALL_EXPRESSION at offset ${context.offset}")
             return null
         }
-        val nameToken = callExpr.firstChild ?: return null
+        val nameToken = callExpr.firstChild?.firstChild ?: return null
         val name = nameToken.text
         val tokenType = nameToken.node.elementType
         val signatures = findSignatures(context.file, name, tokenType)
@@ -56,7 +56,7 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
 
     fun signaturesAt(file: PsiFile, offset: Int): List<BwslFunctionSignature> {
         val callExpr = findEnclosingCallExpression(file, offset) ?: return emptyList()
-        val nameToken = callExpr.firstChild ?: return emptyList()
+        val nameToken = callExpr.firstChild?.firstChild ?: return emptyList()
         return findSignatures(file, nameToken.text, nameToken.node.elementType)
     }
 

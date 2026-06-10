@@ -1,7 +1,4 @@
 module Test1 {
-    /**
-     * Rotates a point around a center by a given angle in radians.
-     */
     rotate :: (float2 pos, float2 center, float angle) -> float2 {
         float2 normalized = pos - center;
         float2 result = float2(

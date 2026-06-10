@@ -59,6 +59,10 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslAstAnnotator"/>
 
+        <psi.referenceContributor
+            language="BWSL"
+            implementation="com.bwsl.plugin.BwslReferenceContributor"/>
+
         <codeInsight.parameterInfo
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslParameterInfoHandler"/>
