@@ -70,6 +70,10 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslParameterInfoHandler"/>
 
+        <lang.documentationProvider
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslDocumentationProvider"/>
+
     </extensions>
 
     <actions>
