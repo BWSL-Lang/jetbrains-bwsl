@@ -74,8 +74,22 @@ fun findEnclosingFunction(root: AstRoot, scope: AstScope, line: Int, column: Int
         astContains(line, column, it.line, it.column, it.endLine, it.endColumn)
     }
 
+/** The document offset range spanned by a function declaration, per the AST. */
+fun functionRange(file: PsiFile, fn: AstFunction): IntRange? {
+    val start = offsetAt(file, fn.line, fn.column) ?: return null
+    val end = offsetAt(file, fn.endLine, fn.endColumn) ?: return null
+    return start..end
+}
+
+/** The document offset range of a given 1-based line. */
+fun lineRange(file: PsiFile, line: Int): IntRange? {
+    val doc = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return null
+    if (line < 1 || line > doc.lineCount) return null
+    return doc.getLineStartOffset(line - 1)..doc.getLineEndOffset(line - 1)
+}
+
 /** Recursively collects all VARIABLE_DECL statements within a block, including nested blocks (if/for/etc). */
-private fun collectVariableDecls(block: AstBlock?): List<AstStatement> {
+fun collectVariableDecls(block: AstBlock?): List<AstStatement> {
     if (block == null) return emptyList()
     return block.statements.flatMap { stmt ->
         val self = if (stmt.type == "VARIABLE_DECL") listOf(stmt) else emptyList()

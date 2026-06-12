@@ -128,12 +128,59 @@ class BwslFunctionReference(element: PsiElement) :
     override fun getVariants(): Array<Any> = emptyArray()
 }
 
+/**
+ * Finds the leftmost REFERENCE-wrapped identifier matching [name] within [range], skipping
+ * member-access/qualified usages (preceded by '.' or '::'). For a declaration range, the
+ * declaration itself is the leftmost such occurrence (it precedes all usages).
+ */
+private fun findIdentifierInRange(file: PsiFile, name: String, range: IntRange): PsiElement? {
+    for (leaf in fileLeaves(file)) {
+        if (leaf.elementType != BwslTokenTypes.IDENTIFIER) continue
+        if (leaf.text != name) continue
+        if (leaf.textOffset !in range) continue
+        val wrapper = leaf.parent ?: continue
+        val prev = previousNonWhitespace(wrapper)?.elementType
+        if (prev == BwslTokenTypes.DOT || prev == BwslTokenTypes.COLONCOLON) continue
+        return wrapper
+    }
+    return null
+}
+
+/**
+ * Resolves a variable usage to its declaration using the bwslc AST to determine the enclosing
+ * function, then locating the actual PSI token for the declaration's name. Returns null if no
+ * AST is cached for this file, letting callers fall back to a text-based search.
+ */
+private fun resolveVariableViaAst(file: PsiFile, offset: Int, name: String): PsiElement? {
+    val filePath = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.getRoot(filePath) ?: return null
+    val (line, column) = lineColumnAt(file, offset) ?: return null
+    val scope = findScope(root, line, column)
+    val fn = findEnclosingFunction(root, scope, line, column) ?: return null
+
+    val decl = collectVariableDecls(fn.body)
+        .filter { it.name == name && (it.line < line || (it.line == line && it.column <= column)) }
+        .maxWithOrNull(compareBy({ it.line }, { it.column }))
+    if (decl != null) {
+        lineRange(file, decl.line)?.let { findIdentifierInRange(file, name, it) }?.let { return it }
+    }
+
+    if (fn.parameters.any { it.name == name }) {
+        functionRange(file, fn)?.let { findIdentifierInRange(file, name, it) }?.let { return it }
+    }
+
+    return null
+}
+
 class BwslVariableReference(element: PsiElement) :
     PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
 
     override fun resolve(): PsiElement? {
         val name = element.text
         val offset = element.textOffset
+
+        resolveVariableViaAst(element.containingFile, offset, name)?.let { return it }
+
         var best: PsiElement? = null
         for (leaf in fileLeaves(element.containingFile)) {
             if (leaf.elementType != BwslTokenTypes.IDENTIFIER) continue
