@@ -55,6 +55,27 @@ private fun intrinsicDoc(name: String, hasReceiver: Boolean): String? {
     return renderDoc(null, signature, fn.description.takeIf { it.isNotBlank() })
 }
 
+/** Shows the declared type of a variable/parameter usage or declaration, via the AST. */
+private fun variableTypeDoc(element: PsiElement): String? {
+    val file = element.containingFile
+    val filePath = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.getRoot(filePath) ?: return null
+    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+    val scope = findScope(root, line, column)
+    val fn = findEnclosingFunction(root, scope, line, column) ?: return null
+    val name = element.text
+
+    fn.parameters.firstOrNull { it.name == name }?.let {
+        return renderDoc(null, "${it.type} ${it.name}", "parameter")
+    }
+
+    val decl = collectVariableDecls(fn.body)
+        .filter { it.name == name && (it.line < line || (it.line == line && it.column <= column)) }
+        .maxWithOrNull(compareBy({ it.line }, { it.column }))
+    val declaredType = decl?.declaredType?.takeIf { it.isNotBlank() } ?: return null
+    return renderDoc(null, "$declaredType $name", "local variable")
+}
+
 private fun customFunctionDoc(element: PsiElement): String? {
     val file = element.containingFile
     val filePath = file.virtualFile?.path ?: return null
@@ -77,6 +98,10 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
         if (element.parent?.elementType == BwslTokenTypes.REFERENCE && element.parent?.firstChild?.elementType == BwslTokenTypes.INTRINSIC_CALL) {
             return element.parent
         }
+        // Variable/parameter identifiers resolve to their declaration via BwslVariableReference,
+        // but the type lookup works identically for the usage and the declaration itself, so
+        // skip reference resolution entirely and document the hovered element directly.
+        if (element.elementType == BwslTokenTypes.IDENTIFIER) return element
         return null
     }
 
@@ -94,6 +119,7 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
             // A method-style call (e.g. "values.cos()") is lexed as FUNCTION_CALL rather than
             // INTRINSIC_CALL because it has a receiver, but it may still name an intrinsic.
             BwslTokenTypes.FUNCTION_CALL -> customFunctionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
+            BwslTokenTypes.IDENTIFIER -> variableTypeDoc(element)
             else -> null
         }
     }

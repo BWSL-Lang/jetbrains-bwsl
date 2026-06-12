@@ -67,6 +67,60 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         assertTrue("Expected cosine description, got: $doc", doc.contains("Cosine"))
     }
 
+    fun testLocalVariableUsageShowsDeclaredType() {
+        myFixture.configureByText(
+            "test.bwsl",
+            "module M {\n" +
+                "    f1 :: () -> float2 {\n" +
+                "        float2 normalized = float2(1.0, 2.0);\n" +
+                "        return normali<caret>zed;\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val filePath = myFixture.file.virtualFile.path
+        val fn = AstFunction(
+            "f1", emptyList(), "float2", line = 2, column = 5, endLine = 5, endColumn = 6,
+            body = AstBlock(listOf(
+                AstStatement(type = "VARIABLE_DECL", name = "normalized", declaredType = "float2", line = 3, column = 9)
+            ))
+        )
+        BwslAstCache.update(filePath, AstRoot(
+            modules = listOf(AstModule(name = "M", line = 1, column = 1, endLine = 6, endColumn = 2, functions = listOf(fn)))
+        ))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'normalized'", doc)
+        assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 normalized"))
+        assertTrue("Expected 'local variable' label, got: $doc", doc.contains("local variable"))
+    }
+
+    fun testParameterUsageShowsDeclaredType() {
+        myFixture.configureByText(
+            "test.bwsl",
+            "module M {\n" +
+                "    rotate :: (float2 pos, float2 center) -> float2 {\n" +
+                "        return po<caret>s - center;\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val filePath = myFixture.file.virtualFile.path
+        val fn = AstFunction(
+            "rotate",
+            listOf(AstParam("pos", "float2"), AstParam("center", "float2")),
+            "float2", line = 2, column = 5, endLine = 4, endColumn = 6
+        )
+        BwslAstCache.update(filePath, AstRoot(
+            modules = listOf(AstModule(name = "M", line = 1, column = 1, endLine = 5, endColumn = 2, functions = listOf(fn)))
+        ))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'pos'", doc)
+        assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 pos"))
+        assertTrue("Expected 'parameter' label, got: $doc", doc.contains("parameter"))
+    }
+
     fun testCustomFunctionCallShowsQualifiedNameAndSignature() {
         myFixture.configureByText(
             "test.bwsl",
