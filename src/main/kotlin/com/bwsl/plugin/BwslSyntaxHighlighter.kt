@@ -23,6 +23,12 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         @JvmField val LINE_COMMENT = createTextAttributesKey("BWSL_LINE_COMMENT", DefaultLanguageHighlighterColors.LINE_COMMENT)
         @JvmField val BLOCK_COMMENT= createTextAttributesKey("BWSL_BLOCK_COMMENT",DefaultLanguageHighlighterColors.BLOCK_COMMENT)
         @JvmField val OPERATOR       = createTextAttributesKey("BWSL_OPERATOR",       DefaultLanguageHighlighterColors.OPERATION_SIGN)
+        @JvmField val BRACES         = createTextAttributesKey("BWSL_BRACES",         DefaultLanguageHighlighterColors.BRACES)
+        @JvmField val BRACKETS       = createTextAttributesKey("BWSL_BRACKETS",       DefaultLanguageHighlighterColors.BRACKETS)
+        @JvmField val PARENTHESES    = createTextAttributesKey("BWSL_PARENTHESES",    DefaultLanguageHighlighterColors.PARENTHESES)
+        @JvmField val COMMA          = createTextAttributesKey("BWSL_COMMA",          DefaultLanguageHighlighterColors.COMMA)
+        @JvmField val DOT            = createTextAttributesKey("BWSL_DOT",            DefaultLanguageHighlighterColors.DOT)
+        @JvmField val SEMICOLON      = createTextAttributesKey("BWSL_SEMICOLON",      DefaultLanguageHighlighterColors.SEMICOLON)
         @JvmField val FUNCTION_CALL  = createTextAttributesKey("BWSL_FUNCTION_CALL",  DefaultLanguageHighlighterColors.FUNCTION_CALL)
         @JvmField val INTRINSIC      = createTextAttributesKey("BWSL_INTRINSIC",      DefaultLanguageHighlighterColors.FUNCTION_CALL)
         @JvmField val IDENTIFIER     = createTextAttributesKey("BWSL_IDENTIFIER",     DefaultLanguageHighlighterColors.IDENTIFIER)
@@ -85,6 +91,12 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         private val LINE_COMMENT_KEYS  = arrayOf(LINE_COMMENT)
         private val BLOCK_COMMENT_KEYS = arrayOf(BLOCK_COMMENT)
         private val OPERATOR_KEYS       = arrayOf(OPERATOR)
+        private val BRACES_KEYS         = arrayOf(BRACES)
+        private val BRACKETS_KEYS       = arrayOf(BRACKETS)
+        private val PARENTHESES_KEYS    = arrayOf(PARENTHESES)
+        private val COMMA_KEYS          = arrayOf(COMMA)
+        private val DOT_KEYS            = arrayOf(DOT)
+        private val SEMICOLON_KEYS      = arrayOf(SEMICOLON)
         private val FUNCTION_DECLARATION_KEYS = arrayOf(FUNCTION_DECLARATION)
         private val FUNCTION_CALL_KEYS        = arrayOf(FUNCTION_CALL)
         private val INTRINSIC_KEYS            = arrayOf(INTRINSIC)
@@ -109,6 +121,12 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         tokenType == BwslTokenTypes.INTRINSIC_CALL -> INTRINSIC_KEYS
         tokenType == BwslTokenTypes.IDENTIFIER     -> IDENTIFIER_KEYS
         tokenType == TokenType.BAD_CHARACTER  -> BAD_CHARACTER_KEYS
+        tokenType == BwslTokenTypes.LBRACE || tokenType == BwslTokenTypes.RBRACE -> BRACES_KEYS
+        tokenType == BwslTokenTypes.LBRACKET || tokenType == BwslTokenTypes.RBRACKET -> BRACKETS_KEYS
+        tokenType == BwslTokenTypes.LPAREN || tokenType == BwslTokenTypes.RPAREN -> PARENTHESES_KEYS
+        tokenType == BwslTokenTypes.COMMA -> COMMA_KEYS
+        tokenType == BwslTokenTypes.DOT -> DOT_KEYS
+        tokenType == BwslTokenTypes.SEMI -> SEMICOLON_KEYS
         isOperator(tokenType)                 -> OPERATOR_KEYS
         else                                  -> EMPTY
     }
@@ -127,9 +145,6 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         || t == BwslTokenTypes.AMPEQ || t == BwslTokenTypes.PIPEEQ || t == BwslTokenTypes.CARETEQ
         || t == BwslTokenTypes.PLUSPLUS || t == BwslTokenTypes.MINUSMINUS
         || t == BwslTokenTypes.ARROW || t == BwslTokenTypes.COLONCOLON || t == BwslTokenTypes.COLON
-        || t == BwslTokenTypes.DOT || t == BwslTokenTypes.DOTDOT || t == BwslTokenTypes.DOTDOTEQ
-        || t == BwslTokenTypes.LBRACE || t == BwslTokenTypes.RBRACE
-        || t == BwslTokenTypes.LPAREN || t == BwslTokenTypes.RPAREN
-        || t == BwslTokenTypes.LBRACKET || t == BwslTokenTypes.RBRACKET
-        || t == BwslTokenTypes.SEMI || t == BwslTokenTypes.COMMA || t == BwslTokenTypes.QUESTION
+        || t == BwslTokenTypes.DOTDOT || t == BwslTokenTypes.DOTDOTEQ
+        || t == BwslTokenTypes.QUESTION
 }
