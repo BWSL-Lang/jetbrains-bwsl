@@ -42,11 +42,16 @@ class BwslReferenceContributor : PsiReferenceContributor() {
                         return emptyArray()
                     }
                     val prev = previousNonWhitespace(element)?.node?.elementType
+                    val next = nextNonWhitespace(element)?.node?.elementType
                     return when {
                         prev == BwslTokenTypes.KW_IMPORT || prev == BwslTokenTypes.KW_USING ->
                             arrayOf(BwslModuleReference(element))
                         prev == BwslTokenTypes.KW_MODULE -> emptyArray()
                         prev != null && BWSL_TYPE_KEYWORDS.contains(prev) -> emptyArray()
+                        isAstTypeReference(element.containingFile, element.textOffset) ->
+                            arrayOf(BwslTypeReference(element))
+                        BwslAstCache.getRoot(element.containingFile.virtualFile?.path ?: "") == null && next == BwslTokenTypes.REFERENCE ->
+                            arrayOf(BwslTypeReference(element))
                         else -> arrayOf(BwslVariableReference(element))
                     }
                 }
@@ -61,6 +66,16 @@ fun previousNonWhitespace(element: PsiElement): PsiElement? {
             sibling.node.elementType == BwslTokenTypes.LINE_COMMENT ||
             sibling.node.elementType == BwslTokenTypes.BLOCK_COMMENT)) {
         sibling = sibling.prevSibling
+    }
+    return sibling
+}
+
+fun nextNonWhitespace(element: PsiElement): PsiElement? {
+    var sibling = element.nextSibling
+    while (sibling != null && (sibling.node.elementType == TokenType.WHITE_SPACE ||
+            sibling.node.elementType == BwslTokenTypes.LINE_COMMENT ||
+            sibling.node.elementType == BwslTokenTypes.BLOCK_COMMENT)) {
+        sibling = sibling.nextSibling
     }
     return sibling
 }

@@ -68,6 +68,12 @@ fun findDeclarationElement(file: PsiFile, fn: AstFunction): PsiElement? {
     return file.findElementAt(offset)
 }
 
+/** Resolves the PSI element at the position where an AST struct is declared. */
+fun findDeclarationElement(file: PsiFile, struct: AstStruct): PsiElement? {
+    val offset = offsetAt(file, struct.line, struct.column) ?: return null
+    return file.findElementAt(offset)
+}
+
 /** Finds the function (from the given scope) whose body range contains the given position. */
 fun findEnclosingFunction(root: AstRoot, scope: AstScope, line: Int, column: Int): AstFunction? =
     functionsInScope(root, scope).firstOrNull {

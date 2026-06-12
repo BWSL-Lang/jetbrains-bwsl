@@ -199,6 +199,53 @@ class BwslVariableReference(element: PsiElement) :
     override fun getVariants(): Array<Any> = emptyArray()
 }
 
+/**
+ * Returns true if [element] is part of a declared type written out in a VARIABLE_DECL, per the
+ * AST (e.g. "testStruct" or "LengthMethodTest"/"testStruct" in "LengthMethodTest::testStruct s1;").
+ * The AST gives each VARIABLE_DECL's declaredType string along with the (line, column) where that
+ * type text starts; [element]'s position must fall within that span.
+ */
+fun isAstTypeReference(file: PsiFile, offset: Int): Boolean {
+    val filePath = file.virtualFile?.path ?: return false
+    val root = BwslAstCache.getRoot(filePath) ?: return false
+    val (line, column) = lineColumnAt(file, offset) ?: return false
+    val scope = findScope(root, line, column)
+    val fn = findEnclosingFunction(root, scope, line, column) ?: return false
+    return collectVariableDecls(fn.body).any { decl ->
+        if (decl.declaredType.isBlank()) return@any false
+        val start = offsetAt(file, decl.line, decl.column) ?: return@any false
+        val end = start + decl.declaredType.length
+        offset in start until end
+    }
+}
+
+/**
+ * Resolves a type-name reference (e.g. "testStruct" or "LengthMethodTest::testStruct" in a
+ * variable declaration) to the AST struct declaration it names, using the enclosing AST scope
+ * to resolve unqualified names.
+ */
+class BwslTypeReference(element: PsiElement) :
+    PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
+
+    override fun resolve(): PsiElement? {
+        val name = element.text
+        val file = element.containingFile
+        val filePath = file.virtualFile?.path ?: return null
+        val root = BwslAstCache.getRoot(filePath) ?: return null
+        val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+        val scope = findScope(root, line, column)
+
+        val prev = previousNonWhitespace(element)
+        val qualifier = if (prev?.elementType == BwslTokenTypes.COLONCOLON) previousNonWhitespace(prev)?.text else null
+        val typeName = if (qualifier != null) "$qualifier::$name" else name
+
+        val struct = resolveStruct(root, scope, typeName) ?: return null
+        return findDeclarationElement(file, struct)
+    }
+
+    override fun getVariants(): Array<Any> = emptyArray()
+}
+
 class BwslModuleReference(element: PsiElement) :
     PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
 
