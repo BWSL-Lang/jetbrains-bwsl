@@ -41,8 +41,8 @@ module MathUtils {
     const float PI = 3.14159f;
     const uint MAX_SAMPLES = 64u;
 
-    dot :: (float3 a, float3 b) -> float {
-        return a.x * b.x + a.y * b.y + a.z * b.z;
+    luminance :: (float3 c) -> float {
+        return c.x * 0.2126f + c.y * 0.7152f + c.z * 0.0722f;
     }
 
     blend :: (float4 a, float4 b, float t) -> float4 {
@@ -98,6 +98,7 @@ pipeline PBR {
             float4 col     = albedo.sample(samp, uv);
             if (col.a < 0.01f) { discard; }
             float wave = sin(uv.x * PI) * cos(uv.y * PI);
+            float4 blended = MathUtils::blend(col, float4(n, 1.0f), 0.5f);
             color = blend(float4(n * 0.5f + 0.5f, 1.0f) * col, float4(wave), 0.1f);
         }
     }

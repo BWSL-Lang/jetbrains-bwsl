@@ -48,28 +48,15 @@ class BwslReferenceContributor : PsiReferenceContributor() {
                             arrayOf(BwslModuleReference(element))
                         prev == BwslTokenTypes.KW_MODULE -> emptyArray()
                         prev != null && BWSL_TYPE_KEYWORDS.contains(prev) -> emptyArray()
+                        // "Name" in "Name::Thing" / "Name::func(...)" is a module qualifier
+                        // (the lexer only emits FUNCTION_DECLARATION for "name :: (").
+                        next == BwslTokenTypes.COLONCOLON -> arrayOf(BwslModuleNameReference(element))
                         isAstTypeReference(element.containingFile, element.textOffset) ->
                             arrayOf(BwslTypeReference(element))
                         BwslAstCache.getRoot(element.containingFile.virtualFile?.path ?: "") == null && next == BwslTokenTypes.REFERENCE ->
                             arrayOf(BwslTypeReference(element))
                         else -> arrayOf(BwslVariableReference(element))
                     }
-                }
-            }
-        )
-
-        // An identifier immediately followed by "::" is lexed as FUNCTION_DECLARATION even when
-        // it's a module qualifier (e.g. "LengthMethodTest::testStruct" / "LengthMethodTest::test(...)"),
-        // not just for actual function declarations ("rotate :: (...)").
-        registrar.registerReferenceProvider(
-            PlatformPatterns.psiElement().withElementType(BwslTokenTypes.FUNCTION_DECLARATION),
-            object : PsiReferenceProvider() {
-                override fun getReferencesByElement(element: PsiElement, context: ProcessingContext): Array<PsiReference> {
-                    val colonColon = nextNonWhitespace(element)
-                    if (colonColon?.node?.elementType != BwslTokenTypes.COLONCOLON) return emptyArray()
-                    val afterColonColon = nextNonWhitespace(colonColon)
-                    if (afterColonColon?.node?.elementType == BwslTokenTypes.LPAREN) return emptyArray()
-                    return arrayOf(BwslModuleNameReference(element))
                 }
             }
         )

@@ -51,8 +51,12 @@ class BwslLexerAdapter : LexerBase() {
 
         val name = bufSeq.substring(raw.start, raw.end)
         val hasReceiver = prevSignificantType == BwslTokenTypes.DOT
-        current = when (nextNonWhitespace()?.type) {
-            BwslTokenTypes.COLONCOLON -> raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
+        current = when (nextNonWhitespace(0)?.type) {
+            // "name :: (" is a function declaration; "Name::Thing" / "Name::func(...)" is a
+            // module qualifier and "Name" should stay a plain identifier/reference.
+            BwslTokenTypes.COLONCOLON -> if (nextNonWhitespace(1)?.type == BwslTokenTypes.LPAREN)
+                                              raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
+                                          else raw
             BwslTokenTypes.LPAREN    -> raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
                                                             BwslTokenTypes.INTRINSIC_CALL
                                                         else BwslTokenTypes.FUNCTION_CALL)
@@ -60,8 +64,10 @@ class BwslLexerAdapter : LexerBase() {
         }
     }
 
-    private fun nextNonWhitespace(): Tok? {
+    /** Returns the (skip+1)-th non-whitespace token after the current position (0-based). */
+    private fun nextNonWhitespace(skip: Int): Tok? {
         var i = 0
+        var found = 0
         while (true) {
             while (queue.size <= i) {
                 val tok = drainFlex()
@@ -69,7 +75,10 @@ class BwslLexerAdapter : LexerBase() {
                 if (tok.type == null) return null
             }
             val tok = queue[i]
-            if (tok.type != TokenType.WHITE_SPACE) return tok
+            if (tok.type != TokenType.WHITE_SPACE) {
+                if (found == skip) return tok
+                found++
+            }
             i++
         }
     }

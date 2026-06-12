@@ -47,12 +47,6 @@ class BwslParserDefinition : ParserDefinition {
                 marker.done(BwslTokenTypes.CALL_EXPRESSION)
             } else if (type == BwslTokenTypes.IDENTIFIER) {
                 wrapAsReference()
-            } else if (type == BwslTokenTypes.FUNCTION_DECLARATION) {
-                // Wrap in a composite of the same type so it gets a BwslReferenceElement (leaf
-                // tokens bypass ParserDefinition.createElement and never delegate references).
-                val marker = builder.mark()
-                builder.advanceLexer()
-                marker.done(BwslTokenTypes.FUNCTION_DECLARATION)
             } else {
                 builder.advanceLexer()
             }
@@ -69,8 +63,7 @@ class BwslParserDefinition : ParserDefinition {
     override fun getCommentTokens(): TokenSet                        = COMMENTS
     override fun getStringLiteralElements(): TokenSet                = STRING_LITS
     override fun createElement(node: ASTNode): PsiElement =
-        if (node.elementType == BwslTokenTypes.REFERENCE || node.elementType == BwslTokenTypes.FUNCTION_DECLARATION)
-            BwslReferenceElement(node)
+        if (node.elementType == BwslTokenTypes.REFERENCE) BwslReferenceElement(node)
         else ASTWrapperPsiElement(node)
     override fun createFile(viewProvider: FileViewProvider): PsiFile = BwslFile(viewProvider)
 }
