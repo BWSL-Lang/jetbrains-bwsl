@@ -10,17 +10,19 @@ import javax.swing.Icon
 class BwslColorSettingsPage : ColorSettingsPage {
 
     private val descriptors = arrayOf(
-        AttributesDescriptor("Decorator//@flat, @location, @instance, …",          BwslSyntaxHighlighter.DECORATOR),
+        AttributesDescriptor("Decorator",          BwslSyntaxHighlighter.DECORATOR),
         AttributesDescriptor("Block keyword//pipeline, pass, vertex, fragment, …", BwslSyntaxHighlighter.BLOCK_KEYWORD),
         AttributesDescriptor("Function declaration",                               BwslSyntaxHighlighter.FUNCTION_DECLARATION),
-        AttributesDescriptor("Control flow keyword//if, return, for, import, …",   BwslSyntaxHighlighter.KEYWORD),
-        AttributesDescriptor("Type keyword//float3, mat4, texture2D, …",           BwslSyntaxHighlighter.TYPE_KEYWORD),
+        AttributesDescriptor("Control flow keyword",   BwslSyntaxHighlighter.KEYWORD),
+        AttributesDescriptor("Type keyword",           BwslSyntaxHighlighter.TYPE_KEYWORD),
         AttributesDescriptor("Number",                BwslSyntaxHighlighter.NUMBER),
         AttributesDescriptor("String",                BwslSyntaxHighlighter.STRING),
         AttributesDescriptor("Line comment",          BwslSyntaxHighlighter.LINE_COMMENT),
         AttributesDescriptor("Block comment",         BwslSyntaxHighlighter.BLOCK_COMMENT),
         AttributesDescriptor("Function call",          BwslSyntaxHighlighter.FUNCTION_CALL),
-        AttributesDescriptor("Intrinsic call//sin, cos, normalize, …", BwslSyntaxHighlighter.INTRINSIC),
+        AttributesDescriptor("Intrinsic call", BwslSyntaxHighlighter.INTRINSIC),
+        AttributesDescriptor("Module declaration",     BwslSyntaxHighlighter.MODULE_DECLARATION),
+        AttributesDescriptor("Module qualifier", BwslSyntaxHighlighter.MODULE_REFERENCE),
         AttributesDescriptor("Braces and Operators//Operator sign", BwslSyntaxHighlighter.OPERATOR),
         AttributesDescriptor("Braces and Operators//Braces",        BwslSyntaxHighlighter.BRACES),
         AttributesDescriptor("Braces and Operators//Brackets",      BwslSyntaxHighlighter.BRACKETS),

@@ -41,16 +41,19 @@ class BwslReferenceContributor : PsiReferenceContributor() {
                     if (innerType == BwslTokenTypes.INTRINSIC_CALL) {
                         return emptyArray()
                     }
+                    if (innerType == BwslTokenTypes.MODULE_QUALIFIER) {
+                        return arrayOf(BwslModuleNameReference(element))
+                    }
+                    if (innerType == BwslTokenTypes.MODULE_NAME) {
+                        // The declaration site of a module ("module <Name> { ... }") has no reference.
+                        return emptyArray()
+                    }
                     val prev = previousNonWhitespace(element)?.node?.elementType
                     val next = nextNonWhitespace(element)?.node?.elementType
                     return when {
                         prev == BwslTokenTypes.KW_IMPORT || prev == BwslTokenTypes.KW_USING ->
                             arrayOf(BwslModuleReference(element))
-                        prev == BwslTokenTypes.KW_MODULE -> emptyArray()
                         prev != null && BWSL_TYPE_KEYWORDS.contains(prev) -> emptyArray()
-                        // "Name" in "Name::Thing" / "Name::func(...)" is a module qualifier
-                        // (the lexer only emits FUNCTION_DECLARATION for "name :: (").
-                        next == BwslTokenTypes.COLONCOLON -> arrayOf(BwslModuleNameReference(element))
                         isAstTypeReference(element.containingFile, element.textOffset) ->
                             arrayOf(BwslTypeReference(element))
                         BwslAstCache.getRoot(element.containingFile.virtualFile?.path ?: "") == null && next == BwslTokenTypes.REFERENCE ->

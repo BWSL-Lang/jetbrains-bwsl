@@ -30,8 +30,10 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         @JvmField val DOT            = createTextAttributesKey("BWSL_DOT",            DefaultLanguageHighlighterColors.DOT)
         @JvmField val SEMICOLON      = createTextAttributesKey("BWSL_SEMICOLON",      DefaultLanguageHighlighterColors.SEMICOLON)
         @JvmField val FUNCTION_CALL  = createTextAttributesKey("BWSL_FUNCTION_CALL",  DefaultLanguageHighlighterColors.FUNCTION_CALL)
-        @JvmField val INTRINSIC      = createTextAttributesKey("BWSL_INTRINSIC",      DefaultLanguageHighlighterColors.FUNCTION_CALL)
+        @JvmField val INTRINSIC      = createTextAttributesKey("BWSL_INTRINSIC",      DefaultLanguageHighlighterColors.PREDEFINED_SYMBOL)
         @JvmField val IDENTIFIER     = createTextAttributesKey("BWSL_IDENTIFIER",     DefaultLanguageHighlighterColors.IDENTIFIER)
+        @JvmField val MODULE_DECLARATION = createTextAttributesKey("BWSL_MODULE_DECLARATION", DefaultLanguageHighlighterColors.CLASS_NAME)
+        @JvmField val MODULE_REFERENCE   = createTextAttributesKey("BWSL_MODULE_REFERENCE",   DefaultLanguageHighlighterColors.CLASS_REFERENCE)
         @JvmField val BAD_CHARACTER= createTextAttributesKey("BWSL_BAD_CHARACTER",HighlighterColors.BAD_CHARACTER)
 
         // pipeline, pass, vertex, fragment, attributes, resources, …
@@ -101,6 +103,8 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         private val FUNCTION_CALL_KEYS        = arrayOf(FUNCTION_CALL)
         private val INTRINSIC_KEYS            = arrayOf(INTRINSIC)
         private val IDENTIFIER_KEYS     = arrayOf(IDENTIFIER)
+        private val MODULE_DECLARATION_KEYS = arrayOf(MODULE_DECLARATION)
+        private val MODULE_REFERENCE_KEYS   = arrayOf(MODULE_REFERENCE)
         private val BAD_CHARACTER_KEYS = arrayOf(BAD_CHARACTER)
         private val EMPTY              = emptyArray<TextAttributesKey>()
     }
@@ -120,6 +124,8 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
         tokenType == BwslTokenTypes.FUNCTION_CALL        -> FUNCTION_CALL_KEYS
         tokenType == BwslTokenTypes.INTRINSIC_CALL -> INTRINSIC_KEYS
         tokenType == BwslTokenTypes.IDENTIFIER     -> IDENTIFIER_KEYS
+        tokenType == BwslTokenTypes.MODULE_NAME      -> MODULE_DECLARATION_KEYS
+        tokenType == BwslTokenTypes.MODULE_QUALIFIER -> MODULE_REFERENCE_KEYS
         tokenType == TokenType.BAD_CHARACTER  -> BAD_CHARACTER_KEYS
         tokenType == BwslTokenTypes.LBRACE || tokenType == BwslTokenTypes.RBRACE -> BRACES_KEYS
         tokenType == BwslTokenTypes.LBRACKET || tokenType == BwslTokenTypes.RBRACKET -> BRACKETS_KEYS

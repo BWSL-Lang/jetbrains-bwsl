@@ -45,7 +45,7 @@ class BwslParserDefinition : ParserDefinition {
                     if (!builder.eof()) builder.advanceLexer() // consume )
                 }
                 marker.done(BwslTokenTypes.CALL_EXPRESSION)
-            } else if (type == BwslTokenTypes.IDENTIFIER) {
+            } else if (type == BwslTokenTypes.IDENTIFIER || type == BwslTokenTypes.MODULE_NAME || type == BwslTokenTypes.MODULE_QUALIFIER) {
                 wrapAsReference()
             } else {
                 builder.advanceLexer()

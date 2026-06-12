@@ -51,15 +51,18 @@ class BwslLexerAdapter : LexerBase() {
 
         val name = bufSeq.substring(raw.start, raw.end)
         val hasReceiver = prevSignificantType == BwslTokenTypes.DOT
-        current = when (nextNonWhitespace(0)?.type) {
+        current = when {
+            prevSignificantType == BwslTokenTypes.KW_MODULE -> raw.copy(type = BwslTokenTypes.MODULE_NAME)
             // "name :: (" is a function declaration; "Name::Thing" / "Name::func(...)" is a
-            // module qualifier and "Name" should stay a plain identifier/reference.
-            BwslTokenTypes.COLONCOLON -> if (nextNonWhitespace(1)?.type == BwslTokenTypes.LPAREN)
-                                              raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
-                                          else raw
-            BwslTokenTypes.LPAREN    -> raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
-                                                            BwslTokenTypes.INTRINSIC_CALL
-                                                        else BwslTokenTypes.FUNCTION_CALL)
+            // module qualifier, "Name" should be tagged MODULE_QUALIFIER.
+            nextNonWhitespace(0)?.type == BwslTokenTypes.COLONCOLON ->
+                if (nextNonWhitespace(1)?.type == BwslTokenTypes.LPAREN)
+                    raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
+                else raw.copy(type = BwslTokenTypes.MODULE_QUALIFIER)
+            nextNonWhitespace(0)?.type == BwslTokenTypes.LPAREN ->
+                raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
+                                    BwslTokenTypes.INTRINSIC_CALL
+                                else BwslTokenTypes.FUNCTION_CALL)
             else -> raw
         }
     }
