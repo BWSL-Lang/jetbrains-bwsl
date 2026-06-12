@@ -4,6 +4,53 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class BwslReferenceTest : BasePlatformTestCase() {
 
+    fun testFunctionCallResolvesViaAstScopeNotTextProximity() {
+        // Two functions named "tonemap" in different pipeline passes - the parser's flat token
+        // tree has no notion of "pass" scoping, so only the AST (with its line/column ranges)
+        // can tell which one is in scope at the call site.
+        myFixture.configureByText(
+            "test.bwsl",
+            "pipeline P {\n" +
+                "    pass \"A\" {\n" +
+                "        tonemap :: () -> float { return 1.0; }\n" +
+                "    }\n" +
+                "    pass \"B\" {\n" +
+                "        tonemap :: () -> float { return 2.0; }\n" +
+                "        other :: () -> float { return tone<caret>map(); }\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val filePath = myFixture.file.virtualFile.path
+        BwslAstCache.update(filePath, AstRoot(
+            root = AstRootNode(
+                line = 1, column = 1, endLine = 9, endColumn = 2,
+                passes = listOf(
+                    AstPass(
+                        name = "A", line = 2, column = 5, endLine = 4, endColumn = 6,
+                        functions = listOf(AstFunction("tonemap", emptyList(), "float", line = 3, column = 9, endLine = 3, endColumn = 47))
+                    ),
+                    AstPass(
+                        name = "B", line = 5, column = 5, endLine = 8, endColumn = 6,
+                        functions = listOf(
+                            AstFunction("tonemap", emptyList(), "float", line = 6, column = 9, endLine = 6, endColumn = 47),
+                            AstFunction("other", emptyList(), "float", line = 7, column = 9, endLine = 7, endColumn = 53)
+                        )
+                    )
+                )
+            )
+        ))
+
+        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        assertEquals(BwslTokenTypes.FUNCTION_CALL, element.node.elementType)
+        val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
+
+        assertNotNull("Expected 'tonemap' call to resolve to a declaration", resolved)
+        assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, resolved!!.node.elementType)
+        assertEquals("tonemap", resolved.text)
+        assertEquals(offsetAt(myFixture.file, 6, 9), resolved.textOffset)
+    }
+
     fun testQualifiedFunctionCallNavigatesToModuleLevelDeclarationOnly() {
         myFixture.configureByText(
             "test.bwsl",

@@ -57,7 +57,7 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
             }
             val functions = root.allFunctions()
             log.warn("bwslc -ast-json parsed for ${info.filePath}: modules=${root.modules.size} functions=${functions.map { it.name }}")
-            BwslAstCache.update(info.filePath, functions)
+            BwslAstCache.update(info.filePath, root)
             return true
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${info.filePath}", e)
