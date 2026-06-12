@@ -51,15 +51,20 @@ private fun walkScopes(file: PsiFile, until: Int? = null, onFunctionDeclaration:
  * line/column ranges), rather than tree-walking the PSI. Returns an empty list if no AST is cached
  * for this file, letting callers fall back to a text-based search.
  */
-private fun resolveViaAst(file: PsiFile, callOffset: Int, name: String, qualifier: String?): List<PsiElement> {
+private fun resolveViaAst(file: PsiFile, callOffset: Int, name: String, qualifier: String?, receiver: String?): List<PsiElement> {
     val filePath = file.virtualFile?.path ?: return emptyList()
     val root = BwslAstCache.getRoot(filePath) ?: return emptyList()
+    val (line, column) = lineColumnAt(file, callOffset) ?: return emptyList()
+    val scope = findScope(root, line, column)
 
-    val candidates: List<AstFunction> = if (qualifier != null) {
+    val candidates: List<AstFunction> = if (receiver != null) {
+        val enclosingFn = findEnclosingFunction(root, scope, line, column) ?: return emptyList()
+        val declaredType = findVariableType(enclosingFn, receiver, line, column) ?: return emptyList()
+        val struct = resolveStruct(root, scope, declaredType) ?: return emptyList()
+        struct.methods.filter { it.name == name }
+    } else if (qualifier != null) {
         root.modules.firstOrNull { it.name == qualifier }?.functions?.filter { it.name == name } ?: emptyList()
     } else {
-        val (line, column) = lineColumnAt(file, callOffset) ?: return emptyList()
-        val scope = findScope(root, line, column)
         functionsInScope(root, scope).filter { it.name == name }
     }
 
@@ -91,8 +96,9 @@ class BwslFunctionReference(element: PsiElement) :
         val refOrCallExprEarly = if (element.parent?.elementType == BwslTokenTypes.CALL_EXPRESSION) element.parent else element
         val prevEarly = previousNonWhitespace(refOrCallExprEarly)
         val qualifierEarly = if (prevEarly?.elementType == BwslTokenTypes.COLONCOLON) previousNonWhitespace(prevEarly)?.text else null
+        val receiverEarly = if (prevEarly?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prevEarly)?.text else null
 
-        val astResults = resolveViaAst(file, element.textOffset, name, qualifierEarly)
+        val astResults = resolveViaAst(file, element.textOffset, name, qualifierEarly, receiverEarly)
         if (astResults.isNotEmpty()) {
             return astResults.map { PsiElementResolveResult(it) as ResolveResult }.toTypedArray()
         }

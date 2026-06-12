@@ -5,6 +5,15 @@ import java.util.concurrent.ConcurrentHashMap
 data class BwslFunctionSignature(val name: String, val params: List<String>, val returnType: String = "")
 
 data class AstParam(val name: String, val type: String)
+data class AstStatement(
+    val type: String = "",
+    val name: String = "",
+    val declaredType: String = "",
+    val line: Int = 0,
+    val column: Int = 0,
+    val body: AstBlock? = null
+)
+data class AstBlock(val statements: List<AstStatement> = emptyList())
 data class AstFunction(
     val name: String,
     val parameters: List<AstParam>,
@@ -12,7 +21,8 @@ data class AstFunction(
     val line: Int = 0,
     val column: Int = 0,
     val endLine: Int = 0,
-    val endColumn: Int = 0
+    val endColumn: Int = 0,
+    val body: AstBlock? = null
 )
 data class AstStruct(
     val name: String = "",

@@ -4,6 +4,79 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class BwslReferenceTest : BasePlatformTestCase() {
 
+    fun testReceiverMethodCallResolvesViaVariableType() {
+        // s1 and s2 both call test(), but their declared types point to different structs
+        // (in different modules) - only the AST's variable-type info can disambiguate.
+        myFixture.configureByText(
+            "test.bwsl",
+            "module LengthMethodTest {\n" +
+                "    struct testStruct {\n" +
+                "        test :: () -> float {\n" +
+                "            return 1.0;\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "module LengthTest2 {\n" +
+                "    struct testStruct {\n" +
+                "        test :: () -> int {\n" +
+                "            return 2;\n" +
+                "        }\n" +
+                "    }\n" +
+                "    test3 :: () -> void {\n" +
+                "        LengthMethodTest::testStruct s1;\n" +
+                "        testStruct s2;\n" +
+                "        s1.test();\n" +
+                "        s2.test();\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val test3 = AstFunction(
+            "test3", emptyList(), "void", line = 14, column = 5, endLine = 19, endColumn = 6,
+            body = AstBlock(listOf(
+                AstStatement(type = "VARIABLE_DECL", name = "s1", declaredType = "LengthMethodTest::testStruct", line = 15, column = 9),
+                AstStatement(type = "VARIABLE_DECL", name = "s2", declaredType = "testStruct", line = 16, column = 9)
+            ))
+        )
+
+        val filePath = myFixture.file.virtualFile.path
+        BwslAstCache.update(filePath, AstRoot(
+            modules = listOf(
+                AstModule(
+                    name = "LengthMethodTest", line = 1, column = 1, endLine = 7, endColumn = 2,
+                    structs = listOf(AstStruct(
+                        name = "testStruct", line = 2, column = 5, endLine = 6, endColumn = 6,
+                        methods = listOf(AstFunction("test", emptyList(), "float", line = 3, column = 9, endLine = 5, endColumn = 10))
+                    ))
+                ),
+                AstModule(
+                    name = "LengthTest2", line = 8, column = 1, endLine = 20, endColumn = 2,
+                    structs = listOf(AstStruct(
+                        name = "testStruct", line = 9, column = 5, endLine = 13, endColumn = 6,
+                        methods = listOf(AstFunction("test", emptyList(), "int", line = 10, column = 9, endLine = 12, endColumn = 10))
+                    )),
+                    functions = listOf(test3)
+                )
+            )
+        ))
+
+        val s1TestOffset = myFixture.file.text.indexOf("s1.test();") + "s1.".length
+        val s2TestOffset = myFixture.file.text.indexOf("s2.test();") + "s2.".length
+
+        val s1Element = myFixture.file.findElementAt(s1TestOffset)!!
+        val s1Resolved = s1Element.parent.references.firstNotNullOfOrNull { it.resolve() }
+        assertNotNull("Expected s1.test() to resolve", s1Resolved)
+        assertEquals(offsetAt(myFixture.file, 3, 9), s1Resolved!!.textOffset)
+
+        val s2Element = myFixture.file.findElementAt(s2TestOffset)!!
+        val s2Resolved = s2Element.parent.references.firstNotNullOfOrNull { it.resolve() }
+        assertNotNull("Expected s2.test() to resolve", s2Resolved)
+        assertEquals(offsetAt(myFixture.file, 10, 9), s2Resolved!!.textOffset)
+
+        assertTrue("s1.test() and s2.test() should resolve to different declarations",
+            s1Resolved.textOffset != s2Resolved.textOffset)
+    }
+
     fun testFunctionCallResolvesViaAstScopeNotTextProximity() {
         // Two functions named "tonemap" in different pipeline passes - the parser's flat token
         // tree has no notion of "pass" scoping, so only the AST (with its line/column ranges)

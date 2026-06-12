@@ -22,6 +22,9 @@ fun offsetAt(file: PsiFile, line: Int, column: Int): Int? {
     return doc.getLineStartOffset(line - 1) + (column - 1)
 }
 
+fun astContains(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean =
+    contains(line, column, startLine, startColumn, endLine, endColumn)
+
 private fun contains(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean {
     if (line < startLine || line > endLine) return false
     if (line == startLine && column < startColumn) return false
@@ -63,4 +66,41 @@ fun functionsInScope(root: AstRoot, scope: AstScope): List<AstFunction> {
 fun findDeclarationElement(file: PsiFile, fn: AstFunction): PsiElement? {
     val offset = offsetAt(file, fn.line, fn.column) ?: return null
     return file.findElementAt(offset)
+}
+
+/** Finds the function (from the given scope) whose body range contains the given position. */
+fun findEnclosingFunction(root: AstRoot, scope: AstScope, line: Int, column: Int): AstFunction? =
+    functionsInScope(root, scope).firstOrNull {
+        astContains(line, column, it.line, it.column, it.endLine, it.endColumn)
+    }
+
+/** Recursively collects all VARIABLE_DECL statements within a block, including nested blocks (if/for/etc). */
+private fun collectVariableDecls(block: AstBlock?): List<AstStatement> {
+    if (block == null) return emptyList()
+    return block.statements.flatMap { stmt ->
+        val self = if (stmt.type == "VARIABLE_DECL") listOf(stmt) else emptyList()
+        self + collectVariableDecls(stmt.body)
+    }
+}
+
+/**
+ * Finds the declared type of a local variable visible at the given position within [fn],
+ * preferring the declaration closest to (but before) that position.
+ */
+fun findVariableType(fn: AstFunction, name: String, line: Int, column: Int): String? =
+    collectVariableDecls(fn.body)
+        .filter { it.name == name && (it.line < line || (it.line == line && it.column <= column)) }
+        .maxWithOrNull(compareBy({ it.line }, { it.column }))
+        ?.declaredType
+        ?.takeIf { it.isNotBlank() }
+
+/** Resolves a (possibly module-qualified, e.g. "Module::Struct") type name to its struct declaration. */
+fun resolveStruct(root: AstRoot, scope: AstScope, typeName: String): AstStruct? {
+    val parts = typeName.split("::")
+    return if (parts.size == 2) {
+        root.modules.firstOrNull { it.name == parts[0] }?.structs?.firstOrNull { it.name == parts[1] }
+    } else {
+        scope.module?.structs?.firstOrNull { it.name == typeName }
+            ?: root.root?.structs?.firstOrNull { it.name == typeName }
+    }
 }

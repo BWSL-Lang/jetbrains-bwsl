@@ -35,12 +35,19 @@ module LengthMethodTest {
 }
 
 module LengthTest2 {
+    struct testStruct {
+        test :: () -> int {
+            return 4; // a random number.
+        }
+    }
     test2 :: () -> float {
         float[5] values;
         return LengthMethodTest::test(values);
     }
     test3 :: () -> void {
-        LengthMethodTest::testStruct s;
-        s.test();
+        LengthMethodTest::testStruct s1;
+        testStruct s2;
+        s1.test();
+        s2.test();
     }
 }
