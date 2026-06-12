@@ -21,7 +21,8 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         val nameToken = callExpr.firstChild?.firstChild ?: return null
         val name = nameToken.text
         val tokenType = nameToken.node.elementType
-        val signatures = findSignatures(context.file, name, tokenType)
+        val hasReceiver = previousNonWhitespace(callExpr)?.node?.elementType == BwslTokenTypes.DOT
+        val signatures = findSignatures(context.file, name, tokenType, hasReceiver)
         log.warn("findElementForParameterInfo: name=$name tokenType=$tokenType signatures=${signatures.size} cacheKeys=${BwslAstCache.keys()}")
         if (signatures.isEmpty()) return null
         context.itemsToShow = signatures.toTypedArray()
@@ -57,7 +58,8 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
     fun signaturesAt(file: PsiFile, offset: Int): List<BwslFunctionSignature> {
         val callExpr = findEnclosingCallExpression(file, offset) ?: return emptyList()
         val nameToken = callExpr.firstChild?.firstChild ?: return emptyList()
-        return findSignatures(file, nameToken.text, nameToken.node.elementType)
+        val hasReceiver = previousNonWhitespace(callExpr)?.node?.elementType == BwslTokenTypes.DOT
+        return findSignatures(file, nameToken.text, nameToken.node.elementType, hasReceiver)
     }
 
     fun findEnclosingCallExpression(file: PsiFile, offset: Int): PsiElement? {
@@ -71,8 +73,11 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         return null
     }
 
-    fun findSignatures(file: PsiFile, name: String, tokenType: com.intellij.psi.tree.IElementType): List<BwslFunctionSignature> {
+    fun findSignatures(file: PsiFile, name: String, tokenType: com.intellij.psi.tree.IElementType, hasReceiver: Boolean = false): List<BwslFunctionSignature> {
         if (tokenType == BwslTokenTypes.INTRINSIC_CALL) {
+            if (hasReceiver && name == "length") {
+                return listOf(BwslFunctionSignature("length", emptyList(), "int"))
+            }
             return BwslIntrinsics.ALL.filter { it.name == name }.map { fn ->
                 BwslFunctionSignature(fn.name, fn.params.map { "${it.type} ${it.name}" }, fn.returnType)
             }

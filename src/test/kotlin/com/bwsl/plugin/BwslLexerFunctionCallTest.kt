@@ -39,12 +39,32 @@ class BwslLexerFunctionCallTest {
     @Test
     fun cosAndSinAreIntrinsicCalls() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
-        val intrinsics = tokens.filter { it.text == "cos" || it.text == "sin" }
+        val intrinsics = tokens.filter { (it.text == "cos" || it.text == "sin") && it.line != 23 }
         assertNotNull(intrinsics.firstOrNull()) { "Expected cos/sin tokens in file" }
         intrinsics.forEach { token ->
             assertEquals(BwslTokenTypes.INTRINSIC_CALL, token.type) {
                 "'${token.text}' on line ${token.line} should be INTRINSIC_CALL"
             }
+        }
+    }
+
+    @Test
+    fun methodCallOnReceiverIsNotAnIntrinsic() {
+        val tokens = tokenizeResource("lexer_test_files/module.bwsl")
+        val cosCall = tokens.firstOrNull { it.line == 23 && it.text == "cos" }
+        assertNotNull(cosCall) { "Expected 'cos' token on line 23" }
+        assertEquals(BwslTokenTypes.FUNCTION_CALL, cosCall!!.type) {
+            "'cos' on line 23 (values.cos()) should be FUNCTION_CALL, not INTRINSIC_CALL"
+        }
+    }
+
+    @Test
+    fun lengthCallOnArrayReceiverIsStillAnIntrinsic() {
+        val tokens = tokenizeResource("lexer_test_files/module.bwsl")
+        val lengthCall = tokens.firstOrNull { it.line == 22 && it.text == "length" }
+        assertNotNull(lengthCall) { "Expected 'length' token on line 22" }
+        assertEquals(BwslTokenTypes.INTRINSIC_CALL, lengthCall!!.type) {
+            "'length' on line 22 (values.length()) should remain INTRINSIC_CALL"
         }
     }
 

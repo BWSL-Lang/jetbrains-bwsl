@@ -23,6 +23,8 @@ class BwslLexerAdapter : LexerBase() {
 
     private data class Tok(val type: IElementType?, val start: Int, val end: Int)
 
+    private var prevSignificantType: IElementType? = null
+
     override fun start(buffer: CharSequence, startOffset: Int, endOffset: Int, initialState: Int) {
         bufSeq = buffer
         bufEnd = endOffset
@@ -40,13 +42,18 @@ class BwslLexerAdapter : LexerBase() {
     override fun getBufferEnd(): Int = bufEnd
 
     override fun advance() {
+        if (current.type != null && current.type != TokenType.WHITE_SPACE) {
+            prevSignificantType = current.type
+        }
+
         val raw = dequeue()
         if (raw.type != BwslTokenTypes.IDENTIFIER) { current = raw; return }
 
         val name = bufSeq.substring(raw.start, raw.end)
+        val hasReceiver = prevSignificantType == BwslTokenTypes.DOT
         current = when (nextNonWhitespace()?.type) {
             BwslTokenTypes.COLONCOLON -> raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
-            BwslTokenTypes.LPAREN    -> raw.copy(type = if (name in INTRINSIC_NAMES)
+            BwslTokenTypes.LPAREN    -> raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
                                                             BwslTokenTypes.INTRINSIC_CALL
                                                         else BwslTokenTypes.FUNCTION_CALL)
             else -> raw

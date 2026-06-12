@@ -15,3 +15,32 @@ module Test1 {
         return rotate(pos, float2(0), 3.14*0.5);
     }
 }
+
+module LengthMethodTest {
+    test :: (float[5] values) -> float {
+        float sum = 0.0;
+        for (int i = 0; i < values.length(); i++) {
+            values.cos();
+            sum += values[i];
+        }
+        return sum + length(vec3(1, 2, 3));
+    }
+    struct testStruct {
+        float m1;
+        int m2;
+        test :: () -> float {
+            return m1 + float(m2);
+        }
+    }
+}
+
+module LengthTest2 {
+    test2 :: () -> float {
+        float[5] values;
+        return LengthMethodTest::test(values);
+    }
+    test3 :: () -> void {
+        LengthMethodTest::testStruct s;
+        s.test();
+    }
+}
