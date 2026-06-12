@@ -4,6 +4,40 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class BwslReferenceTest : BasePlatformTestCase() {
 
+    fun testQualifiedFunctionCallNavigatesToModuleLevelDeclarationOnly() {
+        myFixture.configureByText(
+            "test.bwsl",
+            "module LengthMethodTest {\n" +
+                "    test :: (float[5] values) -> float {\n" +
+                "        return 1.0;\n" +
+                "    }\n" +
+                "    struct testStruct {\n" +
+                "        test :: () -> float {\n" +
+                "            return 2.0;\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "module LengthTest2 {\n" +
+                "    test2 :: () -> float {\n" +
+                "        float[5] values;\n" +
+                "        return LengthMethodTest::tes<caret>t(values);\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val references = element.parent.references
+        val resolved = references.firstNotNullOfOrNull { (it as? com.intellij.psi.PsiPolyVariantReference)?.multiResolve(false) }
+
+        assertNotNull("Expected exactly one resolve target", resolved)
+        assertEquals(1, resolved!!.size)
+        val target = resolved[0].element!!
+        assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, target.node.elementType)
+        assertEquals("test", target.text)
+        assertTrue("Resolved declaration should be the module-level 'test', not the struct method",
+            target.textOffset < myFixture.file.text.indexOf("struct testStruct"))
+    }
+
     fun testFunctionCallNavigatesToDeclaration() {
         myFixture.configureByText(
             "test.bwsl",

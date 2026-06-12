@@ -10,9 +10,41 @@ import com.intellij.psi.PsiReferenceBase
 import com.intellij.psi.ResolveResult
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.elementType
-import com.intellij.util.SmartList
 import java.io.File
+
+private data class ScopeFrame(val kind: IElementType, val name: String)
+
+private fun walkScopes(file: PsiFile, until: Int? = null, onFunctionDeclaration: (PsiElement, List<ScopeFrame>) -> Unit = { _, _ -> }): List<ScopeFrame> {
+    val stack = mutableListOf<ScopeFrame>()
+    var pendingFrame: IElementType? = null
+    var pendingName: String? = null
+    var child = file.firstChild
+    while (child != null && (until == null || child.textOffset < until)) {
+        when (child.elementType) {
+            BwslTokenTypes.KW_MODULE, BwslTokenTypes.KW_STRUCT -> {
+                pendingFrame = child.elementType
+                pendingName = null
+            }
+            BwslTokenTypes.REFERENCE -> if (pendingFrame != null && pendingName == null) {
+                pendingName = child.text
+            }
+            BwslTokenTypes.LBRACE -> {
+                val frame = pendingFrame
+                val name = pendingName
+                if (frame != null && name != null) stack.add(ScopeFrame(frame, name))
+                pendingFrame = null
+                pendingName = null
+            }
+            BwslTokenTypes.RBRACE -> if (stack.isNotEmpty()) stack.removeAt(stack.size - 1)
+            BwslTokenTypes.FUNCTION_DECLARATION -> onFunctionDeclaration(child, stack.toList())
+            else -> {}
+        }
+        child = child.nextSibling
+    }
+    return stack.toList()
+}
 
 private fun fileLeaves(file: PsiFile): Sequence<PsiElement> = sequence {
     fun visit(element: PsiElement): Sequence<PsiElement> = sequence {
@@ -34,13 +66,30 @@ class BwslFunctionReference(element: PsiElement) :
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
         val name = element.text
-        val results = SmartList<ResolveResult>()
-        for (leaf in fileLeaves(element.containingFile)) {
-            if (leaf.elementType == BwslTokenTypes.FUNCTION_DECLARATION && leaf.text == name) {
-                results.add(PsiElementResolveResult(leaf))
-            }
+        val file = element.containingFile
+
+        val matches = mutableListOf<Pair<PsiElement, List<ScopeFrame>>>()
+        val callerContext = walkScopes(file, element.textOffset) { decl, context ->
+            if (decl.text == name) matches.add(decl to context)
         }
-        return results.toTypedArray()
+
+        val refOrCallExpr = if (element.parent?.elementType == BwslTokenTypes.CALL_EXPRESSION) element.parent else element
+        val prev = previousNonWhitespace(refOrCallExpr)
+        val qualifier = if (prev?.elementType == BwslTokenTypes.COLONCOLON) previousNonWhitespace(prev)?.text else null
+
+        val selected = if (qualifier != null) {
+            matches.filter { (_, context) -> context.size == 1 && context[0].name == qualifier }
+        } else {
+            var m = matches.filter { (_, context) -> context == callerContext }
+            if (m.isEmpty() && callerContext.isNotEmpty()) {
+                val moduleContext = listOf(callerContext[0])
+                m = matches.filter { (_, context) -> context == moduleContext }
+            }
+            if (m.isEmpty()) m = matches
+            m
+        }
+
+        return selected.map { (decl, _) -> PsiElementResolveResult(decl) as ResolveResult }.toTypedArray()
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
