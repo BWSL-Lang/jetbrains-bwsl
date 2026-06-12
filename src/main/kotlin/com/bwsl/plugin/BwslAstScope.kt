@@ -3,6 +3,7 @@ package com.bwsl.plugin
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.elementType
 
 data class AstScope(val module: AstModule?, val struct: AstStruct?, val pass: AstPass?)
 
@@ -72,6 +73,14 @@ fun findDeclarationElement(file: PsiFile, fn: AstFunction): PsiElement? {
 fun findDeclarationElement(file: PsiFile, struct: AstStruct): PsiElement? {
     val offset = offsetAt(file, struct.line, struct.column) ?: return null
     return file.findElementAt(offset)
+}
+
+/** Resolves the PSI element for an AST module's name (the identifier following "module"). */
+fun findModuleNameElement(file: PsiFile, module: AstModule): PsiElement? {
+    val kwOffset = offsetAt(file, module.line, module.column) ?: return null
+    val kw = file.findElementAt(kwOffset) ?: return null
+    val next = nextNonWhitespace(kw) ?: return null
+    return if (next.elementType == BwslTokenTypes.REFERENCE) next.firstChild else next
 }
 
 /** Finds the function (from the given scope) whose body range contains the given position. */

@@ -246,6 +246,31 @@ class BwslTypeReference(element: PsiElement) :
     override fun getVariants(): Array<Any> = emptyArray()
 }
 
+/**
+ * Resolves a module-name qualifier (e.g. "LengthMethodTest" in "LengthMethodTest::testStruct" or
+ * "LengthMethodTest::test(...)") to that module's declaration. Prefers a module declared in the
+ * same file (via the AST); falls back to a cross-file module lookup by filename, like
+ * [BwslModuleReference].
+ */
+class BwslModuleNameReference(element: PsiElement) :
+    PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
+
+    override fun resolve(): PsiElement? {
+        val name = element.text
+        val file = element.containingFile
+        val filePath = file.virtualFile?.path
+        val root = filePath?.let { BwslAstCache.getRoot(it) }
+
+        root?.modules?.firstOrNull { it.name == name }?.let { module ->
+            findModuleNameElement(file, module)?.let { return it }
+        }
+
+        return BwslModuleReference(element).resolve()
+    }
+
+    override fun getVariants(): Array<Any> = emptyArray()
+}
+
 class BwslModuleReference(element: PsiElement) :
     PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
 

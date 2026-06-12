@@ -1,6 +1,7 @@
 package com.bwsl.plugin
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.psi.util.elementType
 
 class BwslReferenceTest : BasePlatformTestCase() {
 
@@ -75,6 +76,53 @@ class BwslReferenceTest : BasePlatformTestCase() {
 
         assertTrue("s1.test() and s2.test() should resolve to different declarations",
             s1Resolved.textOffset != s2Resolved.textOffset)
+    }
+
+    fun testModuleQualifierNavigatesToModuleDeclaration() {
+        myFixture.configureByText(
+            "test.bwsl",
+            "module LengthMethodTest {\n" +
+                "    struct testStruct {\n" +
+                "        test :: () -> float {\n" +
+                "            return 1.0;\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "module LengthTest2 {\n" +
+                "    test3 :: () -> void {\n" +
+                "        Length<caret>MethodTest::testStruct s1;\n" +
+                "    }\n" +
+                "}"
+        )
+
+        val test3 = AstFunction(
+            "test3", emptyList(), "void", line = 9, column = 5, endLine = 11, endColumn = 6,
+            body = AstBlock(listOf(
+                AstStatement(type = "VARIABLE_DECL", name = "s1", declaredType = "LengthMethodTest::testStruct", line = 10, column = 9)
+            ))
+        )
+        val lengthMethodTestModule = AstModule(
+            name = "LengthMethodTest", line = 1, column = 1, endLine = 7, endColumn = 2,
+            structs = listOf(AstStruct(
+                name = "testStruct", line = 2, column = 5, endLine = 6, endColumn = 6,
+                methods = listOf(AstFunction("test", emptyList(), "float", line = 3, column = 9, endLine = 5, endColumn = 10))
+            ))
+        )
+
+        val filePath = myFixture.file.virtualFile.path
+        BwslAstCache.update(filePath, AstRoot(
+            modules = listOf(
+                lengthMethodTestModule,
+                AstModule(name = "LengthTest2", line = 8, column = 1, endLine = 12, endColumn = 2, functions = listOf(test3))
+            )
+        ))
+
+        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
+
+        assertNotNull("Expected 'LengthMethodTest' qualifier to resolve", resolved)
+        assertEquals("LengthMethodTest", resolved!!.text)
+        assertEquals(offsetAt(myFixture.file, 1, 8), resolved.textOffset)
     }
 
     fun testFunctionCallResolvesViaAstScopeNotTextProximity() {
