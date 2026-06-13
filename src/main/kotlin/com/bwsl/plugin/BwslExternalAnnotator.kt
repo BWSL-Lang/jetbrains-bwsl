@@ -30,12 +30,12 @@ data class CompilerOutput(
 class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
 
     override fun collectInformation(file: PsiFile): String? {
-        if (BwslSettings.getInstance().compilerPath.isBlank()) return null
+        if (resolveCompilerPath() == null) return null
         return file.text
     }
 
     override fun doAnnotate(fileContent: String): List<Diagnostic> {
-        val compilerPath = BwslSettings.getInstance().compilerPath
+        val compilerPath = resolveCompilerPath() ?: return emptyList()
         val tempFile = Files.createTempFile("bwsl_", ".bwsl").toFile()
         try {
             tempFile.writeText(fileContent)
@@ -72,6 +72,14 @@ class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
                 .range(range)
                 .create()
         }
+    }
+
+    /** The configured compiler path, falling back to a previously downloaded copy if present. */
+    private fun resolveCompilerPath(): String? {
+        val configured = BwslSettings.getInstance().compilerPath
+        if (configured.isNotBlank()) return configured
+        val downloaded = BwslCompilerDownloader.installPath()
+        return if (downloaded.toFile().exists()) downloaded.toString() else null
     }
 }
 

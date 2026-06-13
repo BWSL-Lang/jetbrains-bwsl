@@ -2,8 +2,10 @@ package com.bwsl.plugin
 
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
@@ -56,11 +58,25 @@ class BwslSettingsConfigurable : Configurable {
         return panel {
             row("Compiler path:") {
                 @Suppress("UnstableApiUsage")
-                textFieldWithBrowseButton(
+                val field = textFieldWithBrowseButton(
                     FileChooserDescriptor(true, false, false, false, false, false)
                         .withTitle("Select BWSL Compiler"),
                     project
                 ).bindText(settings::compilerPath)
+                button("Download Latest...") {
+                    val installed = try {
+                        ProgressManager.getInstance().runProcessWithProgressSynchronously<java.nio.file.Path, Exception>(
+                            { BwslCompilerDownloader.downloadLatest() },
+                            "Downloading bwslc compiler",
+                            true,
+                            project
+                        )
+                    } catch (e: Exception) {
+                        Messages.showErrorDialog(project, "Failed to download bwslc: ${e.message}", "BWSL")
+                        return@button
+                    }
+                    field.component.text = installed.toString()
+                }
             }
             row("Output format:") {
                 cell(formatCombo!!)

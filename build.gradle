@@ -109,9 +109,26 @@ tasks.register('fetchBwslTests') {
 
 processTestResources.dependsOn fetchBwslTests
 
+tasks.register('fetchBwslCompiler', JavaExec) {
+    def osName = System.getProperty('os.name').toLowerCase()
+    def extension = osName.contains('win') ? '.exe' : ''
+    def outputFile = new File(layout.buildDirectory.dir('bwslc').get().asFile, "bwslc$extension")
+
+    dependsOn 'classes'
+    outputs.file(outputFile)
+    onlyIf { !outputFile.exists() }
+
+    classpath = sourceSets.main.runtimeClasspath + configurations.compileClasspath
+    mainClass = 'com.bwsl.plugin.BwslCompilerDownloaderKt'
+    args = [outputFile.absolutePath]
+}
+
 test {
+    dependsOn fetchBwslCompiler
     useJUnitPlatform()
     systemProperty 'bwsl.test.subdirs', bwslTestSubdirs.join(',')
+    systemProperty 'bwslc.path', new File(layout.buildDirectory.dir('bwslc').get().asFile,
+        "bwslc${System.getProperty('os.name').toLowerCase().contains('win') ? '.exe' : ''}").absolutePath
     systemProperty 'java.util.logging.config.file', file('src/test/resources/test-log.properties').canonicalPath
     testLogging {
         showStandardStreams = true

@@ -8,7 +8,8 @@ import java.util.concurrent.TimeUnit
 
 /** Shells out to the real bwslc compiler to produce an [AstRoot] for a snippet of BWSL source. */
 object BwslcAstHelper {
-    private const val COMPILER_PATH = "C:\\Users\\lundis\\BWSL\\BWSL\\build\\bwslc.exe"
+    private val COMPILER_PATH = System.getProperty("bwslc.path")
+        ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
 
     fun parse(source: String): AstRoot {
         val tempFile = Files.createTempFile("bwsl_ast_test_", ".bwsl").toFile()
