@@ -64,7 +64,7 @@
 
         <psi.referenceContributor
             language="BWSL"
-            implementation="com.bwsl.plugin.BwslReferenceContributor"/>
+            implementation="com.bwsl.plugin.references.BwslReferenceContributor"/>
 
         <codeInsight.parameterInfo
             language="BWSL"
@@ -76,7 +76,7 @@
 
         <completion.contributor
             language="BWSL"
-            implementationClass="com.bwsl.plugin.BwslCompletionContributor"/>
+            implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>
 
     </extensions>
 

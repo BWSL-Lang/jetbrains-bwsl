@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.completion
+
+import com.bwsl.plugin.*
 
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters

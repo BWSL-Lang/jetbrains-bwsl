@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.completion
+
+import com.bwsl.plugin.*
 
 /** Completion tests for the file's root (top-level) scope, outside any module/pipeline. */
 class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {

@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.completion
+
+import com.bwsl.plugin.*
 
 import com.google.gson.Gson
 import java.nio.file.Files

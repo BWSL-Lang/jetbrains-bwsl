@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.references
+
+import com.bwsl.plugin.*
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.psi.util.elementType

@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.references
+
+import com.bwsl.plugin.*
 
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiReferenceContributor

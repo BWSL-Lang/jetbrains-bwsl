@@ -1,4 +1,6 @@
-package com.bwsl.plugin
+package com.bwsl.plugin.completion
+
+import com.bwsl.plugin.*
 
 /** Completion tests for positions inside a `module { ... }` block. */
 class BwslCompletionModuleTest : BwslCompletionScopeTestCase() {

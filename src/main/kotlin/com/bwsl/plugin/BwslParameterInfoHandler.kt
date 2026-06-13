@@ -1,4 +1,6 @@
 package com.bwsl.plugin
+import com.bwsl.plugin.references.nextNonWhitespace
+import com.bwsl.plugin.references.previousNonWhitespace
 
 import com.intellij.lang.parameterInfo.CreateParameterInfoContext
 import com.intellij.lang.parameterInfo.ParameterInfoHandler
