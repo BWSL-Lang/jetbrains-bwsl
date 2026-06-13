@@ -82,9 +82,21 @@ test {
     useJUnitPlatform()
     systemProperty 'bwslc.path', new File(layout.buildDirectory.dir('bwslc').get().asFile,
         "bwslc${System.getProperty('os.name').toLowerCase().contains('win') ? '.exe' : ''}").absolutePath
-    systemProperty 'java.util.logging.config.file', file('src/test/resources/test-log.properties').canonicalPath
     testLogging {
         showStandardStreams = true
+    }
+    // The bundled IDE platform looks for a test-log.properties file inside its own extracted
+    // transforms dir and prints a startup warning when it's missing. Copy ours there so the
+    // warning goes away.
+    def testLogProps = layout.projectDirectory.file('src/test/resources/test-log.properties').asFile
+    doFirst {
+        def ideaHome = classpath.files.findAll { it.path.contains("transformed${File.separator}idea-") }
+            .collect { it.path.find(/.*transformed.[^\\\/]+/) }
+            .toUnique()
+            .collect { new File(it) }
+        ideaHome.each { dir ->
+            new File(dir, 'test-log.properties').text = testLogProps.text
+        }
     }
 }
 
