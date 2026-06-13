@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Free disk space
+        # this allegedly clears up 20-30GB of space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune --all --force
+
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
