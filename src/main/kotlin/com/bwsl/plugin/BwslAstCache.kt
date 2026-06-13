@@ -41,9 +41,50 @@ data class AstModule(
     val endLine: Int = 0,
     val endColumn: Int = 0
 )
+data class AstStage(
+    val line: Int = 0,
+    val column: Int = 0,
+    val endLine: Int = 0,
+    val endColumn: Int = 0
+)
 data class AstPass(
     val name: String = "",
     val functions: List<AstFunction> = emptyList(),
+    val line: Int = 0,
+    val column: Int = 0,
+    val endLine: Int = 0,
+    val endColumn: Int = 0,
+    val vertexShader: AstStage? = null,
+    val fragmentShader: AstStage? = null,
+    val computeShader: AstStage? = null
+)
+data class AstAttributeDecl(
+    val name: String = "",
+    val dataType: String = "",
+    val line: Int = 0,
+    val column: Int = 0
+)
+data class AstResourceDecl(
+    val name: String = "",
+    val typeName: String = "",
+    val line: Int = 0,
+    val column: Int = 0
+)
+data class AstExprPos(
+    val line: Int = 0,
+    val column: Int = 0
+)
+data class AstVariantDecl(
+    val name: String = "",
+    val typeName: String = "",
+    val defaultExpr: AstExprPos? = null
+)
+data class AstPipeline(
+    val name: String = "",
+    val passes: List<AstPass> = emptyList(),
+    val attributes: List<AstAttributeDecl> = emptyList(),
+    val resources: List<AstResourceDecl> = emptyList(),
+    val variantDecls: List<AstVariantDecl> = emptyList(),
     val line: Int = 0,
     val column: Int = 0,
     val endLine: Int = 0,
@@ -58,7 +99,11 @@ data class AstRootNode(
     val endLine: Int = 0,
     val endColumn: Int = 0
 )
-data class AstRoot(val modules: List<AstModule> = emptyList(), val root: AstRootNode? = null) {
+data class AstRoot(
+    val modules: List<AstModule> = emptyList(),
+    val pipelines: List<AstPipeline> = emptyList(),
+    val root: AstRootNode? = null
+) {
     fun allFunctions(): List<AstFunction> {
         val moduleFunctions = modules.flatMap { it.functions + it.structs.flatMap { s -> s.methods } }
         val rootFunctions = root?.let { r ->

@@ -123,6 +123,108 @@ fun findVariableType(fn: AstFunction, name: String, line: Int, column: Int): Str
         ?.declaredType
         ?.takeIf { it.isNotBlank() }
 
+/** Coarse classification of "what kind of block surrounds this position", used to decide which
+ *  block-structure keywords and intrinsics are valid completions. */
+enum class BwslBlockContext {
+    /** Not inside any module/pipeline/struct/function — `module`/`pipeline` declarations allowed. */
+    TOP_LEVEL,
+    /** Directly inside a `module { ... }` (or the implicit file-root scope) — function/struct declarations. */
+    MODULE_BODY,
+    /** Directly inside a `pipeline { ... }` — `attributes`/`resources`/`variants`/`pass` allowed. */
+    PIPELINE_BODY,
+    /** Directly inside a `pass { ... }` — `vertex`/`fragment`/`compute` stage blocks allowed. */
+    PASS_BODY,
+    /** Inside a `struct { ... }` but not inside one of its methods. */
+    STRUCT_BODY,
+    /** Inside a pipeline's `attributes { ... }` block — `name: type` declarations, type keywords valid. */
+    ATTRIBUTES_BODY,
+    /** Inside a pipeline's `resources { ... }` block — `name: type` declarations, type keywords valid. */
+    RESOURCES_BODY,
+    /** Inside a pipeline's `variants { ... }` block — `name: type = expr` declarations, type keywords valid. */
+    VARIANTS_BODY,
+    /** Inside a function/method body or a shader stage body — statements and intrinsics are valid. */
+    STATEMENT_BODY
+}
+
+private fun astContainsRange(line: Int, column: Int, r: AstStage) =
+    astContains(line, column, r.line, r.column, r.endLine, r.endColumn)
+
+private fun astContainsRange(line: Int, column: Int, fn: AstFunction) =
+    astContains(line, column, fn.line, fn.column, fn.endLine, fn.endColumn)
+
+private fun structContext(struct: AstStruct, line: Int, column: Int): BwslBlockContext {
+    val fn = struct.methods.firstOrNull { astContainsRange(line, column, it) }
+    return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.STRUCT_BODY
+}
+
+private fun passContext(pass: AstPass, line: Int, column: Int): BwslBlockContext {
+    val stages = listOfNotNull(pass.vertexShader, pass.fragmentShader, pass.computeShader)
+    if (stages.any { astContainsRange(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
+    if (pass.functions.any { astContainsRange(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
+    return BwslBlockContext.PASS_BODY
+}
+
+/**
+ * Finds the (1-based, inclusive) line range of the `keyword { ... }` block in [text], by locating
+ * `keyword {` and brace-matching to its closing `}`. bwslc's AST gives only point locations for
+ * individual `attributes`/`resources`/`variants` declarations (no range for the enclosing block),
+ * so this brace-matching is needed to correctly classify positions where no declaration exists yet
+ * (e.g. an empty line while typing a new declaration, or a still-empty block).
+ */
+private fun blockLineRange(text: String, keyword: String): IntRange? {
+    val match = Regex("\\b$keyword\\s*\\{").find(text) ?: return null
+    val startLine = text.substring(0, match.range.first).count { it == '\n' } + 1
+    var depth = 0
+    for (i in match.range.last until text.length) {
+        when (text[i]) {
+            '{' -> depth++
+            '}' -> {
+                depth--
+                if (depth == 0) return startLine..(text.substring(0, i).count { it == '\n' } + 1)
+            }
+        }
+    }
+    return null
+}
+
+/** Determines which kind of block surrounds the given (1-based) source position, based on AST ranges. */
+fun blockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): BwslBlockContext {
+    for (module in root.modules) {
+        if (!astContains(line, column, module.line, module.column, module.endLine, module.endColumn)) continue
+        val struct = module.structs.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+        if (struct != null) return structContext(struct, line, column)
+        val fn = module.functions.firstOrNull { astContainsRange(line, column, it) }
+        return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.MODULE_BODY
+    }
+    for (pipeline in root.pipelines) {
+        if (!astContains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) continue
+        val pass = pipeline.passes.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+        if (pass != null) return passContext(pass, line, column)
+
+        // bwslc's AST gives only point locations for individual attributes/resources/variants
+        // declarations, not a range for the enclosing block, so brace-matching on the source text
+        // is used to find each block's extent (see blockLineRange).
+        val sections = listOfNotNull(
+            if (pipeline.attributes.isNotEmpty()) blockLineRange(text, "attributes")?.let { it to BwslBlockContext.ATTRIBUTES_BODY } else null,
+            if (pipeline.resources.isNotEmpty()) blockLineRange(text, "resources")?.let { it to BwslBlockContext.RESOURCES_BODY } else null,
+            if (pipeline.variantDecls.isNotEmpty()) blockLineRange(text, "variants")?.let { it to BwslBlockContext.VARIANTS_BODY } else null
+        )
+
+        return sections.firstOrNull { line in it.first }?.second ?: BwslBlockContext.PIPELINE_BODY
+    }
+    root.root?.let { r ->
+        if (astContains(line, column, r.line, r.column, r.endLine, r.endColumn)) {
+            val struct = r.structs.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+            if (struct != null) return structContext(struct, line, column)
+            val pass = r.passes.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+            if (pass != null) return passContext(pass, line, column)
+            val fn = r.functions.firstOrNull { astContainsRange(line, column, it) }
+            return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.MODULE_BODY
+        }
+    }
+    return BwslBlockContext.TOP_LEVEL
+}
+
 /** Resolves a (possibly module-qualified, e.g. "Module::Struct") type name to its struct declaration. */
 fun resolveStruct(root: AstRoot, scope: AstScope, typeName: String): AstStruct? {
     val parts = typeName.split("::")

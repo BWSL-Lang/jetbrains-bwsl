@@ -74,6 +74,10 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslDocumentationProvider"/>
 
+        <completion.contributor
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslCompletionContributor"/>
+
     </extensions>
 
     <actions>
