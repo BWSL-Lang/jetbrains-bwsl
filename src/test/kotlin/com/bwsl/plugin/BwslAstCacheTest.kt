@@ -1,6 +1,6 @@
 package com.bwsl.plugin
 
-import com.google.gson.Gson
+import com.bwsl.plugin.completion.BwslcAstHelper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
@@ -10,7 +10,7 @@ class BwslAstCacheTest {
 
     @Test
     fun moduleFunctionIsCachedWithItsParameters() {
-        val functions = parseAstFunctions("lexer_test_files/module.ast.json")
+        val functions = parseAstFunctions("lexer_test_files/module.bwsl")
 
         val rotate = functions.firstOrNull { it.name == "rotate" }
         assertNotNull(rotate) { "Expected 'rotate' function in parsed AST" }
@@ -75,10 +75,7 @@ class BwslAstCacheTest {
 
     private fun parseAstFunctions(resourcePath: String): List<AstFunction> {
         val file = File(javaClass.classLoader.getResource(resourcePath)!!.toURI())
-        val rawBytes = file.readBytes()
-        val hasUtf16Bom = rawBytes.size >= 2 && rawBytes[0] == 0xFF.toByte() && rawBytes[1] == 0xFE.toByte()
-        val json = if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)
-        val root = Gson().fromJson(json, AstRoot::class.java)
+        val root = BwslcAstHelper.parse(file.readText())
         return root.allFunctions()
     }
 }
