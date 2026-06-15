@@ -37,6 +37,14 @@ intellijPlatform {
         }
         changeNotes = 'Initial version'
     }
+    //noinspection GroovyAssignabilityCheck
+    publishing {
+        channels = ['alpha']
+        // token can be given in two ways:
+        // export ORG_GRADLE_PROJECT_intellijPlatformPublishingToken='YOUR_TOKEN'
+        // gradle flag -PintellijPlatformPublishingToken=YOUR_TOKEN
+        token = providers.gradleProperty("intellijPlatformPublishingToken")
+    }
 }
 
 generateLexer {
