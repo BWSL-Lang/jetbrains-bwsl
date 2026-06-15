@@ -202,6 +202,26 @@ class BwslVariableReference(element: PsiElement) :
 }
 
 /**
+ * Resolves `input.<member>` usages in a pass's fragment stage to the corresponding
+ * `output.<member> = ...` assignment in that pass's vertex stage, via the bwslc AST.
+ */
+class BwslShaderInputReference(element: PsiElement) :
+    PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
+
+    override fun resolve(): PsiElement? {
+        val file = element.containingFile
+        val filePath = file.virtualFile?.path ?: return null
+        val root = BwslAstCache.getRoot(filePath) ?: return null
+        val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+        val pass = findScope(root, line, column).pass ?: return null
+        val assignment = vertexOutputAssignments(pass)[element.text] ?: return null
+        return findMemberElement(file, assignment.target!!)
+    }
+
+    override fun getVariants(): Array<Any> = emptyArray()
+}
+
+/**
  * Returns true if [element] is part of a declared type written out in a VARIABLE_DECL, per the
  * AST (e.g. "testStruct" or "LengthMethodTest"/"testStruct" in "LengthMethodTest::testStruct s1;").
  * The AST gives each VARIABLE_DECL's declaredType string along with the (line, column) where that

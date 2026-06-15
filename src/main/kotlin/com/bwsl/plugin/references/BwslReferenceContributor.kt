@@ -53,6 +53,8 @@ class BwslReferenceContributor : PsiReferenceContributor() {
                     val prev = previousNonWhitespace(element)?.node?.elementType
                     val next = nextNonWhitespace(element)?.node?.elementType
                     return when {
+                        prev == BwslTokenTypes.DOT && previousNonWhitespace(previousNonWhitespace(element)!!)?.text == "input" ->
+                            arrayOf(BwslShaderInputReference(element))
                         prev == BwslTokenTypes.KW_IMPORT || prev == BwslTokenTypes.KW_USING ->
                             arrayOf(BwslModuleReference(element))
                         prev != null && BWSL_TYPE_KEYWORDS.contains(prev) -> emptyArray()

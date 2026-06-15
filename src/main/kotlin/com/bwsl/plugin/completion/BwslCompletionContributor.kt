@@ -1,6 +1,7 @@
 package com.bwsl.plugin.completion
 
 import com.bwsl.plugin.*
+import com.bwsl.plugin.references.previousNonWhitespace
 
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
@@ -9,6 +10,7 @@ import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns
+import com.intellij.psi.util.elementType
 import com.intellij.util.ProcessingContext
 
 // Keywords whose validity doesn't depend on the surrounding block structure.
@@ -78,6 +80,23 @@ class BwslCompletionContributor : CompletionContributor() {
                     context: ProcessingContext,
                     result: CompletionResultSet
                 ) {
+                    val prevSibling = parameters.position.parent?.let { previousNonWhitespace(it) }
+                    if (prevSibling?.elementType == BwslTokenTypes.DOT &&
+                        previousNonWhitespace(prevSibling)?.text == "input"
+                    ) {
+                        val file = parameters.originalFile
+                        val path = file.virtualFile?.path
+                        val root = path?.let { BwslAstCache.getRoot(it) }
+                        val (line, column) = lineColumnAt(file, parameters.offset) ?: (0 to 0)
+                        val pass = root?.let { findScope(it, line, column).pass }
+                        if (pass != null) {
+                            for (name in vertexOutputAssignments(pass).keys) {
+                                result.addElement(LookupElementBuilder.create(name).withTypeText("output"))
+                            }
+                            return
+                        }
+                    }
+
                     val blockContext = currentBlockContext(parameters)
 
                     if (blockContext == BwslBlockContext.TOP_LEVEL) {

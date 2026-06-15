@@ -303,4 +303,29 @@ class BwslReferenceTest : BasePlatformTestCase() {
         assertNotNull("Expected 'Common' import to resolve to Common.bwsl", resolved)
         assertEquals("Common.bwsl", (resolved as com.intellij.psi.PsiFile).name)
     }
+
+    fun testFragmentInputResolvesToVertexOutputAssignment() {
+        val source = "pipeline ShaderIoTest {\n" +
+            "    pass \"Main\" {\n" +
+            "        vertex {\n" +
+            "            output.position = float4(0, 0, 0, 1);\n" +
+            "            output.uv = float2(0, 0);\n" +
+            "        }\n" +
+            "        fragment {\n" +
+            "            output.color = float4(input.uv, 0.0, 1.0);\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n"
+
+        myFixture.configureByText("test.bwsl", source)
+        BwslAstCache.update(myFixture.file.virtualFile.path, com.bwsl.plugin.completion.BwslcAstHelper.parse(source))
+
+        val inputUvOffset = source.indexOf("input.uv") + "input.".length
+        val element = myFixture.file.findElementAt(inputUvOffset)!!
+        val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
+
+        assertNotNull("Expected input.uv to resolve to the vertex stage's output.uv assignment", resolved)
+        val expectedOffset = source.indexOf("output.uv") + "output.".length
+        assertEquals(expectedOffset, resolved!!.textOffset)
+    }
 }

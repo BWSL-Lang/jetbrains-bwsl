@@ -43,6 +43,12 @@ fun findScope(root: AstRoot, line: Int, column: Int): AstScope {
             return AstScope(module, struct, null)
         }
     }
+    for (pipeline in root.pipelines) {
+        if (contains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
+            val pass = pipeline.passes.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+            if (pass != null) return AstScope(null, null, pass)
+        }
+    }
     root.root?.let { rootNode ->
         for (pass in rootNode.passes) {
             if (contains(line, column, pass.line, pass.column, pass.endLine, pass.endColumn)) {
@@ -225,6 +231,36 @@ fun blockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): Bw
         }
     }
     return BwslBlockContext.TOP_LEVEL
+}
+
+/** Recursively collects ASSIGNMENT statements within a block, including nested blocks (if/for/etc). */
+fun collectAssignments(block: AstBlock?): List<AstStatement> {
+    if (block == null) return emptyList()
+    return block.statements.flatMap { stmt ->
+        val self = if (stmt.type == "ASSIGNMENT") listOf(stmt) else emptyList()
+        self + collectAssignments(stmt.body)
+    }
+}
+
+/**
+ * Output attributes written by a pass's vertex stage (`output.<member> = ...`), keyed by member
+ * name with the first assignment to each. bwslc's AST has no separate "output declaration" node —
+ * these are plain ASSIGNMENT statements whose target is a MEMBER_ACCESS on the `output` identifier
+ * (identifierKind == "OUTPUT").
+ */
+fun vertexOutputAssignments(pass: AstPass): Map<String, AstStatement> =
+    collectAssignments(pass.vertexShader?.body)
+        .filter { it.target?.type == "MEMBER_ACCESS" && it.target.objectExpr?.identifierKind == "OUTPUT" }
+        .groupBy { it.target!!.member }
+        .mapValues { (_, stmts) -> stmts.minWith(compareBy({ it.line }, { it.column })) }
+
+/** Resolves the PSI element for the `<member>` identifier in an `output.<member>`/`input.<member>` expression. */
+fun findMemberElement(file: PsiFile, target: AstExpr): PsiElement? {
+    val obj = target.objectExpr ?: return null
+    val offset = offsetAt(file, obj.line, obj.column) ?: return null
+    val objElement = file.findElementAt(offset)?.parent ?: return null
+    val dot = nextNonWhitespace(objElement) ?: return null
+    return nextNonWhitespace(dot)
 }
 
 /** Resolves a (possibly module-qualified, e.g. "Module::Struct") type name to its struct declaration. */

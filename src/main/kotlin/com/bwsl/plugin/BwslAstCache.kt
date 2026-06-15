@@ -1,17 +1,31 @@
 package com.bwsl.plugin
 
+import com.google.gson.annotations.SerializedName
 import java.util.concurrent.ConcurrentHashMap
 
 data class BwslFunctionSignature(val name: String, val params: List<String>, val returnType: String = "")
 
 data class AstParam(val name: String, val type: String)
+
+/** A (partial) expression node — used to detect `output.<member>`/`input.<member>` assignment targets. */
+data class AstExpr(
+    val type: String = "",
+    val name: String = "",
+    val member: String = "",
+    val identifierKind: String = "",
+    val line: Int = 0,
+    val column: Int = 0,
+    @SerializedName("object") val objectExpr: AstExpr? = null
+)
+
 data class AstStatement(
     val type: String = "",
     val name: String = "",
     val declaredType: String = "",
     val line: Int = 0,
     val column: Int = 0,
-    val body: AstBlock? = null
+    val body: AstBlock? = null,
+    val target: AstExpr? = null
 )
 data class AstBlock(val statements: List<AstStatement> = emptyList())
 data class AstFunction(
@@ -45,7 +59,8 @@ data class AstStage(
     val line: Int = 0,
     val column: Int = 0,
     val endLine: Int = 0,
-    val endColumn: Int = 0
+    val endColumn: Int = 0,
+    val body: AstBlock? = null
 )
 data class AstPass(
     val name: String = "",
