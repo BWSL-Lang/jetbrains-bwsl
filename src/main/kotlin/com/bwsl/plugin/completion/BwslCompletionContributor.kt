@@ -88,10 +88,15 @@ class BwslCompletionContributor : CompletionContributor() {
                         val path = file.virtualFile?.path
                         val root = path?.let { BwslAstCache.getRoot(it) }
                         val (line, column) = lineColumnAt(file, parameters.offset) ?: (0 to 0)
-                        val pass = root?.let { findScope(it, line, column).pass }
+                        val scope = root?.let { findScope(it, line, column) }
+                        val pass = scope?.pass
                         if (pass != null) {
-                            for (name in vertexOutputAssignments(pass).keys) {
-                                result.addElement(LookupElementBuilder.create(name).withTypeText("output"))
+                            val attrs = scope.pipeline?.attributes ?: emptyList()
+                            for ((_, vo) in vertexOutputAssignments(pass, attrs)) {
+                                result.addElement(
+                                    LookupElementBuilder.create(vo.member)
+                                        .withTypeText(vo.type ?: "output")
+                                )
                             }
                             return
                         }
@@ -127,8 +132,7 @@ class BwslCompletionContributor : CompletionContributor() {
                     for (kw in keywords) {
                         result.addElement(LookupElementBuilder.create(kw).bold())
                     }
-                    if (blockContext != BwslBlockContext.TOP_LEVEL &&
-                        blockContext != BwslBlockContext.PIPELINE_BODY &&
+                    if (blockContext != BwslBlockContext.PIPELINE_BODY &&
                         blockContext != BwslBlockContext.PASS_BODY
                     ) {
                         for (type in TYPE_KEYWORDS) {

@@ -1,5 +1,4 @@
 package com.bwsl.plugin
-import com.bwsl.plugin.references.nextNonWhitespace
 import com.bwsl.plugin.references.previousNonWhitespace
 
 import com.intellij.lang.documentation.AbstractDocumentationProvider
@@ -55,6 +54,101 @@ private fun intrinsicDoc(name: String, hasReceiver: Boolean): String? {
     val fn = BwslIntrinsics.ALL.firstOrNull { it.name == name } ?: return null
     val signature = signatureHtml(fn.returnType, fn.name, fn.params.map { "${it.type} ${it.name}" })
     return renderDoc(null, signature, fn.description.takeIf { it.isNotBlank() })
+}
+
+/**
+ * Formats an interpolation qualifier for display ("DEFAULT" → null, "FLAT" → "@flat", etc.).
+ */
+private fun interpolationLabel(interp: String): String? = when (interp) {
+    "FLAT"           -> "@flat"
+    "NO_PERSPECTIVE" -> "@noperspective"
+    else             -> null
+}
+
+private fun outputListHtml(outputs: Map<String, VertexOutput>): String {
+    if (outputs.isEmpty()) return "(none)"
+    return outputs.values.joinToString("<br/>") { vo ->
+        val type = vo.type ?: "?"
+        val interp = interpolationLabel(vo.interpolation)?.let { " &nbsp;<i>$it</i>" } ?: ""
+        "<code><b>$type</b> ${vo.member}</code>$interp"
+    }
+}
+
+/** Tooltip for the `input` or `output` qualifier identifier, explaining its role in the shader pipeline. */
+private fun shaderQualifierDoc(element: PsiElement): String? {
+    val name = element.text
+    if (name != "input" && name != "output") return null
+    val file = element.containingFile
+    val filePath = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.getRoot(filePath) ?: return null
+    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+    val scope = findScope(root, line, column)
+    val pass = scope.pass ?: return null
+    val attrs = scope.pipeline?.attributes ?: emptyList()
+
+    return when (name) {
+        "input" if isInsideFragmentStage(pass, line, column) -> {
+            val outputs = vertexOutputAssignments(pass, attrs)
+            renderDoc("input", "Built-in fragment stage qualifier",
+                "Provides access to values written to <code>output.*</code> in the vertex stage, " +
+                        "interpolated across the triangle.<br/><br/>" +
+                        "Vertex outputs available here:<br/>${outputListHtml(outputs)}")
+        }
+        "input" -> renderDoc("input", "Built-in stage qualifier",
+            "In a vertex stage: provides per-vertex built-in values such as <code>vertex_id</code>, <code>instance_id</code>.<br/>" +
+                    "In a compute stage: provides dispatch-grid built-ins such as <code>global_id</code>, <code>local_id</code>.")
+        "output" if isInsideVertexStage(pass, line, column) -> {
+            val outputs = vertexOutputAssignments(pass, attrs)
+            renderDoc("output", "Built-in vertex stage qualifier",
+                "Writes per-vertex output attributes passed to the fragment stage as <code>input.*</code>.<br/><br/>" +
+                        "Outputs declared in this vertex block:<br/>${outputListHtml(outputs)}")
+        }
+        else -> renderDoc("output", "Built-in stage qualifier",
+            "Writes values to render targets or depth. " +
+                    "In a fragment stage: <code>output.color</code>, <code>output.depth</code>, etc.")
+    }
+}
+
+private fun isInsideVertexStage(pass: AstPass, line: Int, column: Int): Boolean {
+    val vs = pass.vertexShader ?: return false
+    return astContains(line, column, vs.line, vs.column, vs.endLine, vs.endColumn)
+}
+
+private fun isInsideFragmentStage( pass: AstPass, line: Int, column: Int): Boolean {
+    val fs = pass.fragmentShader ?: return false
+    return astContains(line, column, fs.line, fs.column, fs.endLine, fs.endColumn)
+}
+
+/** Tooltip for a member identifier accessed via `input.<member>` or `output.<member>`. */
+private fun shaderMemberDoc(element: PsiElement): String? {
+    val file = element.containingFile
+    val filePath = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.getRoot(filePath) ?: return null
+    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+    val scope = findScope(root, line, column)
+    val pass = scope.pass ?: return null
+    val attrs = scope.pipeline?.attributes ?: emptyList()
+
+    val memberName = element.text
+    val parentRef = element.parent ?: return null
+    val prev = previousNonWhitespace(parentRef)
+    val beforeDot = if (prev?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prev) else null
+    val qualifier = beforeDot?.text ?: return null
+
+    if (qualifier != "input" && qualifier != "output") return null
+
+    val vo = vertexOutputAssignments(pass, attrs)[memberName] ?: return null
+    val typePart = vo.type ?: "?"
+    val interpLabel = interpolationLabel(vo.interpolation)
+    val details = buildString {
+        append("Vertex output attribute")
+        if (interpLabel != null) append(", interpolated as <code>$interpLabel</code>")
+    }
+    return when (qualifier) {
+        "input"  -> renderDoc("input.$memberName", "$typePart $memberName", details)
+        "output" -> renderDoc("output.$memberName", "$typePart $memberName", details)
+        else     -> null
+    }
 }
 
 /** Shows the declared type of a variable/parameter usage or declaration, via the AST. */
@@ -121,7 +215,15 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
             // A method-style call (e.g. "values.cos()") is lexed as FUNCTION_CALL rather than
             // INTRINSIC_CALL because it has a receiver, but it may still name an intrinsic.
             BwslTokenTypes.FUNCTION_CALL -> customFunctionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
-            BwslTokenTypes.IDENTIFIER -> variableTypeDoc(element)
+            BwslTokenTypes.IDENTIFIER -> {
+                // Highest priority: input/output qualifier keywords and their member identifiers.
+                val prev = previousNonWhitespace(element.parent ?: element)
+                if (prev?.elementType == BwslTokenTypes.DOT)
+                    shaderMemberDoc(element)?.let { return it }
+                if (element.text == "input" || element.text == "output")
+                    shaderQualifierDoc(element)?.let { return it }
+                variableTypeDoc(element)
+            }
             else -> null
         }
     }

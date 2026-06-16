@@ -213,19 +213,21 @@ class BwslShaderInputReference(element: PsiElement) :
         val filePath = file.virtualFile?.path ?: return null
         val root = BwslAstCache.getRoot(filePath) ?: return null
         val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-        val pass = findScope(root, line, column).pass ?: return null
-        val assignment = vertexOutputAssignments(pass)[element.text] ?: return null
-        return findMemberElement(file, assignment.target!!)
+        val scope = findScope(root, line, column)
+        val pass = scope.pass ?: return null
+        val attrs = scope.pipeline?.attributes ?: emptyList()
+        val output = vertexOutputAssignments(pass, attrs)[element.text] ?: return null
+        return findMemberElement(file, output.assignment.target!!)
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
 }
 
 /**
- * Returns true if [element] is part of a declared type written out in a VARIABLE_DECL, per the
+ * Returns true if element]is part of a declared type written out in a VARIABLE_DECL, per the
  * AST (e.g. "testStruct" or "LengthMethodTest"/"testStruct" in "LengthMethodTest::testStruct s1;").
  * The AST gives each VARIABLE_DECL's declaredType string along with the (line, column) where that
- * type text starts; [element]'s position must fall within that span.
+ * type text starts; element's position must fall within that span.
  */
 fun isAstTypeReference(file: PsiFile, offset: Int): Boolean {
     val filePath = file.virtualFile?.path ?: return false

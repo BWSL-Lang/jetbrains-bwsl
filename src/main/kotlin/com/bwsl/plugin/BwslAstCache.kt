@@ -7,7 +7,9 @@ data class BwslFunctionSignature(val name: String, val params: List<String>, val
 
 data class AstParam(val name: String, val type: String)
 
-/** A (partial) expression node — used to detect `output.<member>`/`input.<member>` assignment targets. */
+data class AstLiteralVal(val literalType: String = "")
+
+/** A (partial) expression node — used to detect `output.<member>`/`input.<member>` targets and deduce value types. */
 data class AstExpr(
     val type: String = "",
     val name: String = "",
@@ -15,7 +17,17 @@ data class AstExpr(
     val identifierKind: String = "",
     val line: Int = 0,
     val column: Int = 0,
-    @SerializedName("object") val objectExpr: AstExpr? = null
+    @SerializedName("object") val objectExpr: AstExpr? = null,
+    // FUNCTION_CALL
+    val arguments: List<AstExpr> = emptyList(),
+    // BINARY_OP
+    val left: AstExpr? = null,
+    val right: AstExpr? = null,
+    val op: String = "",
+    // UNARY_OP
+    val operand: AstExpr? = null,
+    // LITERAL
+    val literal: AstLiteralVal? = null
 )
 
 data class AstStatement(
@@ -25,7 +37,9 @@ data class AstStatement(
     val line: Int = 0,
     val column: Int = 0,
     val body: AstBlock? = null,
-    val target: AstExpr? = null
+    val target: AstExpr? = null,
+    val value: AstExpr? = null,
+    val interpolation: String = ""
 )
 data class AstBlock(val statements: List<AstStatement> = emptyList())
 data class AstFunction(

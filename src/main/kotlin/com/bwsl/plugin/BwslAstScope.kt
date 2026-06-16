@@ -1,13 +1,12 @@
 package com.bwsl.plugin
 import com.bwsl.plugin.references.nextNonWhitespace
-import com.bwsl.plugin.references.previousNonWhitespace
 
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.elementType
 
-data class AstScope(val module: AstModule?, val struct: AstStruct?, val pass: AstPass?)
+data class AstScope(val module: AstModule?, val struct: AstStruct?, val pass: AstPass?, val pipeline: AstPipeline? = null)
 
 /** Converts a zero-based document offset to a 1-based (line, column) pair, matching bwslc's AST positions. */
 fun lineColumnAt(file: PsiFile, offset: Int): Pair<Int, Int>? {
@@ -46,7 +45,7 @@ fun findScope(root: AstRoot, line: Int, column: Int): AstScope {
     for (pipeline in root.pipelines) {
         if (contains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
             val pass = pipeline.passes.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            if (pass != null) return AstScope(null, null, pass)
+            if (pass != null) return AstScope(null, null, pass, pipeline)
         }
     }
     root.root?.let { rootNode ->
@@ -242,17 +241,61 @@ fun collectAssignments(block: AstBlock?): List<AstStatement> {
     }
 }
 
+/** A vertex output attribute with its deduced type and interpolation qualifier. */
+data class VertexOutput(
+    val member: String,
+    val assignment: AstStatement,
+    /** Deduced from the RHS expression — null when the type cannot be determined statically. */
+    val type: String?,
+    /** Raw interpolation qualifier from the AST: "DEFAULT", "FLAT", "NO_PERSPECTIVE". */
+    val interpolation: String
+)
+
+/**
+ * Deduces the BWSL type of an expression using the following rules (applied recursively):
+ * 1. FUNCTION_CALL → the function/constructor name (e.g. `float4(...)` → `"float4"`)
+ * 2. IDENTIFIER → look up the nearest preceding VARIABLE_DECL in [block]
+ * 3. BINARY_OP / UNARY_OP → recurse on the left/first operand
+ * 4. LITERAL → the literal's type (INT, FLOAT, BOOL lowercased)
+ * Returns null when the type cannot be determined.
+ */
+fun deduceExprType(expr: AstExpr, block: AstBlock? = null, attributes: List<AstAttributeDecl> = emptyList()): String? = when (expr.type) {
+    "FUNCTION_CALL" -> expr.name.takeIf { it.isNotBlank() }
+    "IDENTIFIER"    -> block?.let { blk ->
+        collectVariableDecls(blk).lastOrNull { it.name == expr.name }?.declaredType?.takeIf { it.isNotBlank() }
+    }
+    "MEMBER_ACCESS" -> when (expr.objectExpr?.identifierKind) {
+        "ATTRIBUTES" -> attributes.firstOrNull { it.name == expr.member }?.dataType
+        else         -> null
+    }
+    "BINARY_OP"     -> expr.left?.let { deduceExprType(it, block, attributes) }
+    "UNARY_OP"      -> expr.operand?.let { deduceExprType(it, block, attributes) }
+    "LITERAL"       -> expr.literal?.literalType?.lowercase()?.takeIf { it.isNotBlank() }
+    else            -> null
+}
+
 /**
  * Output attributes written by a pass's vertex stage (`output.<member> = ...`), keyed by member
- * name with the first assignment to each. bwslc's AST has no separate "output declaration" node —
- * these are plain ASSIGNMENT statements whose target is a MEMBER_ACCESS on the `output` identifier
- * (identifierKind == "OUTPUT").
+ * name. Each entry captures the first assignment, its interpolation qualifier (from the AST), and
+ * the statically deduced type of the assigned value. bwslc's AST has no separate "output
+ * declaration" node — outputs are plain ASSIGNMENT statements whose target is a MEMBER_ACCESS on
+ * the built-in `output` identifier (identifierKind == "OUTPUT").
  */
-fun vertexOutputAssignments(pass: AstPass): Map<String, AstStatement> =
-    collectAssignments(pass.vertexShader?.body)
+fun vertexOutputAssignments(pass: AstPass, attributes: List<AstAttributeDecl> = emptyList()): Map<String, VertexOutput> {
+    val block = pass.vertexShader?.body
+    return collectAssignments(block)
         .filter { it.target?.type == "MEMBER_ACCESS" && it.target.objectExpr?.identifierKind == "OUTPUT" }
         .groupBy { it.target!!.member }
-        .mapValues { (_, stmts) -> stmts.minWith(compareBy({ it.line }, { it.column })) }
+        .mapValues { (member, stmts) ->
+            val stmt = stmts.minWith(compareBy({ it.line }, { it.column }))
+            VertexOutput(
+                member        = member,
+                assignment    = stmt,
+                type          = stmt.value?.let { deduceExprType(it, block, attributes) },
+                interpolation = stmt.interpolation
+            )
+        }
+}
 
 /** Resolves the PSI element for the `<member>` identifier in an `output.<member>`/`input.<member>` expression. */
 fun findMemberElement(file: PsiFile, target: AstExpr): PsiElement? {
