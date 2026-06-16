@@ -5,12 +5,11 @@ import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.psi.PsiFile
-import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
 private val log = logger<BwslAstAnnotator>()
 
-data class AstCollectedInfo(val content: String, val filePath: String)
+data class AstCollectedInfo(val filePath: String)
 
 class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
 
@@ -20,18 +19,16 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
             return null
         }
         val path = file.virtualFile?.path ?: return null
-        return AstCollectedInfo(file.text, path)
+        return AstCollectedInfo(path)
     }
 
     override fun doAnnotate(info: AstCollectedInfo): Boolean? {
         val compilerPath = BwslSettings.getInstance().compilerPath
-        val tempFile = Files.createTempFile("bwsl_ast_", ".bwsl").toFile()
         try {
-            tempFile.writeText(info.content)
             val moduleArgs = BwslSettings.getInstance().modulePaths
                 .flatMap { listOf("-modules", it) }
             val process = ProcessBuilder(
-                listOf(compilerPath, tempFile.absolutePath, "-ast-json") + moduleArgs
+                listOf(compilerPath, info.filePath, "-ast-json") + moduleArgs
             ).start()
             val rawBytes = process.inputStream.readBytes()
             val stderrText = process.errorStream.bufferedReader().readText()
@@ -62,8 +59,6 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${info.filePath}", e)
             return null
-        } finally {
-            tempFile.delete()
         }
     }
 

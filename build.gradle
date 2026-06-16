@@ -86,10 +86,16 @@ tasks.register('fetchBwslCompiler', JavaExec) {
 }
 
 test {
-    dependsOn fetchBwslCompiler
+    def osName = System.getProperty('os.name').toLowerCase()
+    def extension = osName.contains('win') ? '.exe' : ''
+    def overridePath = findProperty('bwslc')
+    if (overridePath) {
+        systemProperty 'bwslc.path', overridePath
+    } else {
+        dependsOn fetchBwslCompiler
+        systemProperty 'bwslc.path', new File(layout.buildDirectory.dir('bwslc').get().asFile, "bwslc${extension}").absolutePath
+    }
     useJUnitPlatform()
-    systemProperty 'bwslc.path', new File(layout.buildDirectory.dir('bwslc').get().asFile,
-        "bwslc${System.getProperty('os.name').toLowerCase().contains('win') ? '.exe' : ''}").absolutePath
     testLogging {
         showStandardStreams = true
     }

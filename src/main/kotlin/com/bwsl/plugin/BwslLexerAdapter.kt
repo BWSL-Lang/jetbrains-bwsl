@@ -52,7 +52,9 @@ class BwslLexerAdapter : LexerBase() {
         val name = bufSeq.substring(raw.start, raw.end)
         val hasReceiver = prevSignificantType == BwslTokenTypes.DOT
         current = when {
-            prevSignificantType == BwslTokenTypes.KW_MODULE -> raw.copy(type = BwslTokenTypes.MODULE_NAME)
+            prevSignificantType == BwslTokenTypes.KW_MODULE ||
+            prevSignificantType == BwslTokenTypes.KW_SUBMODULE -> raw.copy(type = BwslTokenTypes.MODULE_NAME)
+            prevSignificantType == BwslTokenTypes.KW_EXTENDS -> raw.copy(type = BwslTokenTypes.MODULE_QUALIFIER)
             // "name :: (" is a function declaration; "Name::Thing" / "Name::func(...)" is a
             // module qualifier, "Name" should be tagged MODULE_QUALIFIER.
             nextNonWhitespace(0)?.type == BwslTokenTypes.COLONCOLON ->

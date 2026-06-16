@@ -29,7 +29,7 @@ private val STATEMENT_KEYWORDS = listOf(
 )
 
 // "module"/"pipeline" declarations can only appear at the top level of a file.
-private val TOP_LEVEL_KEYWORDS = listOf("module", "pipeline")
+private val TOP_LEVEL_KEYWORDS = listOf("module", "submodule", "pipeline")
 
 // "attributes"/"resources"/"variants"/"pass" can only appear directly inside a pipeline body.
 private val PIPELINE_BODY_KEYWORDS = listOf("attributes", "resources", "variants", "pass")
@@ -110,6 +110,18 @@ class BwslCompletionContributor : CompletionContributor() {
                             }
                             return
                         }
+                    }
+
+                    // `extends` is only valid directly after a submodule's name:
+                    // `submodule <MODULE_NAME> <caret>` → offer only "extends".
+                    // MODULE_NAME is wrapped in a REFERENCE composite by the parser, so check firstChild.
+                    val posParent = parameters.position.parent
+                    val prevRef = posParent?.let { previousNonWhitespace(it) }
+                    if (prevRef?.firstChild?.elementType == BwslTokenTypes.MODULE_NAME &&
+                        previousNonWhitespace(prevRef)?.elementType == BwslTokenTypes.KW_SUBMODULE
+                    ) {
+                        result.addElement(LookupElementBuilder.create("extends").bold())
+                        return
                     }
 
                     val blockContext = currentBlockContext(parameters)

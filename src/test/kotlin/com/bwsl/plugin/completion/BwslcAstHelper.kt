@@ -12,7 +12,8 @@ object BwslcAstHelper {
         ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
 
     fun parse(source: String): AstRoot {
-        val tempFile = Files.createTempFile("bwsl_ast_test_", ".bwsl").toFile()
+        val tempDir = Files.createTempDirectory("bwsl_ast_test_").toFile()
+        val tempFile = tempDir.resolve("test.bwsl")
         try {
             tempFile.writeText(source)
             val process = ProcessBuilder(COMPILER_PATH, tempFile.absolutePath, "-ast-json").start()
@@ -25,7 +26,7 @@ object BwslcAstHelper {
             return Gson().fromJson(json, AstRoot::class.java)
                 ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
         } finally {
-            tempFile.delete()
+            tempDir.deleteRecursively()
         }
     }
 }

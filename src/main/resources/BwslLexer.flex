@@ -61,6 +61,7 @@ BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
 
   "compute_graph"     { return BwslTokenTypes.KW_COMPUTE_GRAPH; }
   "compute"           { return BwslTokenTypes.KW_COMPUTE; }
+  "submodule"         { return BwslTokenTypes.KW_SUBMODULE; }
   "module"            { return BwslTokenTypes.KW_MODULE; }
   "pipeline"          { return BwslTokenTypes.KW_PIPELINE; }
   "pass"              { return BwslTokenTypes.KW_PASS; }
@@ -77,6 +78,7 @@ BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
   "outputs"           { return BwslTokenTypes.KW_OUTPUTS; }
 
   // ── Control / declaration keywords ────────────────────────────────────────
+  "extends"           { return BwslTokenTypes.KW_EXTENDS; }
   "import"            { return BwslTokenTypes.KW_IMPORT; }
   "using"             { return BwslTokenTypes.KW_USING; }
   "as"                { return BwslTokenTypes.KW_AS; }

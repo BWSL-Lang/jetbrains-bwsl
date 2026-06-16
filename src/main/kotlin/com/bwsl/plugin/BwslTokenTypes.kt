@@ -18,6 +18,7 @@ object BwslTokenTypes {
 
     // Block-structure keywords
     @JvmField val KW_MODULE        = BwslElementType("KW_MODULE")
+    @JvmField val KW_SUBMODULE     = BwslElementType("KW_SUBMODULE")
     @JvmField val KW_PIPELINE      = BwslElementType("KW_PIPELINE")
     @JvmField val KW_PASS          = BwslElementType("KW_PASS")
     @JvmField val KW_VERTEX        = BwslElementType("KW_VERTEX")
@@ -35,6 +36,7 @@ object BwslTokenTypes {
     @JvmField val KW_OUTPUTS       = BwslElementType("KW_OUTPUTS")
 
     // Control / declaration keywords
+    @JvmField val KW_EXTENDS     = BwslElementType("KW_EXTENDS")
     @JvmField val KW_IMPORT      = BwslElementType("KW_IMPORT")
     @JvmField val KW_USING       = BwslElementType("KW_USING")
     @JvmField val KW_AS          = BwslElementType("KW_AS")

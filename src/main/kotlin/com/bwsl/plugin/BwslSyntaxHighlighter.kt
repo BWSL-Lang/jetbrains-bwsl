@@ -38,7 +38,7 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
 
         // pipeline, pass, vertex, fragment, attributes, resources, …
         private val BLOCK_KW_SET = TokenSet.create(
-            BwslTokenTypes.KW_MODULE, BwslTokenTypes.KW_PIPELINE,
+            BwslTokenTypes.KW_MODULE, BwslTokenTypes.KW_SUBMODULE, BwslTokenTypes.KW_PIPELINE,
             BwslTokenTypes.KW_PASS, BwslTokenTypes.KW_VERTEX, BwslTokenTypes.KW_FRAGMENT,
             BwslTokenTypes.KW_COMPUTE, BwslTokenTypes.KW_COMPUTE_GRAPH,
             BwslTokenTypes.KW_ATTRIBUTES, BwslTokenTypes.KW_RESOURCES, BwslTokenTypes.KW_VARIANTS,
@@ -48,6 +48,7 @@ class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
 
         // if, return, for, import, const, …
         private val KW_SET = TokenSet.create(
+            BwslTokenTypes.KW_EXTENDS,
             BwslTokenTypes.KW_IMPORT, BwslTokenTypes.KW_USING, BwslTokenTypes.KW_AS,
             BwslTokenTypes.KW_USE, BwslTokenTypes.KW_CONST, BwslTokenTypes.KW_SHARED,
             BwslTokenTypes.KW_CONSTRAINT, BwslTokenTypes.KW_RULES,
