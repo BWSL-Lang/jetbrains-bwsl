@@ -81,22 +81,32 @@ class BwslCompletionContributor : CompletionContributor() {
                     result: CompletionResultSet
                 ) {
                     val prevSibling = parameters.position.parent?.let { previousNonWhitespace(it) }
+                    val beforeDot = if (prevSibling?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prevSibling) else null
                     if (prevSibling?.elementType == BwslTokenTypes.DOT &&
-                        previousNonWhitespace(prevSibling)?.text == "input"
+                        (beforeDot?.text == "attributes" || beforeDot?.text == "input")
                     ) {
                         val file = parameters.originalFile
-                        val path = file.virtualFile?.path
-                        val root = path?.let { BwslAstCache.getRoot(it) }
+                        val root = file.virtualFile?.path?.let { BwslAstCache.getRoot(it) }
                         val (line, column) = lineColumnAt(file, parameters.offset) ?: (0 to 0)
                         val scope = root?.let { findScope(it, line, column) }
                         val pass = scope?.pass
+                        val pipeline = scope?.pipeline
                         if (pass != null) {
-                            val attrs = scope.pipeline?.attributes ?: emptyList()
-                            for ((_, vo) in vertexOutputAssignments(pass, attrs)) {
-                                result.addElement(
-                                    LookupElementBuilder.create(vo.member)
-                                        .withTypeText(vo.type ?: "output")
-                                )
+                            if (beforeDot.text == "attributes" && pipeline != null) {
+                                for (attr in passUsedAttributes(pass, pipeline)) {
+                                    result.addElement(
+                                        LookupElementBuilder.create(attr.name)
+                                            .withTypeText(attr.dataType)
+                                    )
+                                }
+                            } else if (beforeDot.text == "input") {
+                                val allAttrs = pipeline?.attributes ?: emptyList()
+                                for ((_, vo) in vertexOutputAssignments(pass, allAttrs)) {
+                                    result.addElement(
+                                        LookupElementBuilder.create(vo.member)
+                                            .withTypeText(vo.type ?: "output")
+                                    )
+                                }
                             }
                             return
                         }

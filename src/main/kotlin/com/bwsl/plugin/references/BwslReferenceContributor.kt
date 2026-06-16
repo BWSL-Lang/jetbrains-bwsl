@@ -58,6 +58,7 @@ class BwslReferenceContributor : PsiReferenceContributor() {
                         prev == BwslTokenTypes.KW_IMPORT || prev == BwslTokenTypes.KW_USING ->
                             arrayOf(BwslModuleReference(element))
                         prev != null && BWSL_TYPE_KEYWORDS.contains(prev) -> emptyArray()
+                        isInUseAttributesBlock(element) -> arrayOf(BwslAttributeNameReference(element))
                         isAstTypeReference(element.containingFile, element.textOffset) ->
                             arrayOf(BwslTypeReference(element))
                         BwslAstCache.getRoot(element.containingFile.virtualFile?.path ?: "") == null && next == BwslTokenTypes.REFERENCE ->
@@ -68,6 +69,28 @@ class BwslReferenceContributor : PsiReferenceContributor() {
             }
         )
     }
+}
+
+/**
+ * Returns true when [element] is an identifier inside `use attributes { ... }`.
+ * Walks backwards through siblings to find the opening LBRACE, then checks that
+ * the two preceding non-whitespace tokens are KW_ATTRIBUTES and KW_USE.
+ */
+private fun isInUseAttributesBlock(element: PsiElement): Boolean {
+    var sib = element.prevSibling
+    while (sib != null) {
+        when (sib.node.elementType) {
+            BwslTokenTypes.LBRACE -> {
+                val beforeBrace = previousNonWhitespace(sib) ?: return false
+                if (beforeBrace.node.elementType != BwslTokenTypes.KW_ATTRIBUTES) return false
+                val beforeAttr = previousNonWhitespace(beforeBrace) ?: return false
+                return beforeAttr.node.elementType == BwslTokenTypes.KW_USE
+            }
+            BwslTokenTypes.RBRACE -> return false
+        }
+        sib = sib.prevSibling
+    }
+    return false
 }
 
 fun previousNonWhitespace(element: PsiElement): PsiElement? {

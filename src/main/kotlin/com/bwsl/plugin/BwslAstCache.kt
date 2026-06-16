@@ -76,6 +76,7 @@ data class AstStage(
     val endColumn: Int = 0,
     val body: AstBlock? = null
 )
+data class AstUsedAttribute(val name: String = "")
 data class AstPass(
     val name: String = "",
     val functions: List<AstFunction> = emptyList(),
@@ -85,7 +86,8 @@ data class AstPass(
     val endColumn: Int = 0,
     val vertexShader: AstStage? = null,
     val fragmentShader: AstStage? = null,
-    val computeShader: AstStage? = null
+    val computeShader: AstStage? = null,
+    val usedAttributes: List<AstUsedAttribute> = emptyList()
 )
 data class AstAttributeDecl(
     val name: String = "",

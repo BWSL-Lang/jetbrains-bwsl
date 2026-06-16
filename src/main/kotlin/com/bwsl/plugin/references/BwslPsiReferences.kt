@@ -135,7 +135,7 @@ class BwslFunctionReference(element: PsiElement) :
  * member-access/qualified usages (preceded by '.' or '::'). For a declaration range, the
  * declaration itself is the leftmost such occurrence (it precedes all usages).
  */
-private fun findIdentifierInRange(file: PsiFile, name: String, range: IntRange): PsiElement? {
+internal fun findIdentifierInRange(file: PsiFile, name: String, range: IntRange): PsiElement? {
     for (leaf in fileLeaves(file)) {
         if (leaf.elementType != BwslTokenTypes.IDENTIFIER) continue
         if (leaf.text != name) continue
@@ -196,6 +196,28 @@ class BwslVariableReference(element: PsiElement) :
             }
         }
         return best
+    }
+
+    override fun getVariants(): Array<Any> = emptyArray()
+}
+
+/**
+ * Resolves an attribute name inside `use attributes { name, ... }` to the attribute's
+ * declaration in the enclosing pipeline's `attributes { name: type }` block, via the bwslc AST.
+ */
+class BwslAttributeNameReference(element: PsiElement) :
+    PsiReferenceBase<PsiElement>(element, com.intellij.openapi.util.TextRange(0, element.textLength)) {
+
+    override fun resolve(): PsiElement? {
+        val file = element.containingFile
+        val filePath = file.virtualFile?.path ?: return null
+        val root = BwslAstCache.getRoot(filePath) ?: return null
+        val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+        val scope = findScope(root, line, column)
+        val decl = scope.pipeline?.attributes?.firstOrNull { it.name == element.text } ?: return null
+        // AstAttributeDecl.column points to the type, not the name; use the line and search for the name.
+        val range = lineRange(file, decl.line) ?: return null
+        return findIdentifierInRange(file, decl.name, range)
     }
 
     override fun getVariants(): Array<Any> = emptyArray()

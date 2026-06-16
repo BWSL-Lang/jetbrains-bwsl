@@ -1,5 +1,6 @@
 package com.bwsl.plugin
 
+import com.bwsl.plugin.completion.BwslcAstHelper
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class BwslDocumentationProviderTest : BasePlatformTestCase() {
@@ -119,6 +120,55 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         assertNotNull("Expected documentation for 'pos'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 pos"))
         assertTrue("Expected 'parameter' label, got: $doc", doc.contains("parameter"))
+    }
+
+    fun testAttributesQualifierShowsUsedAttributeList() {
+        val source = "pipeline P {\n" +
+            "    attributes {\n" +
+            "        position: float4\n" +
+            "        color: float4\n" +
+            "        uv: float2\n" +
+            "    }\n" +
+            "    pass \"Main\" {\n" +
+            "        use attributes { position, color }\n" +
+            "        vertex {\n" +
+            "            output.pos = attribu<caret>tes.position;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n"
+
+        myFixture.configureByText("test.bwsl", source)
+        BwslAstCache.update(myFixture.file.virtualFile.path, BwslcAstHelper.parse(source.replace("<caret>", "")))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'attributes'", doc)
+        assertTrue("Expected position in list, got: $doc", doc!!.contains("position"))
+        assertTrue("Expected color in list, got: $doc", doc.contains("color"))
+        assertFalse("Expected uv NOT in list (not in use block), got: $doc", doc.contains("uv"))
+        assertTrue("Expected float4 type shown, got: $doc", doc.contains("float4"))
+    }
+
+    fun testAttributesMemberShowsType() {
+        val source = "pipeline P {\n" +
+            "    attributes {\n" +
+            "        position: float4\n" +
+            "        uv: float2\n" +
+            "    }\n" +
+            "    pass \"Main\" {\n" +
+            "        use attributes { position, uv }\n" +
+            "        vertex {\n" +
+            "            output.pos = attributes.posi<caret>tion;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n"
+
+        myFixture.configureByText("test.bwsl", source)
+        BwslAstCache.update(myFixture.file.virtualFile.path, BwslcAstHelper.parse(source.replace("<caret>", "")))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'attributes.position'", doc)
+        assertTrue("Expected type float4, got: $doc", doc!!.contains("float4"))
+        assertTrue("Expected member name, got: $doc", doc.contains("position"))
     }
 
     fun testCustomFunctionCallShowsQualifiedNameAndSignature() {

@@ -74,6 +74,23 @@ private fun outputListHtml(outputs: Map<String, VertexOutput>): String {
     }
 }
 
+/** Tooltip for the `attributes` qualifier, listing the attributes available in the current pass. */
+private fun attributesQualifierDoc(element: PsiElement): String? {
+    if (element.text != "attributes") return null
+    val file = element.containingFile
+    val filePath = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.getRoot(filePath) ?: return null
+    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
+    val scope = findScope(root, line, column)
+    val pass = scope.pass ?: return null
+    val pipeline = scope.pipeline ?: return null
+    val used = passUsedAttributes(pass, pipeline)
+    val listHtml = if (used.isEmpty()) "(none)" else
+        used.joinToString("<br/>") { "<code><b>${it.dataType}</b> ${it.name}</code>" }
+    return renderDoc("attributes", "Pipeline attribute inputs",
+        "Per-vertex attributes available in this pass via <code>use attributes { ... }</code>.<br/><br/>$listHtml")
+}
+
 /** Tooltip for the `input` or `output` qualifier identifier, explaining its role in the shader pipeline. */
 private fun shaderQualifierDoc(element: PsiElement): String? {
     val name = element.text
@@ -134,6 +151,12 @@ private fun shaderMemberDoc(element: PsiElement): String? {
     val prev = previousNonWhitespace(parentRef)
     val beforeDot = if (prev?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prev) else null
     val qualifier = beforeDot?.text ?: return null
+
+    if (qualifier == "attributes") {
+        val pipeline = scope.pipeline ?: return null
+        val decl = passUsedAttributes(pass, pipeline).firstOrNull { it.name == memberName } ?: return null
+        return renderDoc("attributes.$memberName", "${decl.dataType} $memberName", "Pipeline vertex attribute")
+    }
 
     if (qualifier != "input" && qualifier != "output") return null
 
@@ -198,6 +221,7 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
         // but the type lookup works identically for the usage and the declaration itself, so
         // skip reference resolution entirely and document the hovered element directly.
         if (element.elementType == BwslTokenTypes.IDENTIFIER) return element
+        if (element.elementType == BwslTokenTypes.KW_ATTRIBUTES) return element
         return null
     }
 
@@ -215,6 +239,7 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
             // A method-style call (e.g. "values.cos()") is lexed as FUNCTION_CALL rather than
             // INTRINSIC_CALL because it has a receiver, but it may still name an intrinsic.
             BwslTokenTypes.FUNCTION_CALL -> customFunctionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
+            BwslTokenTypes.KW_ATTRIBUTES -> attributesQualifierDoc(element)
             BwslTokenTypes.IDENTIFIER -> {
                 // Highest priority: input/output qualifier keywords and their member identifiers.
                 val prev = previousNonWhitespace(element.parent ?: element)

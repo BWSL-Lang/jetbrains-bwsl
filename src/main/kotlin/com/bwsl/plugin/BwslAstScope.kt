@@ -306,6 +306,16 @@ fun findMemberElement(file: PsiFile, target: AstExpr): PsiElement? {
     return nextNonWhitespace(dot)
 }
 
+/**
+ * Returns the [AstAttributeDecl] entries from [pipeline] that are listed in the pass's
+ * `usedAttributes` list, preserving the declaration order from the pipeline's attributes block.
+ */
+fun passUsedAttributes(pass: AstPass, pipeline: AstPipeline): List<AstAttributeDecl> {
+    if (pass.usedAttributes.isEmpty()) return emptyList()
+    val byName = pipeline.attributes.associateBy { it.name }
+    return pass.usedAttributes.mapNotNull { byName[it.name] }
+}
+
 /** Resolves a (possibly module-qualified, e.g. "Module::Struct") type name to its struct declaration. */
 fun resolveStruct(root: AstRoot, scope: AstScope, typeName: String): AstStruct? {
     val parts = typeName.split("::")

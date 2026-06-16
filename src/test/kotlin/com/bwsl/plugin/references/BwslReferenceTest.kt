@@ -3,7 +3,6 @@ package com.bwsl.plugin.references
 import com.bwsl.plugin.*
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.intellij.psi.util.elementType
 
 class BwslReferenceTest : BasePlatformTestCase() {
 
@@ -327,5 +326,51 @@ class BwslReferenceTest : BasePlatformTestCase() {
         assertNotNull("Expected input.uv to resolve to the vertex stage's output.uv assignment", resolved)
         val expectedOffset = source.indexOf("output.uv") + "output.".length
         assertEquals(expectedOffset, resolved!!.textOffset)
+    }
+
+    fun testUseAttributesNamesResolveToAttributeDeclarations() {
+        val source = "pipeline AttrRefTest {\n" +
+            "    attributes {\n" +
+            "        position: float4\n" +
+            "        lastTransform: float4\n" +
+            "        color: float4\n" +
+            "    }\n" +
+            "    pass \"Main\" {\n" +
+            "        use attributes { position, lastTransform, color }\n" +
+            "        vertex {\n" +
+            "            output.pos = attributes.position;\n" +
+            "        }\n" +
+            "        fragment {\n" +
+            "            output.result = attributes.color;\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n"
+
+        myFixture.configureByText("attr_ref_test.bwsl", source)
+        BwslAstCache.update(myFixture.file.virtualFile.path, com.bwsl.plugin.completion.BwslcAstHelper.parse(source))
+
+        fun resolveAttrName(name: String): Int? {
+            val useBlock = source.indexOf("use attributes {")
+            val nameOffset = source.indexOf(name, useBlock)
+            val element = myFixture.file.findElementAt(nameOffset) ?: return null
+            return element.parent.references.firstNotNullOfOrNull { it.resolve() }?.textOffset
+        }
+
+        // Each name in the use block should navigate to its declaration in the attributes block.
+        assertEquals(
+            "position in use block should resolve to its declaration",
+            source.indexOf("position: float4"),
+            resolveAttrName("position")
+        )
+        assertEquals(
+            "lastTransform in use block should resolve to its declaration",
+            source.indexOf("lastTransform: float4"),
+            resolveAttrName("lastTransform")
+        )
+        assertEquals(
+            "color in use block should resolve to its declaration",
+            source.indexOf("color: float4"),
+            resolveAttrName("color")
+        )
     }
 }
