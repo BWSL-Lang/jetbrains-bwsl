@@ -6,12 +6,12 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.Messages
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import javax.swing.DefaultListModel
 import javax.swing.JComponent
 
@@ -29,7 +29,7 @@ class BwslSettingsConfigurable : Configurable {
         settings.modulePaths.forEach { moduleListModel.addElement(it) }
 
         formatCombo = ComboBox(BwslOutputFormat.entries.toTypedArray()).apply {
-            renderer = SimpleListCellRenderer.create("") { it.displayName }
+            renderer = textListCellRenderer("") {  it.displayName }
             selectedItem = BwslOutputFormat.entries.firstOrNull { it.name == settings.outputFormat }
                 ?: BwslOutputFormat.SPIRV_ONLY
         }
