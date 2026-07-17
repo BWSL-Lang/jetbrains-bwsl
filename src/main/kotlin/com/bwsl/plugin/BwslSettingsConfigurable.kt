@@ -67,7 +67,7 @@ class BwslSettingsConfigurable : Configurable {
                     val installed = try {
                         ProgressManager.getInstance().runProcessWithProgressSynchronously<java.nio.file.Path, Exception>(
                             { BwslCompilerDownloader.downloadLatest() },
-                            "Downloading bwslc compiler",
+                            "Downloading BWSL Compiler",
                             true,
                             project
                         )
