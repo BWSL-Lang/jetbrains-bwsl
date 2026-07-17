@@ -63,8 +63,6 @@ sourceSets {
 
 tasks.withType(JavaCompile).configureEach {
     dependsOn generateLexer
-    sourceCompatibility = '21'
-    targetCompatibility = '21'
 }
 
 compileKotlin {
