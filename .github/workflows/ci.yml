@@ -33,9 +33,13 @@ jobs:
 
       - name: Build plugin
         run: ./gradlew buildPlugin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: ./gradlew test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify plugin
         run: ./gradlew verifyPlugin

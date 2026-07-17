@@ -40,12 +40,19 @@ object BwslCompilerDownloader {
         val assetPrefix = "bwslc-$platform-$arch"
 
         val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
-        val releaseRequest = HttpRequest.newBuilder(URI.create(LATEST_RELEASE_URL)).build()
-        val releaseJson = client.send(releaseRequest, HttpResponse.BodyHandlers.ofString()).body()
-        val release = Gson().fromJson(releaseJson, GitHubRelease::class.java)
+        val releaseRequestBuilder = HttpRequest.newBuilder(URI.create(LATEST_RELEASE_URL))
+        val token = System.getenv("GITHUB_TOKEN")
+        if (!token.isNullOrBlank()) {
+            releaseRequestBuilder.header("Authorization", "Bearer $token")
+        }
+        val releaseResponse = client.send(releaseRequestBuilder.build(), HttpResponse.BodyHandlers.ofString())
+        if (releaseResponse.statusCode() != 200) {
+            error("Failed to fetch latest BWSL release: HTTP ${releaseResponse.statusCode()} - ${releaseResponse.body()}")
+        }
+        val release = Gson().fromJson(releaseResponse.body(), GitHubRelease::class.java)
 
         val asset = release.assets.firstOrNull { it.name.startsWith(assetPrefix) }
-            ?: error("No bwslc release asset found matching '$assetPrefix-*' in latest release ${release.tag_name}")
+            ?: error("No BWSL release asset found matching '$assetPrefix-*' in latest release ${release.tag_name}")
 
         Files.createDirectories(target.parent)
         val downloadRequest = HttpRequest.newBuilder(URI.create(asset.browser_download_url)).build()
