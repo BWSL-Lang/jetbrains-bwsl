@@ -20,6 +20,7 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdea('2026.2')
+        bundledPlugin('intellij.libraries.misc.plugin')
         testFramework(TestFrameworkType.JUnit5.INSTANCE)
         testFramework(TestFrameworkType.Platform.INSTANCE)
     }
