@@ -19,7 +19,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdea('2026.1.2')
+        intellijIdea('2026.2')
         testFramework(TestFrameworkType.JUnit5.INSTANCE)
         testFramework(TestFrameworkType.Platform.INSTANCE)
     }
@@ -33,7 +33,7 @@ intellijPlatform {
     //noinspection GroovyAssignabilityCheck
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = '261'
+            sinceBuild = '262'
         }
         changeNotes = 'Initial version'
     }
