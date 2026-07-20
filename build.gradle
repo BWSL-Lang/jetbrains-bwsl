@@ -2,9 +2,9 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     id 'java'
-    id 'org.jetbrains.kotlin.jvm' version '2.4.0'
-    id 'org.jetbrains.intellij.platform' version '2.16.0'
-    id 'org.jetbrains.grammarkit' version '2023.3.0.1'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.10'
+    id 'org.jetbrains.intellij.platform' version '2.18.1'
+    id 'org.jetbrains.grammarkit' version '2023.3.0.3'
 }
 
 group = 'com.bwsl.jetbrains_plugin'
@@ -25,7 +25,7 @@ dependencies {
         testFramework(TestFrameworkType.Platform.INSTANCE)
     }
 
-    testCompileOnly 'org.junit.jupiter:junit-jupiter-api:5.11.4'
+    testCompileOnly 'org.junit.jupiter:junit-jupiter-api:6.1.2'
     testImplementation 'junit:junit:4.13.2'
 }
 
