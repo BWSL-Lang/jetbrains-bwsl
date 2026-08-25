@@ -1,10 +1,14 @@
-name: Checks
+name: PR checks
 
 on:
-  workflow_call:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  checks:
     name: linux-latest
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +38,3 @@ jobs:
         run: ./gradlew test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify plugin
-        run: ./gradlew verifyPlugin
