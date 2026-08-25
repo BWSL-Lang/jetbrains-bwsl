@@ -1,8 +1,6 @@
-name: JetBrains Plugin
+name: PR checks
 
 on:
-  push:
-    branches: [main]
   pull_request:
 
 concurrency:
