@@ -9,3 +9,6 @@
 /dataSources/
 /dataSources.local.xml
 claudeCodeEditorTabs.xml
+# Gradle-linked module state - regenerated locally on every sync from build.gradle
+/modules.xml
+/modules/
