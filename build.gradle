@@ -8,7 +8,7 @@ plugins {
 }
 
 group = 'com.bwsl.jetbrains_plugin'
-version = '0.1.0'
+version = providers.gradleProperty('pluginVersion').get()
 
 repositories {
     mavenCentral()
@@ -40,7 +40,7 @@ intellijPlatform {
     }
     //noinspection GroovyAssignabilityCheck
     publishing {
-        channels = ['alpha']
+        channels = [providers.gradleProperty('pluginChannels').getOrElse('alpha')]
         // token can be given in two ways:
         // export ORG_GRADLE_PROJECT_intellijPlatformPublishingToken='YOUR_TOKEN'
         // gradle flag -PintellijPlatformPublishingToken=YOUR_TOKEN

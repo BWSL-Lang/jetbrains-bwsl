@@ -1,0 +1,80 @@
+name: Publish Plugin
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    secrets: inherit
+
+  publish-stable:
+    name: Publish to Stable channel
+    needs: checks
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Compute version
+        id: version
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+
+      - name: Publish plugin
+        run: ./gradlew publishPlugin -PpluginVersion=${{ steps.version.outputs.version }} -PpluginChannels=Stable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRADLE_PROJECT_intellijPlatformPublishingToken: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+
+      - name: Upload plugin zip to release
+        run: gh release upload "${{ github.event.release.tag_name }}" build/distributions/*.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-alpha:
+    name: Publish to bwsl-alpha channel
+    needs: checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Compute version
+        id: version
+        run: |
+          base=$(grep '^pluginVersion=' gradle.properties | cut -d= -f2)
+          echo "version=${base}-alpha.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish plugin
+        run: ./gradlew publishPlugin -PpluginVersion=${{ steps.version.outputs.version }} -PpluginChannels=bwsl-alpha
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRADLE_PROJECT_intellijPlatformPublishingToken: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
