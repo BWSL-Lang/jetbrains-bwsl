@@ -7,10 +7,20 @@ JetBrains IDE plugin (Kotlin, IntelliJ Platform SDK) for the BWSL shader languag
 ```powershell
 $env:JAVA_HOME = [Environment]::GetEnvironmentVariable("JAVA_HOME","User")
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-./gradlew.bat test --no-configuration-cache
+./gradlew.bat test --no-configuration-cache --rerun-tasks
 ```
 JAVA_HOME (`C:\Users\lundis\.jdks\corretto-21.0.9`) is set persistently at User level but is **not**
 inherited by fresh shell sessions started by tools — always export it first.
+
+**`--rerun-tasks` is required, not optional.** Gradle's up-to-date checks are unreliable in this
+project (most likely the IntelliJ Platform Gradle Plugin's sandbox-install step not correctly
+tracking its inputs) - without `--rerun-tasks`, `./gradlew test` frequently reports `BUILD
+SUCCESSFUL` in ~1s while having silently skipped re-running anything, including after real source
+changes. This previously showed up as a `NoSuchMethodError` in the sandboxed test IDE (stale
+plugin classes from an old build) that looked like a stale-cache/stale-daemon problem but was
+actually just tasks not re-executing at all. Deleting `build`/`.gradle` does **not** fix this -
+`--rerun-tasks` does. Always pass it when a test result needs to be trusted, e.g. after any code
+change.
 
 ## Architecture overview
 

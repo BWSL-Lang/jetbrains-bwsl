@@ -10,11 +10,11 @@ Syntax highlighting and compiler error reporting for the [BWSL shader language](
 
 ## Prerequisites
 
-| Tool | Version |
-|---|---|
-| IntelliJ IDEA | 2026.1+ |
-| JDK | 21+ |
-| Gradle | 9.5.1 (via wrapper) |
+| Tool          | Version             |
+|---------------|---------------------|
+| IntelliJ IDEA | 2026.1+             |
+| JDK           | 21+                 |
+| Gradle        | 9.5.1 (via wrapper) |
 
 ## Setup
 

@@ -10,6 +10,14 @@ plugins {
 group = 'com.bwsl.jetbrains_plugin'
 version = providers.gradleProperty('pluginVersion').get()
 
+// Local, gitignored overrides for gradle.properties (e.g. bwslc=C:/path/to/bwslc.exe)
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    def localProperties = new Properties()
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+    localProperties.each { key, value -> project.ext.set(key as String, value) }
+}
+
 repositories {
     mavenCentral()
     intellijPlatform {

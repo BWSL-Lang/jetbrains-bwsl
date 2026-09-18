@@ -48,15 +48,23 @@ fun findScope(root: AstRoot, line: Int, column: Int): AstScope {
             if (pass != null) return AstScope(null, null, pass, pipeline)
         }
     }
-    root.root?.let { rootNode ->
-        for (pass in rootNode.passes) {
-            if (contains(line, column, pass.line, pass.column, pass.endLine, pass.endColumn)) {
-                return AstScope(null, null, pass)
+    // When the file's top level is a pipeline, bwslc duplicates it into both root.root and
+    // root.pipelines (matching ids) - the loop above already handles that case (with full
+    // pipeline context), so root.root must be skipped here to avoid re-processing it without
+    // that context.
+    val rootIsDuplicatePipeline = root.root?.id?.takeIf { it.isNotBlank() }
+        ?.let { id -> root.pipelines.any { it.id == id } } ?: false
+    if (!rootIsDuplicatePipeline) {
+        root.root?.let { rootNode ->
+            for (pass in rootNode.passes) {
+                if (contains(line, column, pass.line, pass.column, pass.endLine, pass.endColumn)) {
+                    return AstScope(null, null, pass)
+                }
             }
-        }
-        val struct = rootNode.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-        if (struct != null || contains(line, column, rootNode.line, rootNode.column, rootNode.endLine, rootNode.endColumn)) {
-            return AstScope(null, struct, null)
+            val struct = rootNode.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+            if (struct != null || contains(line, column, rootNode.line, rootNode.column, rootNode.endLine, rootNode.endColumn)) {
+                return AstScope(null, struct, null)
+            }
         }
     }
     return AstScope(null, null, null)
