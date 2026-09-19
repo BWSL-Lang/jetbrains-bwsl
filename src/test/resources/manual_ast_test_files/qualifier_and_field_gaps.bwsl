@@ -1,0 +1,19 @@
+module Mod {
+    struct Box {
+        float size;
+
+        area :: () -> float {
+            return size;
+        }
+    }
+
+    helper :: () -> float {
+        return 1.0;
+    }
+}
+
+module Main {
+    run :: () -> float {
+        return Mod::helper();
+    }
+}

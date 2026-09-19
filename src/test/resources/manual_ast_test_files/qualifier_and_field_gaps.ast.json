@@ -1,0 +1,344 @@
+﻿{
+  "schema": "bwsl.ast.v2",
+  "sourceFile": "src\\test\\resources\\manual_ast_test_files\\qualifier_and_field_gaps.bwsl",
+  "root": null,
+  "modules": [
+    {
+      "id": "MODULE:0",
+      "type": "MODULE",
+      "index": 0,
+      "line": 1,
+      "column": 1,
+      "endLine": 13,
+      "endColumn": 2,
+      "name": "Mod",
+      "imports": [],
+      "usingImports": [],
+      "functions": [
+        {
+          "id": "FUNCTION:1",
+          "type": "FUNCTION",
+          "index": 1,
+          "line": 10,
+          "column": 5,
+          "endLine": 12,
+          "endColumn": 6,
+          "name": "helper",
+          "parameters": [],
+          "returnType": "float",
+          "body": {
+            "id": "BLOCK:1",
+            "type": "BLOCK",
+            "index": 1,
+            "line": 10,
+            "column": 27,
+            "endLine": 12,
+            "endColumn": 6,
+            "statements": [
+              {
+                "id": "RETURN:1",
+                "type": "RETURN",
+                "index": 1,
+                "line": 11,
+                "column": 9,
+                "value": {
+                  "id": "LITERAL:0",
+                  "type": "LITERAL",
+                  "index": 0,
+                  "line": 11,
+                  "column": 16,
+                  "literal": {
+                    "literalType": "FLOAT",
+                    "value": 1
+                  }
+                }
+              }
+            ]
+          },
+          "isEval": false,
+          "isStructMethod": false,
+          "isConstMethod": false
+        }
+      ],
+      "structs": [
+        {
+          "id": "STRUCT_DECL:0",
+          "type": "STRUCT_DECL",
+          "index": 0,
+          "line": 2,
+          "column": 5,
+          "endLine": 8,
+          "endColumn": 6,
+          "name": "Box",
+          "fields": [
+            {
+              "name": "size",
+              "type": {
+                "coreType": "FLOAT",
+                "componentCount": 1,
+                "arrayDimensions": 0,
+                "arrayLength": 0,
+                "arrayStride": 0
+              },
+              "arraySize": 0
+            }
+          ],
+          "methods": [
+            {
+              "id": "FUNCTION:0",
+              "type": "FUNCTION",
+              "index": 0,
+              "line": 5,
+              "column": 9,
+              "endLine": 7,
+              "endColumn": 10,
+              "name": "area",
+              "parameters": [],
+              "returnType": "float",
+              "body": {
+                "id": "BLOCK:0",
+                "type": "BLOCK",
+                "index": 0,
+                "line": 5,
+                "column": 29,
+                "endLine": 7,
+                "endColumn": 10,
+                "statements": [
+                  {
+                    "id": "RETURN:0",
+                    "type": "RETURN",
+                    "index": 0,
+                    "line": 6,
+                    "column": 13,
+                    "value": {
+                      "id": "IDENTIFIER:0",
+                      "type": "IDENTIFIER",
+                      "index": 0,
+                      "line": 6,
+                      "column": 20,
+                      "name": "size",
+                      "identifierKind": "NONE"
+                    }
+                  }
+                ]
+              },
+              "isEval": false,
+              "isStructMethod": true,
+              "isConstMethod": false
+            }
+          ]
+        }
+      ],
+      "enums": [],
+      "attributes": [],
+      "resources": [],
+      "variantDecls": [],
+      "variantRules": []
+    },
+    {
+      "id": "MODULE:1",
+      "type": "MODULE",
+      "index": 1,
+      "line": 15,
+      "column": 1,
+      "endLine": 19,
+      "endColumn": 2,
+      "name": "Main",
+      "imports": [],
+      "usingImports": [],
+      "functions": [
+        {
+          "id": "FUNCTION:2",
+          "type": "FUNCTION",
+          "index": 2,
+          "line": 16,
+          "column": 5,
+          "endLine": 18,
+          "endColumn": 6,
+          "name": "run",
+          "parameters": [],
+          "returnType": "float",
+          "body": {
+            "id": "BLOCK:2",
+            "type": "BLOCK",
+            "index": 2,
+            "line": 16,
+            "column": 24,
+            "endLine": 18,
+            "endColumn": 6,
+            "statements": [
+              {
+                "id": "RETURN:2",
+                "type": "RETURN",
+                "index": 2,
+                "line": 17,
+                "column": 9,
+                "value": {
+                  "id": "FUNCTION_CALL:0",
+                  "type": "FUNCTION_CALL",
+                  "index": 0,
+                  "line": 17,
+                  "column": 19,
+                  "name": "helper",
+                  "arguments": [],
+                  "moduleName": "Mod"
+                }
+              }
+            ]
+          },
+          "isEval": false,
+          "isStructMethod": false,
+          "isConstMethod": false
+        }
+      ],
+      "structs": [],
+      "enums": [],
+      "attributes": [],
+      "resources": [],
+      "variantDecls": [],
+      "variantRules": []
+    }
+  ],
+  "pipelines": [],
+  "nodeCounts": {
+    "total": 17,
+    "identifiers": 2,
+    "literals": 1,
+    "binaryOps": 0,
+    "unaryOps": 0,
+    "ternaryExprs": 0,
+    "memberAccesses": 1,
+    "arrayAccesses": 0,
+    "assignments": 3,
+    "shaderStages": 0,
+    "blocks": 3,
+    "variableDecls": 0,
+    "functionCalls": 1,
+    "attributeDecls": 0,
+    "resourceDecls": 0,
+    "forCStyles": 0,
+    "forRanges": 0,
+    "forCollections": 0,
+    "loops": 0,
+    "functions": 3,
+    "structDecls": 1,
+    "constraintDecls": 0,
+    "passes": 0,
+    "modules": 2,
+    "enumDecls": 0,
+    "patternMatches": 0,
+    "typePatternMatches": 0,
+    "typePatternArms": 0,
+    "switchCases": 0,
+    "switches": 0,
+    "pipelines": 0,
+    "computeGraphs": 0
+  },
+  "referenceIndex": {
+    "format": "bwsl.references.v1",
+    "unit": "src\\test\\resources\\manual_ast_test_files\\qualifier_and_field_gaps.bwsl",
+    "nodeIdFormat": "TYPE:index",
+    "syntheticIdFormat": "<owner-id>/<kind>:<index-or-name>",
+    "stableIdFormat": "qualified semantic path for externally addressable symbols",
+    "symbols": [
+      {
+        "id": "MODULE:0",
+        "kind": "module",
+        "name": "Mod",
+        "declaration": "MODULE:0",
+        "stableId": "module:Mod"
+      },
+      {
+        "id": "MODULE:1",
+        "kind": "module",
+        "name": "Main",
+        "declaration": "MODULE:1",
+        "stableId": "module:Main"
+      },
+      {
+        "id": "STRUCT_DECL:0",
+        "kind": "struct",
+        "name": "Box",
+        "declaration": "STRUCT_DECL:0",
+        "owner": "MODULE:0",
+        "stableId": "module:Mod/type:Box"
+      },
+      {
+        "id": "STRUCT_DECL:0/field:0",
+        "kind": "struct-field",
+        "name": "size",
+        "declaration": "STRUCT_DECL:0/field:0",
+        "owner": "STRUCT_DECL:0",
+        "type": "float",
+        "stableId": "module:Mod/type:Box/field:size"
+      },
+      {
+        "id": "FUNCTION:0",
+        "kind": "method",
+        "name": "area",
+        "declaration": "FUNCTION:0",
+        "owner": "STRUCT_DECL:0",
+        "type": "float",
+        "stableId": "module:Mod/type:Box/method:area()->float"
+      },
+      {
+        "id": "FUNCTION:1",
+        "kind": "function",
+        "name": "helper",
+        "declaration": "FUNCTION:1",
+        "owner": "MODULE:0",
+        "type": "float",
+        "stableId": "module:Mod/function:helper()->float"
+      },
+      {
+        "id": "FUNCTION:2",
+        "kind": "function",
+        "name": "run",
+        "declaration": "FUNCTION:2",
+        "owner": "MODULE:1",
+        "type": "float",
+        "stableId": "module:Main/function:run()->float"
+      },
+      {
+        "id": "builtin:type:float",
+        "kind": "core-type",
+        "name": "float",
+        "declaration": "builtin:type:float",
+        "owner": "builtin",
+        "stableId": "builtin:type:float"
+      }
+    ],
+    "references": [
+      {
+        "from": "STRUCT_DECL:0/field:0",
+        "to": "builtin:type:float",
+        "role": "type"
+      },
+      {
+        "from": "FUNCTION:1",
+        "to": "builtin:type:float",
+        "role": "return-type"
+      },
+      {
+        "from": "FUNCTION:0",
+        "to": "builtin:type:float",
+        "role": "return-type"
+      },
+      {
+        "from": "FUNCTION:2",
+        "to": "builtin:type:float",
+        "role": "return-type"
+      },
+      {
+        "from": "IDENTIFIER:1",
+        "to": "MODULE:0",
+        "role": "qualifier"
+      },
+      {
+        "from": "FUNCTION_CALL:0",
+        "to": "FUNCTION:1",
+        "role": "call"
+      }
+    ]
+  }
+}
