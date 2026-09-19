@@ -18,6 +18,14 @@ data class AstNodePos(
     /** Present on VARIABLE_DECL only - see FUCK_THE_LEXER.md §3. */
     val nameLine: Int? = null,
     val nameColumn: Int? = null,
+    /** Present on VARIABLE_DECL only - the start of the declared-type text (node.line/column). */
+    val typeLine: Int? = null,
+    val typeColumn: Int? = null,
+    /** Present on VARIABLE_DECL only - text length gives the declared-type span. */
+    val declaredType: String? = null,
+    /** Present on nodes with a body range (FUNCTION, STRUCT_DECL, MODULE, PIPELINE, PASS, ...). */
+    val endLine: Int? = null,
+    val endColumn: Int? = null,
     /** true for `recv.f()`-style FUNCTION_CALL nodes. */
     val hasReceiver: Boolean = false,
     /** true for `Mod::f()`-style FUNCTION_CALL nodes. */
@@ -102,6 +110,40 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, private val sourceText: S
             .minByOrNull { (range, _) -> range.last - range.first }
             ?.second
 
+    /**
+     * The character range (0-based, end-exclusive) of a VARIABLE_DECL's *declared-type* text -
+     * distinct from [nameRangeOf], which returns its name. Null for every other node type, and
+     * for VARIABLE_DECLs missing typeLine/typeColumn/declaredType (same fail-closed reasoning as
+     * the for-loop-init case in [nameRangeOf]).
+     */
+    fun typeRangeOf(node: AstNodePos): IntRange? {
+        if (node.type != "VARIABLE_DECL") return null
+        val tl = node.typeLine?.takeIf { it != 0 } ?: return null
+        val tc = node.typeColumn?.takeIf { it != 0 } ?: return null
+        val declaredType = node.declaredType?.takeIf { it.isNotEmpty() } ?: return null
+        val start = offsetOf(tl, tc) ?: return null
+        return start until (start + declaredType.length)
+    }
+
+    /** The VARIABLE_DECL (if any) whose declared-type range ([typeRangeOf]) contains [offset]. */
+    fun variableDeclTypeAtOffset(offset: Int): AstNodePos? =
+        nodesById.values
+            .filter { it.type == "VARIABLE_DECL" }
+            .firstOrNull { node -> typeRangeOf(node)?.let { offset in it } == true }
+
+    /**
+     * The character range (0-based, inclusive end) spanned by [node]'s full body, per its
+     * line/column..endLine/endColumn - used to bound a name search inside a declaration that has
+     * no position of its own (e.g. a function parameter), not to locate [node]'s own name.
+     */
+    fun ownerRangeOf(node: AstNodePos): IntRange? {
+        val start = offsetOf(node.line, node.column) ?: return null
+        val endLine = node.endLine?.takeIf { it != 0 } ?: return null
+        val endColumn = node.endColumn?.takeIf { it != 0 } ?: return null
+        val end = offsetOf(endLine, endColumn) ?: return null
+        return start..end
+    }
+
     private fun exactNameRange(line: Int, column: Int, name: String?): IntRange? {
         if (name.isNullOrEmpty()) return null
         val start = offsetOf(line, column) ?: return null
@@ -158,6 +200,11 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, private val sourceText: S
                         member = obj.get("member")?.asStringOrNull(),
                         nameLine = obj.get("nameLine")?.asIntOrNull(),
                         nameColumn = obj.get("nameColumn")?.asIntOrNull(),
+                        typeLine = obj.get("typeLine")?.asIntOrNull(),
+                        typeColumn = obj.get("typeColumn")?.asIntOrNull(),
+                        declaredType = obj.get("declaredType")?.asStringOrNull(),
+                        endLine = obj.get("endLine")?.asIntOrNull(),
+                        endColumn = obj.get("endColumn")?.asIntOrNull(),
                         hasReceiver = obj.has("receiver"),
                         hasModuleQualifier = !obj.get("moduleName")?.asStringOrNull().isNullOrEmpty()
                     )
