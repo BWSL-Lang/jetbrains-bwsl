@@ -1,0 +1,84 @@
+module MathUtils {
+    struct Circle {
+        float radius;
+        int segments;
+
+        area :: () -> float {
+            return radius * radius * 3.14159;
+        }
+    }
+
+    sumArray :: (float[5] values) -> float {
+        float total = 0.0;
+        for (int i = 0; i < values.length(); i++) {
+            total += values[i];
+        }
+        return total;
+    }
+
+    rotate :: (float2 pos, float2 center, float angle) -> float2 {
+        float2 normalized = pos - center;
+        float2 result = float2(
+            normalized.x * cos(angle) - normalized.y * sin(angle),
+            normalized.x * sin(angle) + normalized.y * cos(angle)
+        );
+        return center + result;
+    }
+}
+
+pipeline BasicShading {
+    attributes {
+        position: float3
+        normal: float3
+        uv: float2
+    }
+
+    resources {
+        lightDir: float3
+    }
+
+    pass "Main" {
+        use attributes { position, normal, uv }
+
+        vertex {
+            output.position = float4(position, 1.0);
+            output.uv = uv;
+        }
+
+        fragment {
+            MathUtils::Circle c;
+            c.radius = 2.0;
+            float brightness = c.area() * 0.01;
+            output.color = float4(input.uv * brightness, 0.0, 1.0);
+        }
+    }
+}
+
+
+pipeline BasicShading2 {
+    attributes {
+        position: float3
+        normal: float3
+        uv: float2
+    }
+
+    resources {
+        lightDir: float3
+    }
+
+    pass "Main" {
+        use attributes { position, normal, uv }
+
+        vertex {
+            output.position = float4(position, 1.0);
+            output.uv = uv;
+        }
+
+        fragment {
+            MathUtils::Circle c;
+            c.radius = 2.0;
+            float brightness = c.area() * 0.01;
+            output.color = float4(input.uv * brightness, 0.0, 1.0);
+        }
+    }
+}
