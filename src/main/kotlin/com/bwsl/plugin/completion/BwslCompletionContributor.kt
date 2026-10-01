@@ -8,6 +8,7 @@ import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
+import com.intellij.codeInsight.completion.PrioritizedLookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.util.elementType
@@ -47,6 +48,9 @@ private val TYPE_KEYWORDS = listOf(
     "buffer", "cbuffer", "void"
 )
 
+// Above the default priority (0), so locals sort ahead of keywords, types and intrinsics.
+private const val LOCAL_PRIORITY = 100.0
+
 private val INTRINSIC_NAMES = listOf(
     "abs", "acos", "all", "any", "asin", "atan", "ceil", "clamp", "cos", "cross",
     "degrees", "distance", "dot", "exp", "exp2", "floor", "fmod", "frac",
@@ -67,6 +71,19 @@ private fun currentBlockContext(parameters: CompletionParameters): BwslBlockCont
     // Use the position just before the inserted dummy identifier, which is where the real token starts.
     val (line, column) = lineColumnAt(file, parameters.offset) ?: return BwslBlockContext.STATEMENT_BODY
     return blockContextAt(root, line, column, file.text)
+}
+
+/**
+ * The parameters, locals and constants in scope at the completion position, from the cached AST.
+ * Empty when no AST is cached (there is no lexical fallback).
+ */
+private fun visibleLocals(parameters: CompletionParameters): List<VisibleLocal> {
+    val file = parameters.originalFile
+    val path = file.virtualFile?.path ?: return emptyList()
+    val root = BwslAstCache.getRoot(path) ?: return emptyList()
+    val raw = BwslAstCache.getRawRoot(path) ?: return emptyList()
+    val (line, column) = lineColumnAt(file, parameters.offset) ?: return emptyList()
+    return visibleLocalsAt(root, raw, line, column)
 }
 
 class BwslCompletionContributor : CompletionContributor() {
@@ -150,6 +167,24 @@ class BwslCompletionContributor : CompletionContributor() {
                         (if (blockContext == BwslBlockContext.STATEMENT_BODY) STATEMENT_KEYWORDS else emptyList()) +
                         (if (blockContext == BwslBlockContext.PIPELINE_BODY) PIPELINE_BODY_KEYWORDS else emptyList()) +
                         (if (blockContext == BwslBlockContext.PASS_BODY) PASS_BODY_KEYWORDS else emptyList())
+
+                    // Names the user declared come first: they are the most likely thing to type in a
+                    // function or stage body. Not after `.` or `::`, where a name is a member or a
+                    // module-level name, not a local.
+                    val afterMemberOrQualifier =
+                        prevSibling?.elementType == BwslTokenTypes.DOT || prevSibling?.elementType == BwslTokenTypes.COLONCOLON
+                    if (blockContext == BwslBlockContext.STATEMENT_BODY && !afterMemberOrQualifier) {
+                        for (local in visibleLocals(parameters)) {
+                            result.addElement(
+                                PrioritizedLookupElement.withPriority(
+                                    LookupElementBuilder.create(local.name)
+                                        .withTypeText(local.type ?: "")
+                                        .withTailText(" ${local.kind.label}", true),
+                                    LOCAL_PRIORITY
+                                )
+                            )
+                        }
+                    }
 
                     for (kw in keywords) {
                         result.addElement(LookupElementBuilder.create(kw).bold())

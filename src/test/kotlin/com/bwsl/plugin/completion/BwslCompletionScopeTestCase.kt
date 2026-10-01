@@ -19,10 +19,8 @@ abstract class BwslCompletionScopeTestCase : BasePlatformTestCase() {
 
     protected fun checkCompletions(sourceWithCaret: String, present: Set<String> = emptySet(), absent: Set<String> = emptySet()) {
         val cleanSource = sourceWithCaret.replace("<caret>", "")
-        val root = BwslcAstHelper.parse(cleanSource)
-
         myFixture.configureByText("scope_test_${fileCounter++}.bwsl", sourceWithCaret)
-        BwslAstCache.update(myFixture.file.virtualFile.path, root)
+        BwslcAstHelper.parseAndCache(cleanSource, myFixture.file.virtualFile.path)
 
         val strings = myFixture.completeBasic().map { it.lookupString }
 

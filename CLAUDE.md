@@ -79,7 +79,13 @@ needs to be trusted, e.g. after any code change.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `blockContextAt`, `vertexOutputAssignments`, `passUsedAttributes`, `deduceExprType`) and line
-  ranges. Nothing else may use those helpers.
+  ranges. Nothing else may use those helpers. The parameters, locals, consts and loop variables it
+  offers in a function or stage body come from `visibleLocalsAt` (`BwslAstLocals.kt`), which walks
+  the *raw* cached AST down to the position (only into containers whose range holds it) rather than
+  asking the reference index: it answers "what could be typed here", not "what does this name
+  refer to". A name counts once it is declared and only while its block is open; module-, pipeline-
+  and pass-level consts count throughout. The AST is from the last successful compile of the saved
+  file, so a local typed since then is not offered until the file is saved and re-annotated.
 
 ## The AST and reference index (what the plugin relies on)
 
