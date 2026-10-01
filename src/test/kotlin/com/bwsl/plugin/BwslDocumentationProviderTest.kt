@@ -272,14 +272,13 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         assertTrue("Expected the input.n name, got: $doc", doc.contains("input.n"))
     }
 
-    fun testStageValueTheCompilerLeftUntypedShowsAQuestionMarkNotAGuess() {
-        // `normalize(...)` gets no type in the AST (BWSLC_GAPS.md #2). The doc must say so rather
-        // than invent one, such as the called function's name.
+    fun testStageValueAssignedAnIntrinsicCallShowsTheTypeTheCompilerInferred() {
+        // `normalize(float2)` returns float2; the compiler infers that from the intrinsic's signature.
         configureAndCache(stageIoSource.replace("input.unit", "input.un<caret>it"))
 
         val doc = docAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'input.unit'", doc)
-        assertTrue("Expected an unknown type, got: $doc", doc!!.contains("? unit"))
+        assertTrue("Expected the inferred type float2, got: $doc", doc!!.contains("float2 unit"))
         assertFalse("Must not claim the function name as the type, got: $doc", doc.contains("normalize"))
     }
 

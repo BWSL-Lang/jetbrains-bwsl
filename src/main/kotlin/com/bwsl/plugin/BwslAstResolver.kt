@@ -41,13 +41,13 @@ fun declarationIdsAt(index: BwslAstIndex, offset: Int): List<String> =
  * The reference edges out of the node at [offset]: the edges of the node whose name is there, minus
  * the `type`/`return-type` ones that merely describe a declaration (following those from a
  * declaration's own name would navigate a field to its type). A caret on a variable's declared-type
- * text is the one place those are the answer.
+ * text, or a function's return-type text, is the one place those are the answer.
  */
 fun referenceEdgesAt(index: BwslAstIndex, offset: Int): List<AstReference> {
     index.nodeAtOffset(offset)?.let { hit ->
         return index.refsByFrom[hit.id].orEmpty().filter { it.role !in DECLARATION_ROLES }
     }
-    val declared = index.variableDeclTypeAtOffset(offset) ?: return emptyList()
+    val declared = index.declaredTypeAtOffset(offset) ?: return emptyList()
     return index.refsByFrom[declared.id].orEmpty()
 }
 

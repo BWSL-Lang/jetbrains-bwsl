@@ -84,7 +84,6 @@ needs to be trusted, e.g. after any code change.
 ## The AST and reference index (what the plugin relies on)
 
 Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF-16 with a BOM).
-`BWSLC_GAPS.md` lists what it doesn't give us.
 
 - **Ids.** Every AST node has an `id` of the form `TYPE:index` (`FUNCTION:3`). Synthetic ids are
   `<owner-id>/<kind>:<index-or-name>`: `FUNCTION:0/parameter:1`, `STRUCT_DECL:0/field:0`,
@@ -99,7 +98,8 @@ Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF
 - **`referenceIndex.symbols`** reuse the AST ids and carry no position of their own; a symbol's
   position always comes from the AST node with the same id. Fields: `id`, `kind`, `name`,
   `declaration`, `owner`, `type`, `stableId`, and `definitions` (the ids of the assignments that
-  write it, in source order) on symbols that are assigned. Kinds seen: `module`, `pipeline`, `pass`, `struct`,
+  write it, in source order) on symbols that are assigned. A stage value's `type` is inferred, including
+  from an intrinsic call's result. Kinds seen: `module`, `pipeline`, `pass`, `struct`,
   `struct-field`, `variable`, `constant`, `parameter`, `function`, `method`, `attribute`,
   `core-type`, `intrinsic`, `stage-interface`, `fragment-output`.
 - **`referenceIndex.references`** are `from -> to [role]` edges. Roles seen: `read`, `write`,
@@ -113,7 +113,10 @@ Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF
   to that declaration.
 - **Qualifiers.** `Mod::f()` has a positioned `qualifier` IDENTIFIER with a `qualifier` edge to the
   module; `Mod::Type v` (variables, parameters, struct fields) has a positioned `typeQualifier` with
-  one too. A function's return type has no position.
+  one too. A function records where its return type is written (`returnTypeLine`/
+  `returnTypeColumn`, and `returnType` keeps the qualification as written); a qualified one also has
+  a positioned `returnTypeQualifier` with a `qualifier` edge to the module, alongside the
+  `return-type` edge to the type.
 - **Consts.** Module-, pipeline-, pass- and function/stage-level consts are `VARIABLE_DECL` nodes
   (module/pipeline/pass ones also in a `consts` array). A use the parser folds into a literal keeps
   a positioned `foldedFrom` IDENTIFIER with a `read` edge to the declaration.
@@ -152,8 +155,7 @@ When something looks wrong, verify against the compiler directly before assuming
 bug, and don't assume plugin-side AST/index code is wrong without probing real `bwslc` output
 first. A plain compile (`bwslc <file>`, not `-ast-json`) also reports semantic errors that
 `-ast-json` doesn't, so check a probe file with both. It writes `.spv` files next to the source;
-delete them. `BWSLC_GAPS.md` lists what the AST lacks, with probes in
-`src/test/resources/manual_ast_test_files/`.
+delete them. Probe files live in `src/test/resources/manual_ast_test_files/`.
 
 Module files are written by `BwslcAstHelper` into a directory that outlives the compile (cleaned up
 at JVM exit), because the AST names them by absolute `sourceFile` and navigation opens that path.

@@ -26,6 +26,10 @@ data class AstNodePos(
     val typeColumn: Int? = null,
     /** Present on VARIABLE_DECL only - text length gives the declared-type span. */
     val declaredType: String? = null,
+    /** Present on FUNCTION only - where the return type is written, and its text (qualified, as written). */
+    val returnTypeLine: Int? = null,
+    val returnTypeColumn: Int? = null,
+    val returnType: String? = null,
     /** Present on nodes with a body range (FUNCTION, STRUCT_DECL, MODULE, PIPELINE, PASS, ...). */
     val endLine: Int? = null,
     val endColumn: Int? = null,
@@ -73,17 +77,22 @@ class SourcePositions(private val text: String) {
     }
 
     /**
-     * The character range (0-based, end-exclusive) of a VARIABLE_DECL's *declared-type* text -
-     * distinct from [nameRangeOf], which returns its name. Null for every other node type, and
-     * for VARIABLE_DECLs missing typeLine/typeColumn/declaredType.
+     * The character range (0-based, end-exclusive) of the *type* text a declaration carries -
+     * distinct from [nameRangeOf], which returns its name: a VARIABLE_DECL's declared type, or a
+     * FUNCTION's return type. Null for every other node type, and for a node missing the position
+     * or the type's text.
      */
     fun typeRangeOf(node: AstNodePos): IntRange? {
-        if (node.type != "VARIABLE_DECL") return null
-        val tl = node.typeLine?.takeIf { it != 0 } ?: return null
-        val tc = node.typeColumn?.takeIf { it != 0 } ?: return null
-        val declaredType = node.declaredType?.takeIf { it.isNotEmpty() } ?: return null
+        val (line, column, text) = when (node.type) {
+            "VARIABLE_DECL" -> Triple(node.typeLine, node.typeColumn, node.declaredType)
+            "FUNCTION" -> Triple(node.returnTypeLine, node.returnTypeColumn, node.returnType)
+            else -> return null
+        }
+        val tl = line?.takeIf { it != 0 } ?: return null
+        val tc = column?.takeIf { it != 0 } ?: return null
+        val typeText = text?.takeIf { it.isNotEmpty() } ?: return null
         val start = offsetOf(tl, tc) ?: return null
-        return start until (start + declaredType.length)
+        return start until (start + typeText.length)
     }
 
     /**
@@ -116,9 +125,8 @@ class SourcePositions(private val text: String) {
  * the compiled file's `sourceFile` is as it was passed to bwslc, an imported one is as bwslc found
  * it.
  *
- * See BWSLC_GAPS.md for what the AST still lacks. That this index's positions are right is verified
- * by BwslAstIndexTest against real bwslc output; treat that test as the source of truth over this
- * file's doc comments if they ever disagree.
+ * That this index's positions are right is verified by BwslAstIndexTest against real bwslc output;
+ * treat that test as the source of truth over this file's doc comments if they ever disagree.
  */
 class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
     /** Nodes written by the compiled file itself. */
@@ -206,10 +214,9 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
             .minByOrNull { (range, _) -> range.last - range.first }
             ?.second
 
-    /** The VARIABLE_DECL (if any) whose declared-type range ([typeRangeOf]) contains [offset]. */
-    fun variableDeclTypeAtOffset(offset: Int): AstNodePos? =
+    /** The declaration (a VARIABLE_DECL or FUNCTION) whose type text ([typeRangeOf]) contains [offset]. */
+    fun declaredTypeAtOffset(offset: Int): AstNodePos? =
         nodesById.values
-            .filter { it.type == "VARIABLE_DECL" }
             .firstOrNull { node -> typeRangeOf(node)?.let { offset in it } == true }
 
     private fun collectNodes(
@@ -238,6 +245,9 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                         typeLine = obj.get("typeLine")?.asIntOrNull(),
                         typeColumn = obj.get("typeColumn")?.asIntOrNull(),
                         declaredType = obj.get("declaredType")?.asStringOrNull(),
+                        returnTypeLine = obj.get("returnTypeLine")?.asIntOrNull(),
+                        returnTypeColumn = obj.get("returnTypeColumn")?.asIntOrNull(),
+                        returnType = obj.get("returnType")?.asStringOrNull(),
                         endLine = obj.get("endLine")?.asIntOrNull(),
                         endColumn = obj.get("endColumn")?.asIntOrNull(),
                         interpolation = obj.get("interpolation")?.asStringOrNull(),

@@ -174,4 +174,43 @@ class BwslAstIndexTest {
             assertNameRangeIs(index, source, ref.from, node.member!!)
         }
     }
+
+    @Test
+    fun functionReturnTypeRangeCoversTheTypeTextIncludingItsQualifier() {
+        val source = """
+            module Common {
+                struct Box {
+                    float size;
+                }
+            }
+            module M {
+                struct Local {
+                    float size;
+                }
+
+                plain :: () -> Local {
+                    Local l;
+                    return l;
+                }
+
+                qualified :: () -> Common::Box {
+                    Common::Box b;
+                    return b;
+                }
+            }
+        """.trimIndent() + "\n"
+        val (index, _) = buildIndex(source)
+
+        fun returnTypeText(name: String): String {
+            val fn = index.nodesById.values.first { it.type == "FUNCTION" && it.name == name }
+            val range = index.typeRangeOf(fn)
+            assertNotNull(range) { "Expected a return-type range for $name" }
+            return source.substring(range!!.first, range.last + 1)
+        }
+
+        assertEquals("Local", returnTypeText("plain"))
+        assertEquals("Common::Box", returnTypeText("qualified"))
+        // The qualifier is its own positioned node, named by nameLine/nameColumn.
+        assertNameRangeIs(index, source, index.nodesById.keys.first { it.endsWith("/return-type-qualifier") }, "Common")
+    }
 }

@@ -787,4 +787,99 @@ class BwslAstResolverTest : BasePlatformTestCase() {
             assertEquals(myFixture.file.text.indexOf("result: float4"), resolved[0].textOffset)
         }
     }
+
+    // --- Function return types: positioned, with a qualifier node when written as `Mod::Type` ---
+
+    private val returnTypeSource = """
+        module Common {
+            struct Box {
+                float size;
+            }
+        }
+        module M {
+            struct Local {
+                float size;
+
+                copy :: () -> Local {
+                    return this;
+                }
+            }
+
+            plain :: () -> Local {
+                Local l;
+                return l;
+            }
+
+            qualified :: () -> Common::Box {
+                Common::Box b;
+                return b;
+            }
+        }
+    """.trimIndent()
+
+    private fun resolveReturnTypeCaret(textWithCaret: String): List<com.intellij.psi.PsiElement> {
+        myFixture.configureByText("test.bwsl", textWithCaret)
+        return resolveSymbolAt(myFixture.file, buildIndex(myFixture.file.text), myFixture.caretOffset)
+    }
+
+    fun testReturnTypeResolvesToItsStruct() {
+        val resolved = resolveReturnTypeCaret(returnTypeSource.replace("plain :: () -> Local", "plain :: () -> Lo<caret>cal"))
+
+        assertEquals(1, resolved.size)
+        assertEquals("Local", resolved[0].text)
+        assertEquals(myFixture.file.text.indexOf("struct Local") + "struct ".length, resolved[0].textOffset)
+    }
+
+    fun testStructMethodReturnTypeResolvesToItsStruct() {
+        val resolved = resolveReturnTypeCaret(returnTypeSource.replace("copy :: () -> Local", "copy :: () -> Lo<caret>cal"))
+
+        assertEquals(1, resolved.size)
+        assertEquals(myFixture.file.text.indexOf("struct Local") + "struct ".length, resolved[0].textOffset)
+    }
+
+    fun testQualifiedReturnTypeQualifierResolvesToTheModule() {
+        val resolved = resolveReturnTypeCaret(returnTypeSource.replace("-> Common::Box {", "-> Comm<caret>on::Box {"))
+
+        assertEquals(1, resolved.size)
+        assertEquals("Common", resolved[0].text)
+        assertEquals(myFixture.file.text.indexOf("module Common") + "module ".length, resolved[0].textOffset)
+    }
+
+    fun testQualifiedReturnTypeNameResolvesToTheStruct() {
+        val resolved = resolveReturnTypeCaret(returnTypeSource.replace("-> Common::Box {", "-> Common::B<caret>ox {"))
+
+        assertEquals(1, resolved.size)
+        assertEquals("Box", resolved[0].text)
+        assertEquals(myFixture.file.text.indexOf("struct Box") + "struct ".length, resolved[0].textOffset)
+    }
+
+    fun testCaretOnAFunctionsNameDoesNotFollowItsReturnType() {
+        val resolved = resolveReturnTypeCaret(returnTypeSource.replace("plain :: ", "pla<caret>in :: "))
+
+        assertTrue("A function's own name must not navigate to its return type", resolved.isEmpty())
+    }
+
+    fun testQualifiedReturnTypeFromAnImportedModuleNavigatesIntoItsFile() {
+        myFixture.configureByText(
+            "test.bwsl",
+            """
+            module M {
+                import Common
+
+                make :: () -> Common::Bo<caret>x {
+                    Common::Box b;
+                    return b;
+                }
+            }
+            """.trimIndent()
+        )
+        val common = "module Common {\n    struct Box {\n        float size;\n    }\n}\n"
+        val index = buildIndex(myFixture.file.text, mapOf("Common" to common))
+
+        val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
+
+        assertEquals(1, resolved.size)
+        assertEquals("Common.bwsl", resolved[0].containingFile.name)
+        assertEquals(common.indexOf("Box"), resolved[0].textOffset)
+    }
 }
