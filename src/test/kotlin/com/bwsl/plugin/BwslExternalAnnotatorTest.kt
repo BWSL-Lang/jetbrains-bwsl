@@ -1,0 +1,89 @@
+package com.bwsl.plugin
+
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.io.File
+
+/**
+ * The diagnostics annotator only wants diagnostics from bwslc. Without `-check`, bwslc also writes
+ * `<stem>.vert.spv` / `.frag.spv` for every pass into the process's working directory, and nothing
+ * ever deletes them.
+ */
+class BwslExternalAnnotatorTest : BasePlatformTestCase() {
+
+    private lateinit var originalCompilerPath: String
+
+    override fun setUp() {
+        super.setUp()
+        originalCompilerPath = BwslSettings.getInstance().compilerPath
+        BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
+            ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
+    }
+
+    override fun tearDown() {
+        try {
+            BwslSettings.getInstance().compilerPath = originalCompilerPath
+        } finally {
+            super.tearDown()
+        }
+    }
+
+    private fun pipeline(vertexBody: String) = """
+        pipeline P {
+            attributes {
+                position: float4
+            }
+            pass "Main" {
+                use attributes { position }
+                outputs {
+                    result: float4
+                }
+                vertex {
+                    output.pos = attributes.position;
+                    $vertexBody
+                }
+                fragment {
+                    output.result = float4(1.0);
+                }
+            }
+        }
+    """.trimIndent()
+
+    /** The SPIR-V files in the directories bwslc could write to when run by the annotator. */
+    private fun spirvFiles(): Set<String> =
+        listOf(File(System.getProperty("user.dir")), File(System.getProperty("java.io.tmpdir")))
+            .flatMap { dir -> dir.listFiles { f -> f.extension == "spv" }?.map { it.absolutePath }.orEmpty() }
+            .toSet()
+
+    fun testAValidPipelineLeavesNoSpirvFilesBehind() {
+        val before = spirvFiles()
+
+        val diagnostics = BwslExternalAnnotator().doAnnotate(pipeline("output.uv = float2(0.0);"))
+
+        val created = spirvFiles() - before
+        try {
+            assertTrue("Expected no diagnostics, got: $diagnostics", diagnostics.isEmpty())
+            assertTrue("The annotator left SPIR-V files behind: $created", created.isEmpty())
+        } finally {
+            created.forEach { File(it).delete() }
+        }
+    }
+
+    fun testDiagnosticsAreStillReportedAndNoSpirvFilesAreLeftBehind() {
+        val before = spirvFiles()
+
+        val diagnostics = BwslExternalAnnotator().doAnnotate(
+            pipeline("output.uv = float2(0.0); output.uv = float3(0.0);")
+        )
+
+        val created = spirvFiles() - before
+        try {
+            assertTrue(
+                "Expected the conflicting-types error, got: $diagnostics",
+                diagnostics.any { it.severity == "error" && it.message.contains("conflicting types") }
+            )
+            assertTrue("The annotator left SPIR-V files behind: $created", created.isEmpty())
+        } finally {
+            created.forEach { File(it).delete() }
+        }
+    }
+}

@@ -41,8 +41,10 @@ class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
             tempFile.writeText(fileContent)
             val moduleArgs = BwslSettings.getInstance().modulePaths
                 .flatMap { listOf("-modules", it) }
+            // -check: diagnostics only. Without it bwslc also writes <stem>.<stage>.spv for every pass
+            // into the working directory, and nothing here would ever delete them.
             val process = ProcessBuilder(
-                listOf(compilerPath, tempFile.absolutePath, "-errors-json", "-no-validate") + moduleArgs
+                listOf(compilerPath, tempFile.absolutePath, "-errors-json", "-no-validate", "-check") + moduleArgs
             )
                 .redirectErrorStream(true)
                 .start()
