@@ -16,11 +16,10 @@ inherited by fresh shell sessions started by tools — always export it first.
 project (most likely the IntelliJ Platform Gradle Plugin's sandbox-install step not correctly
 tracking its inputs) - without `--rerun-tasks`, `./gradlew test` frequently reports `BUILD
 SUCCESSFUL` in ~1s while having silently skipped re-running anything, including after real source
-changes. This previously showed up as a `NoSuchMethodError` in the sandboxed test IDE (stale
-plugin classes from an old build) that looked like a stale-cache/stale-daemon problem but was
-actually just tasks not re-executing at all. Deleting `build`/`.gradle` does **not** fix this -
-`--rerun-tasks` does. Always pass it when a test result needs to be trusted, e.g. after any code
-change.
+changes. A `NoSuchMethodError` in the sandboxed test IDE (stale plugin classes from an old build)
+looks like a stale-cache/stale-daemon problem but is just tasks not re-executing. Deleting
+`build`/`.gradle` does **not** fix this - `--rerun-tasks` does. Always pass it when a test result
+needs to be trusted, e.g. after any code change.
 
 ## Architecture overview
 
@@ -33,73 +32,142 @@ change.
   it to call `ReferenceProvidersRegistry.getReferencesFromProviders(this)`. Without this override,
   ctrl+click navigation silently does nothing.
 - `BwslReferenceContributor.kt` — registers reference providers on `BwslTokenTypes.REFERENCE`.
-  Decides which reference class (`BwslFunctionReference`, `BwslVariableReference`,
-  `BwslTypeReference`, `BwslModuleReference`) applies based on the inner element type and
-  surrounding tokens. `BWSL_TYPE_KEYWORDS` is the TokenSet of built-in type keywords
-  (`float`, `int`, `float2`, ...).
+  Everything dispatches to `BwslAstReference` (generic, index-driven — see below), except
+  intrinsic calls and a module's own declaration name, which have no reference. There are no
+  other reference classes: `import`/`using`, `Mod::` qualifiers (calls and declared types),
+  `use attributes { ... }` names, struct fields and fragment outputs are all positioned nodes with
+  an edge in the reference index, so they need no special handling.
 - `BwslAstAnnotator.kt` — runs `bwslc <file> -ast-json -modules <paths...>` as an
-  `ExternalAnnotator`, parses the JSON (handles UTF-16 BOM output) into `AstRoot` via Gson, and
-  stores it in `BwslAstCache`.
+  `ExternalAnnotator`, parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot`
+  and a raw `JsonObject` via Gson, and stores both in `BwslAstCache`.
 - `BwslAstCache.kt` — data classes mirroring the `bwslc -ast-json` schema (`AstRoot`, `AstModule`,
-  `AstStruct`, `AstFunction`, `AstStatement`, `AstBlock`, ...) plus a cache keyed by file path.
-- `BwslAstScope.kt` — the core of AST-driven navigation. Converts PSI offsets ↔ 1-based
-  line/column (`lineColumnAt`/`offsetAt`, matching bwslc's AST positions), finds the enclosing
-  module/struct/pass/function from AST ranges (`findScope`, `findEnclosingFunction`), collects
-  local `VARIABLE_DECL`s (`collectVariableDecls`), resolves a variable's declared type
-  (`findVariableType`), and resolves `Module::Type` qualified struct types (`resolveStruct`).
-- `BwslPsiReferences.kt` — the actual `PsiReference` implementations:
-  - `BwslFunctionReference` (poly-variant): resolves function/method calls via
-    `resolveViaAst` (AST scope + receiver-variable-type lookup for `s.method()`, qualifier lookup
-    for `Module::func()`). Falls back to `walkScopes` (brace-depth PSI tree-walk) when no AST is
-    cached.
-  - `BwslVariableReference`: resolves variable/parameter usages via `resolveVariableViaAst`
-    (finds enclosing AST function, then the nearest preceding `VARIABLE_DECL` or matching
-    parameter, then locates the actual PSI token via `findIdentifierInRange` — leftmost matching
-    identifier in the declaration's line/function range, skipping `.`/`::` member-access
-    occurrences). Falls back to a whole-file nearest-preceding-declaration text search when no
-    AST is cached.
-  - `BwslTypeReference`: resolves a declared type name (`testStruct` or
-    `LengthMethodTest::testStruct`) to its `AstStruct` declaration via `isAstTypeReference` +
-    `resolveStruct`. Falls back to a lexical "identifier followed by identifier" heuristic when
-    no AST is cached.
-  - `BwslModuleReference`: resolves `import`/`using` module names to `.bwsl` files (via
-    `FilenameIndex`, configured module paths, or sibling lookup).
+  `AstStruct`, `AstFunction`, `AstStatement`, `AstBlock`, `AstSymbol`, `AstReference`,
+  `AstReferenceIndex`, ...) plus a cache keyed by file path, storing both the typed root and the
+  raw JSON tree.
+- `BwslAstIndex.kt` — a generic id → position index built by walking the *raw* JSON tree (not the
+  typed model, which can't practically mirror every node type), plus lookups over the compiler's
+  own `referenceIndex` (`symbolsById`/`refsByFrom`/`refsByTo`). `nameRangeOf` is just a node's
+  `nameLine`/`nameColumn` plus its name (`member` for a `MEMBER_ACCESS`), failing closed to null
+  when absent — a node's own `line`/`column` is **not** its name (a `VARIABLE_DECL` points at the
+  declared type, a `MODULE` at the keyword, a `MEMBER_ACCESS` at the dot). **Other files are in
+  the payload too**: imported modules, and members a `submodule` merged into its parent. Their
+  line/column are relative to the file they were written in, which `sourceFile` names on every
+  top-level entry and member (inherited down by `AstNodePos.sourceFile`). `AstRoot.roots` says
+  which entries are the compiled file's own. Never measure `AstRoot.modules`/`pipelines` directly
+  against the current file's text: use `ownModules()`/`ownPipelines()`, or `BwslAstIndex.nodesById`
+  (written by the compiled file) vs `externalNodesById` (written elsewhere, measured against that
+  node's `sourceFile` text via `SourcePositions`).
+- `BwslAstResolver.kt` — `resolveSymbolAt(file, index, offset)`: the single generic resolver.
+  Caret → occurrence node (via `nameRangeOf`) → the reference-index edge from that node → the
+  target symbol's declaration → that declaration's position (an own node, an external node opened
+  through its `sourceFile`, or a stage-interface value, which has no declaration and resolves to
+  the target of the first assignment in the symbol's `definitions`) → PSI element. A caret on a
+  declaration's own name ignores its `type`/`return-type` edges, so a field or parameter doesn't
+  navigate to its type. Returns no results (not a guess) when nothing resolves — see "no
+  fallback" below.
+- `BwslPsiReferences.kt` — `BwslAstReference`, the one `PsiReference` (backed by `resolveSymbolAt`).
+- Also index-driven, through `declarationIdsAt`/`referenceEdgesAt`/`symbolAt`/
+  `functionSignatureOf` in `BwslAstResolver.kt` and `BwslAstIndex.enclosingNodeOfType`: every hover
+  doc (`BwslDocumentationProvider`) and parameter info for non-intrinsic calls
+  (`BwslParameterInfoHandler`). A function's signature is its symbol plus the parameter symbols it
+  owns; its qualified name is its owners' names. The `input.x`/`output.x`/`attributes.x` docs follow
+  the member's reference edge to the stage-interface, fragment-output or attribute symbol, and the
+  qualifier docs list the pass's stage-interface symbols and used-attribute nodes. A doc for a call
+  into another file is generated from the *hovered* element (`originalElement`), because the
+  declaration it resolved to has no cached AST of its own. Intrinsics come from the built-in table
+  in `BwslIntrinsics.kt`.
+- **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
+  cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
+  `blockContextAt`, `vertexOutputAssignments`, `passUsedAttributes`, `deduceExprType`) and line
+  ranges. Nothing else may use those helpers.
+
+## The AST and reference index (what the plugin relies on)
+
+Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF-16 with a BOM).
+`BWSLC_GAPS.md` lists what it doesn't give us.
+
+- **Ids.** Every AST node has an `id` of the form `TYPE:index` (`FUNCTION:3`). Synthetic ids are
+  `<owner-id>/<kind>:<index-or-name>`: `FUNCTION:0/parameter:1`, `STRUCT_DECL:0/field:0`,
+  `PASS:0/used-attribute:2`, `PASS:0/fragment-output:1`, `PASS:0/interface:uv`,
+  `MODULE:0/import:0`, `MODULE:0/using:0`, `VARIABLE_DECL:0/type-qualifier`,
+  `LITERAL:7/folded-constant`. `builtin:*` (`builtin:function:cos`, `builtin:type:float4`) has no
+  source and resolves to nothing.
+- **Positions** are 1-based. `nameLine`/`nameColumn` on every named node is where its name starts;
+  the node's own `line`/`column` is not (a `VARIABLE_DECL` points at the type, a `MODULE`/
+  `STRUCT_DECL`/`PIPELINE` at the keyword, a `MEMBER_ACCESS` at the dot, a qualified call at `::`).
+  Declarations also have `typeLine`/`typeColumn`; bodies have `endLine`/`endColumn`.
+- **`referenceIndex.symbols`** reuse the AST ids and carry no position of their own; a symbol's
+  position always comes from the AST node with the same id. Fields: `id`, `kind`, `name`,
+  `declaration`, `owner`, `type`, `stableId`, and `definitions` (the ids of the assignments that
+  write it, in source order) on symbols that are assigned. Kinds seen: `module`, `pipeline`, `pass`, `struct`,
+  `struct-field`, `variable`, `constant`, `parameter`, `function`, `method`, `attribute`,
+  `core-type`, `intrinsic`, `stage-interface`, `fragment-output`.
+- **`referenceIndex.references`** are `from -> to [role]` edges. Roles seen: `read`, `write`,
+  `call`, `construct`, `type`, `return-type`, `qualifier`, `member`, `output`, `input`,
+  `attribute`, `import`, `using`. `type` and `return-type` describe what a declaration declares;
+  they are not what a caret on the declaration's own name navigates to.
+- **Stage IO.** A vertex `output.x = ...` and a fragment `input.x` reference the same
+  `PASS:n/interface:x` symbol (roles `output` and `input`). A stage interface value has no
+  declaration; its assignment is its definition. A fragment output is declared by an entry in the
+  pass's `outputs { name: type }` block, and `output.x` in the fragment stage has an `output` edge
+  to that declaration.
+- **Qualifiers.** `Mod::f()` has a positioned `qualifier` IDENTIFIER with a `qualifier` edge to the
+  module; `Mod::Type v` (variables, parameters, struct fields) has a positioned `typeQualifier` with
+  one too. A function's return type has no position.
+- **Consts.** Module-, pipeline-, pass- and function/stage-level consts are `VARIABLE_DECL` nodes
+  (module/pipeline/pass ones also in a `consts` array). A use the parser folds into a literal keeps
+  a positioned `foldedFrom` IDENTIFIER with a `read` edge to the declaration.
+- **Other files.** `roots` lists the ids of the compiled file's own top-level declarations;
+  `modules[]`/`pipelines[]` also hold every imported module, and a `submodule`'s members are merged
+  into its parent module. `sourceFile` on top-level entries and members names the file each was
+  written in (the compiled file as it was passed to bwslc, others as an absolute path), and a
+  node's line/column are relative to that file.
+- **Keys.** `type` is the node kind where present; parameters and struct fields use `dataType` for
+  their data type. The singular `root` repeats one top-level pipeline; use `roots`.
 
 ## AST-driven design principle (important — user preference)
 
-Navigation/scope resolution should be driven by the **bwslc AST** (`-ast-json`, with line/column
-ranges for modules/structs/passes/functions/statements), not by ad-hoc PSI tree-walking or text
-search. The flat token-based PSI tree has no real scoping, so things like two same-named
-functions in different `pipeline`/`pass` blocks, or `s.method()` where `s`'s struct type must be
-looked up, cannot be disambiguated by tree-walking alone. The lexical/tree-walking code paths
-that remain (`walkScopes`, text-search fallbacks in `BwslVariableReference`/`BwslTypeReference`)
-are explicitly **fallbacks for when no AST is cached** (e.g. unit tests that don't shell out to
-`bwslc`, or the compiler not configured) — new functionality should be implemented AST-first,
-with the lexical approach only as a fallback, not the primary mechanism.
+Navigation/scope resolution is driven entirely by **bwslc's own reference index**
+(`referenceIndex.symbols`/`referenceIndex.references` in `-ast-json`), not by re-implementing
+BWSL's scoping rules in the plugin. The compiler already resolves scope-sensitive cases (two
+same-named functions in different `pipeline`/`pass` blocks, `s.method()` where `s`'s struct type
+must be looked up, etc.) — the plugin just follows its edges.
 
-## Known bwslc AST bugs (reported upstream, blocking removal of fallbacks)
+**No lexical/PSI-tree-walking fallback.** When no AST is cached (or the reference index has no
+edge for a given position), `BwslAstReference` returns no results — it does not fall back to text
+search or tree-walking. This is deliberate (writing BWSL without a working compiler isn't a
+supported workflow) — do not reintroduce a "thin fallback."
 
-The user wants to eventually remove all lexical fallbacks and have tests run against a real
-`bwslc` binary (found locally at `C:\Users\lundis\BWSL\BWSL\build\bwslc.exe`,
-`bwslc <file> -ast-json -modules <dir>`). This is currently blocked by a compiler bug:
+## Verifying against real bwslc
 
-- `VARIABLE_DECL.line`/`column` is supposed to be the start of the declared-type text, and is
-  correct for some cases (e.g. `LengthMethodTest::testStruct s1;` → points at `LengthMethodTest`).
-  But for many other locals (e.g. `float2 normalized = ...` on its own line), `line`/`column`
-  instead points at the *previous* statement/token's end position (often the `{` that opened the
-  enclosing block), not the actual declaration site. This makes span-based matching
-  (`isAstTypeReference`) unreliable for non-struct-typed locals — currently masked because those
-  are built-in types filtered out by `BWSL_TYPE_KEYWORDS` before reaching that check.
+`C:\Users\lundis\BWSL\BWSL\build\bwslc.exe <file> -ast-json [-modules <dir>]` is the real compiler
+binary. Tests that need real AST/reference-index output use `BwslcAstHelper`
+(`src/test/kotlin/com/bwsl/plugin/completion/BwslcAstHelper.kt`) — `parse`/`parseRaw` shell out to
+it, and `parseAndCache(source, filePath)` populates `BwslAstCache` with both (mirrors what
+`BwslAstAnnotator` does for a real file). Prefer this over hand-built `AstRoot` literals in new
+tests — a hand-built `AstRoot` has no `referenceIndex`, so `BwslAstReference` resolves nothing
+against it.
 
-Once this is fixed upstream, revisit: rewrite `BwslReferenceTest` to populate `BwslAstCache` via
-real `bwslc` output (a small test helper that shells out like `BwslAstAnnotator` does), then strip
-`walkScopes` and the text-search fallbacks from `BwslPsiReferences.kt`.
+When something looks wrong, verify against the compiler directly before assuming it's a plugin
+bug, and don't assume plugin-side AST/index code is wrong without probing real `bwslc` output
+first. A plain compile (`bwslc <file>`, not `-ast-json`) also reports semantic errors that
+`-ast-json` doesn't, so check a probe file with both. It writes `.spv` files next to the source;
+delete them. `BWSLC_GAPS.md` lists what the AST lacks, with probes in
+`src/test/resources/manual_ast_test_files/`.
 
-## Test reference file
+Module files are written by `BwslcAstHelper` into a directory that outlives the compile (cleaned up
+at JVM exit), because the AST names them by absolute `sourceFile` and navigation opens that path.
+Tests must not add the module to the fixture project to make navigation work — that would hide a
+wrong path.
 
-`src/test/resources/lexer_test_files/module.bwsl` is the running example used for lexer and
-reference-resolution tests — it deliberately contains tricky cases: intrinsic vs. method calls on
-array receivers (`values.length()` vs `values.cos()`), same-named functions/methods across
-different modules/structs (`test`/`testStruct::test`), and qualified/typed variable declarations
-(`LengthMethodTest::testStruct s1;` vs `testStruct s2;`) used to verify navigation correctly
-disambiguates by AST scope rather than text proximity.
+## Test reference files
+
+- `src/test/resources/lexer_test_files/module.bwsl` — the running example for lexer and
+  reference-resolution tests: intrinsic vs. method calls on array receivers
+  (`values.length()` vs `values.cos()`), same-named functions/methods across different
+  modules/structs (`test`/`testStruct::test`), and qualified/typed variable declarations
+  (`LengthMethodTest::testStruct s1;` vs `testStruct s2;`).
+- `src/test/resources/manual_ast_test_files/` — ad-hoc `.bwsl` + generated `.ast.json` pairs used
+  to investigate/document specific compiler behavior (not wired into any test; regenerate the
+  `.ast.json` from the `.bwsl` with the compiler binary above when investigating further, don't
+  hand-edit it).

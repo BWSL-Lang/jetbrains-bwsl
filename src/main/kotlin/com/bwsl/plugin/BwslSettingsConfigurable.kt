@@ -101,8 +101,7 @@ class BwslSettingsConfigurable : Configurable {
         if (panel?.isModified() == true) return true
         val settings = BwslSettings.getInstance()
         val currentFormat = (formatCombo?.selectedItem as? BwslOutputFormat)?.name ?: BwslOutputFormat.SPIRV_ONLY.name
-        if (currentFormat != settings.outputFormat) return true
-        return settings.modulePaths != moduleListModel.elements().toList()
+        return currentFormat != settings.outputFormat || settings.modulePaths != moduleListModel.elements().toList()
     }
 
     override fun apply() {

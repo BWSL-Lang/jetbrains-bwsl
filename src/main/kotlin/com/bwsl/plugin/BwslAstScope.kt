@@ -1,10 +1,6 @@
 package com.bwsl.plugin
-import com.bwsl.plugin.references.nextNonWhitespace
-
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.util.elementType
 
 data class AstScope(val module: AstModule?, val struct: AstStruct?, val pass: AstPass?, val pipeline: AstPipeline? = null)
 
@@ -17,13 +13,6 @@ fun lineColumnAt(file: PsiFile, offset: Int): Pair<Int, Int>? {
     return (line + 1) to (column + 1)
 }
 
-/** Converts a 1-based (line, column) AST position to a zero-based document offset. */
-fun offsetAt(file: PsiFile, line: Int, column: Int): Int? {
-    val doc = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return null
-    if (line < 1 || line > doc.lineCount) return null
-    return doc.getLineStartOffset(line - 1) + (column - 1)
-}
-
 fun astContains(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean =
     contains(line, column, startLine, startColumn, endLine, endColumn)
 
@@ -34,88 +23,34 @@ private fun contains(line: Int, column: Int, startLine: Int, startColumn: Int, e
     return true
 }
 
-/** Finds the module/struct/pass that contains the given source position, based on the AST's line/column ranges. */
+/**
+ * Finds the module/struct/pass that contains the given source position, based on the AST's
+ * line/column ranges. Drives this from [AstRoot.roots] (the complete, ordered list of top-level
+ * declaration ids) rather than blindly iterating [AstRoot.modules]/[AstRoot.pipelines] wholesale,
+ * so a top-level kind not modeled here is simply skipped (id not "MODULE:"/"PIPELINE:").
+ */
 fun findScope(root: AstRoot, line: Int, column: Int): AstScope {
-    for (module in root.modules) {
-        if (contains(line, column, module.line, module.column, module.endLine, module.endColumn)) {
-            val struct = module.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            return AstScope(module, struct, null)
-        }
-    }
-    for (pipeline in root.pipelines) {
-        if (contains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
-            val pass = pipeline.passes.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            if (pass != null) return AstScope(null, null, pass, pipeline)
-        }
-    }
-    // When the file's top level is a pipeline, bwslc duplicates it into both root.root and
-    // root.pipelines (matching ids) - the loop above already handles that case (with full
-    // pipeline context), so root.root must be skipped here to avoid re-processing it without
-    // that context.
-    val rootIsDuplicatePipeline = root.root?.id?.takeIf { it.isNotBlank() }
-        ?.let { id -> root.pipelines.any { it.id == id } } ?: false
-    if (!rootIsDuplicatePipeline) {
-        root.root?.let { rootNode ->
-            for (pass in rootNode.passes) {
-                if (contains(line, column, pass.line, pass.column, pass.endLine, pass.endColumn)) {
-                    return AstScope(null, null, pass)
+    for (rootId in root.roots) {
+        when {
+            rootId.startsWith("MODULE:") -> {
+                val module = root.modules.firstOrNull { it.id == rootId } ?: continue
+                if (contains(line, column, module.line, module.column, module.endLine, module.endColumn)) {
+                    val struct = module.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                    return AstScope(module, struct, null)
                 }
             }
-            val struct = rootNode.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            if (struct != null || contains(line, column, rootNode.line, rootNode.column, rootNode.endLine, rootNode.endColumn)) {
-                return AstScope(null, struct, null)
+            rootId.startsWith("PIPELINE:") -> {
+                val pipeline = root.pipelines.firstOrNull { it.id == rootId } ?: continue
+                if (contains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
+                    val pass = pipeline.passes.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                    if (pass != null) return AstScope(null, null, pass, pipeline)
+                    val struct = pipeline.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                    if (struct != null) return AstScope(null, struct, null, pipeline)
+                }
             }
         }
     }
     return AstScope(null, null, null)
-}
-
-/** Functions callable without qualification from within the given scope. */
-fun functionsInScope(root: AstRoot, scope: AstScope): List<AstFunction> {
-    scope.struct?.let { return it.methods }
-    scope.module?.let { return it.functions }
-    scope.pass?.let { return it.functions }
-    return root.root?.functions ?: emptyList()
-}
-
-/** Resolves the PSI element at the position where an AST function/struct member is declared. */
-fun findDeclarationElement(file: PsiFile, fn: AstFunction): PsiElement? {
-    val offset = offsetAt(file, fn.line, fn.column) ?: return null
-    return file.findElementAt(offset)
-}
-
-/** Resolves the PSI element at the position where an AST struct is declared. */
-fun findDeclarationElement(file: PsiFile, struct: AstStruct): PsiElement? {
-    val offset = offsetAt(file, struct.line, struct.column) ?: return null
-    return file.findElementAt(offset)
-}
-
-/** Resolves the PSI element for an AST module's name (the identifier following "module"). */
-fun findModuleNameElement(file: PsiFile, module: AstModule): PsiElement? {
-    val kwOffset = offsetAt(file, module.line, module.column) ?: return null
-    val kw = file.findElementAt(kwOffset) ?: return null
-    val next = nextNonWhitespace(kw) ?: return null
-    return if (next.elementType == BwslTokenTypes.REFERENCE) next.firstChild else next
-}
-
-/** Finds the function (from the given scope) whose body range contains the given position. */
-fun findEnclosingFunction(root: AstRoot, scope: AstScope, line: Int, column: Int): AstFunction? =
-    functionsInScope(root, scope).firstOrNull {
-        astContains(line, column, it.line, it.column, it.endLine, it.endColumn)
-    }
-
-/** The document offset range spanned by a function declaration, per the AST. */
-fun functionRange(file: PsiFile, fn: AstFunction): IntRange? {
-    val start = offsetAt(file, fn.line, fn.column) ?: return null
-    val end = offsetAt(file, fn.endLine, fn.endColumn) ?: return null
-    return start..end
-}
-
-/** The document offset range of a given 1-based line. */
-fun lineRange(file: PsiFile, line: Int): IntRange? {
-    val doc = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return null
-    if (line < 1 || line > doc.lineCount) return null
-    return doc.getLineStartOffset(line - 1)..doc.getLineEndOffset(line - 1)
 }
 
 /** Recursively collects all VARIABLE_DECL statements within a block, including nested blocks (if/for/etc). */
@@ -126,17 +61,6 @@ fun collectVariableDecls(block: AstBlock?): List<AstStatement> {
         self + collectVariableDecls(stmt.body)
     }
 }
-
-/**
- * Finds the declared type of a local variable visible at the given position within [fn],
- * preferring the declaration closest to (but before) that position.
- */
-fun findVariableType(fn: AstFunction, name: String, line: Int, column: Int): String? =
-    collectVariableDecls(fn.body)
-        .filter { it.name == name && (it.line < line || (it.line == line && it.column <= column)) }
-        .maxWithOrNull(compareBy({ it.line }, { it.column }))
-        ?.declaredType
-        ?.takeIf { it.isNotBlank() }
 
 /** Coarse classification of "what kind of block surrounds this position", used to decide which
  *  block-structure keywords and intrinsics are valid completions. */
@@ -204,14 +128,14 @@ private fun blockLineRange(text: String, keyword: String): IntRange? {
 
 /** Determines which kind of block surrounds the given (1-based) source position, based on AST ranges. */
 fun blockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): BwslBlockContext {
-    for (module in root.modules) {
+    for (module in root.ownModules()) {
         if (!astContains(line, column, module.line, module.column, module.endLine, module.endColumn)) continue
         val struct = module.structs.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
         if (struct != null) return structContext(struct, line, column)
         val fn = module.functions.firstOrNull { astContainsRange(line, column, it) }
         return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.MODULE_BODY
     }
-    for (pipeline in root.pipelines) {
+    for (pipeline in root.ownPipelines()) {
         if (!astContains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) continue
         val pass = pipeline.passes.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
         if (pass != null) return passContext(pass, line, column)
@@ -226,16 +150,6 @@ fun blockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): Bw
         )
 
         return sections.firstOrNull { line in it.first }?.second ?: BwslBlockContext.PIPELINE_BODY
-    }
-    root.root?.let { r ->
-        if (astContains(line, column, r.line, r.column, r.endLine, r.endColumn)) {
-            val struct = r.structs.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            if (struct != null) return structContext(struct, line, column)
-            val pass = r.passes.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-            if (pass != null) return passContext(pass, line, column)
-            val fn = r.functions.firstOrNull { astContainsRange(line, column, it) }
-            return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.MODULE_BODY
-        }
     }
     return BwslBlockContext.TOP_LEVEL
 }
@@ -305,15 +219,6 @@ fun vertexOutputAssignments(pass: AstPass, attributes: List<AstAttributeDecl> = 
         }
 }
 
-/** Resolves the PSI element for the `<member>` identifier in an `output.<member>`/`input.<member>` expression. */
-fun findMemberElement(file: PsiFile, target: AstExpr): PsiElement? {
-    val obj = target.objectExpr ?: return null
-    val offset = offsetAt(file, obj.line, obj.column) ?: return null
-    val objElement = file.findElementAt(offset)?.parent ?: return null
-    val dot = nextNonWhitespace(objElement) ?: return null
-    return nextNonWhitespace(dot)
-}
-
 /**
  * Returns the [AstAttributeDecl] entries from [pipeline] that are listed in the pass's
  * `usedAttributes` list, preserving the declaration order from the pipeline's attributes block.
@@ -322,15 +227,4 @@ fun passUsedAttributes(pass: AstPass, pipeline: AstPipeline): List<AstAttributeD
     if (pass.usedAttributes.isEmpty()) return emptyList()
     val byName = pipeline.attributes.associateBy { it.name }
     return pass.usedAttributes.mapNotNull { byName[it.name] }
-}
-
-/** Resolves a (possibly module-qualified, e.g. "Module::Struct") type name to its struct declaration. */
-fun resolveStruct(root: AstRoot, scope: AstScope, typeName: String): AstStruct? {
-    val parts = typeName.split("::")
-    return if (parts.size == 2) {
-        root.modules.firstOrNull { it.name == parts[0] }?.structs?.firstOrNull { it.name == parts[1] }
-    } else {
-        scope.module?.structs?.firstOrNull { it.name == typeName }
-            ?: root.root?.structs?.firstOrNull { it.name == typeName }
-    }
 }

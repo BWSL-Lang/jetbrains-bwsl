@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 data class BwslFunctionSignature(val name: String, val params: List<String>, val returnType: String = "")
 
-data class AstParam(val name: String, val type: String)
+data class AstParam(val name: String, val dataType: String)
 
 data class AstLiteralVal(val literalType: String = "")
 
@@ -130,26 +130,10 @@ data class AstPipeline(
     val id: String = "",
     val name: String = "",
     val passes: List<AstPass> = emptyList(),
+    val structs: List<AstStruct> = emptyList(),
     val attributes: List<AstAttributeDecl> = emptyList(),
     val resources: List<AstResourceDecl> = emptyList(),
     val variantDecls: List<AstVariantDecl> = emptyList(),
-    val line: Int = 0,
-    val column: Int = 0,
-    val endLine: Int = 0,
-    val endColumn: Int = 0
-)
-/**
- * The file's top-level node when it isn't (only) a list of modules - e.g. a top-level `pipeline`.
- * When the top level is a pipeline, bwslc duplicates it here AND in [AstRoot.pipelines] with a
- * matching [id]; [findScope] must not process both (see the dedup check there).
- */
-data class AstRootNode(
-    val id: String = "",
-    val type: String = "",
-    val name: String = "",
-    val functions: List<AstFunction> = emptyList(),
-    val structs: List<AstStruct> = emptyList(),
-    val passes: List<AstPass> = emptyList(),
     val line: Int = 0,
     val column: Int = 0,
     val endLine: Int = 0,
@@ -188,26 +172,31 @@ data class AstRoot(
     val schema: String = "",
     val modules: List<AstModule> = emptyList(),
     val pipelines: List<AstPipeline> = emptyList(),
-    val root: AstRootNode? = null,
+    /** The id of every top-level declaration (module or pipeline) the compiled file itself
+     *  declares, in declaration order. Each id is present in [modules]/[pipelines], which also hold
+     *  every imported module - look it up there by id. */
+    val roots: List<String> = emptyList(),
     val referenceIndex: AstReferenceIndex? = null
 ) {
-    fun allFunctions(): List<AstFunction> {
-        val moduleFunctions = modules.flatMap { it.functions + it.structs.flatMap { s -> s.methods } }
-        val rootFunctions = root?.let { r ->
-            r.functions + r.structs.flatMap { s -> s.methods } + r.passes.flatMap { p -> p.functions }
-        } ?: emptyList()
-        return moduleFunctions + rootFunctions
+    /**
+     * [modules] also contains every imported module (bwslc is given `-modules` paths), whose
+     * line/column are relative to *their own* file. Anything measured against the compiled file's
+     * text must go through this (or [ownPipelines]) instead of [modules] directly.
+     */
+    fun ownModules(): List<AstModule> {
+        val ids = roots.toSet()
+        return modules.filter { it.id in ids }
+    }
+
+    fun ownPipelines(): List<AstPipeline> {
+        val ids = roots.toSet()
+        return pipelines.filter { it.id in ids }
     }
 }
 
 object BwslAstCache {
-    private val cache = ConcurrentHashMap<String, Map<String, BwslFunctionSignature>>()
     private val roots = ConcurrentHashMap<String, AstRoot>()
     private val rawRoots = ConcurrentHashMap<String, com.google.gson.JsonObject>()
-
-    fun update(filePath: String, functions: List<AstFunction>) {
-        cache[filePath] = signaturesOf(functions)
-    }
 
     /**
      * [rawJson] is the same bwslc -ast-json payload as [root], parsed generically. It's needed
@@ -217,24 +206,9 @@ object BwslAstCache {
     fun update(filePath: String, root: AstRoot, rawJson: com.google.gson.JsonObject? = null) {
         roots[filePath] = root
         if (rawJson != null) rawRoots[filePath] = rawJson else rawRoots.remove(filePath)
-        cache[filePath] = signaturesOf(root.allFunctions())
     }
-
-    private fun signaturesOf(functions: List<AstFunction>): Map<String, BwslFunctionSignature> =
-        functions.associate { fn ->
-            fn.name to BwslFunctionSignature(
-                fn.name,
-                fn.parameters.map { "${it.type} ${it.name}" },
-                fn.returnType.lowercase()
-            )
-        }
-
-    fun getSignatures(filePath: String): Map<String, BwslFunctionSignature> =
-        cache[filePath] ?: emptyMap()
 
     fun getRoot(filePath: String): AstRoot? = roots[filePath]
 
     fun getRawRoot(filePath: String): com.google.gson.JsonObject? = rawRoots[filePath]
-
-    fun keys(): Set<String> = cache.keys
 }

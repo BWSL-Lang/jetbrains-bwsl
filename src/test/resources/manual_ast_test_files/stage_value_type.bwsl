@@ -1,0 +1,31 @@
+// Gap: a stage-interface value has no `type` in the AST when it is assigned the result of an
+// intrinsic call. See BWSLC_GAPS.md #2.
+
+pipeline StageValueType {
+    attributes {
+        position: float4
+        uv: float2
+    }
+
+    pass "Main" {
+        use attributes { position, uv }
+        outputs {
+            result: float4
+        }
+
+        vertex {
+            output.pos = attributes.position;
+
+            // Typed: PASS:0/interface:scaled has "type": "float2" (an operator on a typed operand).
+            output.scaled = attributes.uv * 2.0;
+
+            // Untyped: PASS:0/interface:unit has no "type" at all. Neither the symbol nor the
+            // assigned FUNCTION_CALL node says what `normalize` returned (float2 here).
+            output.unit = normalize(attributes.uv);
+        }
+
+        fragment {
+            output.result = float4(input.scaled, input.unit);
+        }
+    }
+}

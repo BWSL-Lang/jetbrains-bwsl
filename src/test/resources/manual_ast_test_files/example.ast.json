@@ -1,6 +1,6 @@
 ﻿{
-  "schema": "bwsl.ast.v2",
-  "sourceFile": "src\\test\\resources\\lexer_test_files\\example.bwsl",
+  "schema": "bwsl.ast.v3",
+  "sourceFile": "example.bwsl",
   "root": {
     "id": "PIPELINE:1",
     "type": "PIPELINE",
@@ -9,9 +9,13 @@
     "column": 1,
     "endLine": 84,
     "endColumn": 2,
+    "nameLine": 58,
+    "nameColumn": 10,
+    "sourceFile": "example.bwsl",
     "name": "BasicShading2",
     "imports": [],
     "usingImports": [],
+    "consts": [],
     "attributes": [
       {
         "id": "ATTRIBUTE_DECL:3",
@@ -19,9 +23,12 @@
         "index": 3,
         "line": 60,
         "column": 19,
+        "nameLine": 60,
+        "nameColumn": 9,
+        "sourceFile": "example.bwsl",
         "name": "position",
         "dataType": "float3",
-        "compression": "<hash:0x00000000>",
+        "compression": null,
         "attributeIndex": 0,
         "isInstance": false
       },
@@ -31,9 +38,12 @@
         "index": 4,
         "line": 61,
         "column": 17,
+        "nameLine": 61,
+        "nameColumn": 9,
+        "sourceFile": "example.bwsl",
         "name": "normal",
         "dataType": "float3",
-        "compression": "<hash:0x00000000>",
+        "compression": null,
         "attributeIndex": 1,
         "isInstance": false
       },
@@ -43,9 +53,12 @@
         "index": 5,
         "line": 62,
         "column": 13,
+        "nameLine": 62,
+        "nameColumn": 9,
+        "sourceFile": "example.bwsl",
         "name": "uv",
         "dataType": "float2",
-        "compression": "<hash:0x00000000>",
+        "compression": null,
         "attributeIndex": 2,
         "isInstance": false
       }
@@ -57,6 +70,9 @@
         "index": 1,
         "line": 66,
         "column": 9,
+        "nameLine": 66,
+        "nameColumn": 9,
+        "sourceFile": "example.bwsl",
         "name": "lightDir",
         "typeName": "float3",
         "resourceIndex": 0
@@ -73,15 +89,33 @@
         "column": 5,
         "endLine": 83,
         "endColumn": 6,
+        "nameLine": 69,
+        "nameColumn": 11,
+        "sourceFile": "example.bwsl",
         "name": "Main",
         "usedAttributes": [
           {
+            "id": "PASS:1/used-attribute:0",
+            "line": 70,
+            "column": 26,
+            "nameLine": 70,
+            "nameColumn": 26,
             "name": "position"
           },
           {
+            "id": "PASS:1/used-attribute:1",
+            "line": 70,
+            "column": 36,
+            "nameLine": 70,
+            "nameColumn": 36,
             "name": "normal"
           },
           {
+            "id": "PASS:1/used-attribute:2",
+            "line": 70,
+            "column": 44,
+            "nameLine": 70,
+            "nameColumn": 44,
             "name": "uv"
           }
         ],
@@ -121,12 +155,16 @@
                   "index": 11,
                   "line": 73,
                   "column": 19,
+                  "nameLine": 73,
+                  "nameColumn": 20,
                   "object": {
                     "id": "IDENTIFIER:37",
                     "type": "IDENTIFIER",
                     "index": 37,
                     "line": 73,
                     "column": 13,
+                    "nameLine": 73,
+                    "nameColumn": 13,
                     "name": "output",
                     "identifierKind": "OUTPUT"
                   },
@@ -139,6 +177,8 @@
                   "index": 9,
                   "line": 73,
                   "column": 31,
+                  "nameLine": 73,
+                  "nameColumn": 31,
                   "name": "float4",
                   "arguments": [
                     {
@@ -147,6 +187,8 @@
                       "index": 39,
                       "line": 73,
                       "column": 38,
+                      "nameLine": 73,
+                      "nameColumn": 38,
                       "name": "position",
                       "identifierKind": "NONE"
                     },
@@ -177,12 +219,16 @@
                   "index": 12,
                   "line": 74,
                   "column": 19,
+                  "nameLine": 74,
+                  "nameColumn": 20,
                   "object": {
                     "id": "IDENTIFIER:40",
                     "type": "IDENTIFIER",
                     "index": 40,
                     "line": 74,
                     "column": 13,
+                    "nameLine": 74,
+                    "nameColumn": 13,
                     "name": "output",
                     "identifierKind": "OUTPUT"
                   },
@@ -195,6 +241,8 @@
                   "index": 41,
                   "line": 74,
                   "column": 25,
+                  "nameLine": 74,
+                  "nameColumn": 25,
                   "name": "uv",
                   "identifierKind": "NONE"
                 },
@@ -236,6 +284,15 @@
                 "column": 13,
                 "name": "c",
                 "declaredType": "MathUtils::Circle",
+                "typeQualifier": {
+                  "id": "VARIABLE_DECL:6/type-qualifier",
+                  "type": "IDENTIFIER",
+                  "line": 78,
+                  "column": 13,
+                  "nameLine": 78,
+                  "nameColumn": 13,
+                  "name": "MathUtils"
+                },
                 "typeLine": 78,
                 "typeColumn": 13,
                 "nameLine": 78,
@@ -259,12 +316,16 @@
                   "index": 13,
                   "line": 79,
                   "column": 14,
+                  "nameLine": 79,
+                  "nameColumn": 15,
                   "object": {
                     "id": "IDENTIFIER:42",
                     "type": "IDENTIFIER",
                     "index": 42,
                     "line": 79,
                     "column": 13,
+                    "nameLine": 79,
+                    "nameColumn": 13,
                     "name": "c",
                     "identifierKind": "NONE"
                   },
@@ -314,6 +375,8 @@
                     "index": 10,
                     "line": 80,
                     "column": 33,
+                    "nameLine": 80,
+                    "nameColumn": 34,
                     "name": "area",
                     "arguments": [],
                     "receiver": {
@@ -322,6 +385,8 @@
                       "index": 43,
                       "line": 80,
                       "column": 32,
+                      "nameLine": 80,
+                      "nameColumn": 32,
                       "name": "c",
                       "identifierKind": "NONE"
                     }
@@ -351,12 +416,16 @@
                   "index": 15,
                   "line": 81,
                   "column": 19,
+                  "nameLine": 81,
+                  "nameColumn": 20,
                   "object": {
                     "id": "IDENTIFIER:44",
                     "type": "IDENTIFIER",
                     "index": 44,
                     "line": 81,
                     "column": 13,
+                    "nameLine": 81,
+                    "nameColumn": 13,
                     "name": "output",
                     "identifierKind": "OUTPUT"
                   },
@@ -369,6 +438,8 @@
                   "index": 11,
                   "line": 81,
                   "column": 28,
+                  "nameLine": 81,
+                  "nameColumn": 28,
                   "name": "float4",
                   "arguments": [
                     {
@@ -384,12 +455,16 @@
                         "index": 16,
                         "line": 81,
                         "column": 40,
+                        "nameLine": 81,
+                        "nameColumn": 41,
                         "object": {
                           "id": "IDENTIFIER:46",
                           "type": "IDENTIFIER",
                           "index": 46,
                           "line": 81,
                           "column": 35,
+                          "nameLine": 81,
+                          "nameColumn": 35,
                           "name": "input",
                           "identifierKind": "INPUT"
                         },
@@ -402,6 +477,8 @@
                         "index": 47,
                         "line": 81,
                         "column": 46,
+                        "nameLine": 81,
+                        "nameColumn": 46,
                         "name": "brightness",
                         "identifierKind": "NONE"
                       }
@@ -457,6 +534,11 @@
     "constraints": [],
     "computeGraph": null
   },
+  "roots": [
+    "MODULE:0",
+    "PIPELINE:0",
+    "PIPELINE:1"
+  ],
   "modules": [
     {
       "id": "MODULE:0",
@@ -466,9 +548,13 @@
       "column": 1,
       "endLine": 27,
       "endColumn": 2,
+      "nameLine": 1,
+      "nameColumn": 8,
+      "sourceFile": "example.bwsl",
       "name": "MathUtils",
       "imports": [],
       "usingImports": [],
+      "consts": [],
       "functions": [
         {
           "id": "FUNCTION:1",
@@ -478,11 +564,21 @@
           "column": 5,
           "endLine": 17,
           "endColumn": 6,
+          "nameLine": 11,
+          "nameColumn": 5,
+          "sourceFile": "example.bwsl",
           "name": "sumArray",
           "parameters": [
             {
+              "id": "FUNCTION:1/parameter:0",
+              "line": 11,
+              "column": 27,
+              "nameLine": 11,
+              "nameColumn": 27,
+              "typeLine": 11,
+              "typeColumn": 18,
               "name": "values",
-              "type": "float"
+              "dataType": "float"
             }
           ],
           "returnType": "float",
@@ -538,6 +634,10 @@
                   "column": 14,
                   "name": "i",
                   "declaredType": "int",
+                  "typeLine": 13,
+                  "typeColumn": 14,
+                  "nameLine": 13,
+                  "nameColumn": 18,
                   "isConst": false,
                   "isEval": false,
                   "storageClass": "DEFAULT",
@@ -568,6 +668,8 @@
                     "index": 2,
                     "line": 13,
                     "column": 25,
+                    "nameLine": 13,
+                    "nameColumn": 25,
                     "name": "i",
                     "identifierKind": "NONE"
                   },
@@ -577,6 +679,8 @@
                     "index": 0,
                     "line": 13,
                     "column": 35,
+                    "nameLine": 13,
+                    "nameColumn": 36,
                     "name": "length",
                     "arguments": [],
                     "receiver": {
@@ -585,6 +689,8 @@
                       "index": 3,
                       "line": 13,
                       "column": 29,
+                      "nameLine": 13,
+                      "nameColumn": 29,
                       "name": "values",
                       "identifierKind": "NONE"
                     }
@@ -603,6 +709,8 @@
                     "index": 4,
                     "line": 13,
                     "column": 46,
+                    "nameLine": 13,
+                    "nameColumn": 46,
                     "name": "i",
                     "identifierKind": "NONE"
                   }
@@ -628,6 +736,8 @@
                         "index": 5,
                         "line": 14,
                         "column": 13,
+                        "nameLine": 14,
+                        "nameColumn": 13,
                         "name": "total",
                         "identifierKind": "NONE"
                       },
@@ -644,6 +754,8 @@
                           "index": 5,
                           "line": 14,
                           "column": 13,
+                          "nameLine": 14,
+                          "nameColumn": 13,
                           "name": "total",
                           "identifierKind": "NONE"
                         },
@@ -659,6 +771,8 @@
                             "index": 6,
                             "line": 14,
                             "column": 22,
+                            "nameLine": 14,
+                            "nameColumn": 22,
                             "name": "values",
                             "identifierKind": "NONE"
                           },
@@ -668,6 +782,8 @@
                             "index": 7,
                             "line": 14,
                             "column": 29,
+                            "nameLine": 14,
+                            "nameColumn": 29,
                             "name": "i",
                             "identifierKind": "NONE"
                           }
@@ -692,6 +808,8 @@
                   "index": 8,
                   "line": 16,
                   "column": 16,
+                  "nameLine": 16,
+                  "nameColumn": 16,
                   "name": "total",
                   "identifierKind": "NONE"
                 }
@@ -710,19 +828,43 @@
           "column": 5,
           "endLine": 26,
           "endColumn": 6,
+          "nameLine": 19,
+          "nameColumn": 5,
+          "sourceFile": "example.bwsl",
           "name": "rotate",
           "parameters": [
             {
+              "id": "FUNCTION:2/parameter:0",
+              "line": 19,
+              "column": 23,
+              "nameLine": 19,
+              "nameColumn": 23,
+              "typeLine": 19,
+              "typeColumn": 16,
               "name": "pos",
-              "type": "float2"
+              "dataType": "float2"
             },
             {
+              "id": "FUNCTION:2/parameter:1",
+              "line": 19,
+              "column": 35,
+              "nameLine": 19,
+              "nameColumn": 35,
+              "typeLine": 19,
+              "typeColumn": 28,
               "name": "center",
-              "type": "float2"
+              "dataType": "float2"
             },
             {
+              "id": "FUNCTION:2/parameter:2",
+              "line": 19,
+              "column": 49,
+              "nameLine": 19,
+              "nameColumn": 49,
+              "typeLine": 19,
+              "typeColumn": 43,
               "name": "angle",
-              "type": "float"
+              "dataType": "float"
             }
           ],
           "returnType": "float2",
@@ -765,6 +907,8 @@
                     "index": 9,
                     "line": 20,
                     "column": 29,
+                    "nameLine": 20,
+                    "nameColumn": 29,
                     "name": "pos",
                     "identifierKind": "NONE"
                   },
@@ -774,6 +918,8 @@
                     "index": 10,
                     "line": 20,
                     "column": 35,
+                    "nameLine": 20,
+                    "nameColumn": 35,
                     "name": "center",
                     "identifierKind": "NONE"
                   }
@@ -802,6 +948,8 @@
                   "index": 1,
                   "line": 21,
                   "column": 25,
+                  "nameLine": 21,
+                  "nameColumn": 25,
                   "name": "float2",
                   "arguments": [
                     {
@@ -824,12 +972,16 @@
                           "index": 1,
                           "line": 22,
                           "column": 23,
+                          "nameLine": 22,
+                          "nameColumn": 24,
                           "object": {
                             "id": "IDENTIFIER:12",
                             "type": "IDENTIFIER",
                             "index": 12,
                             "line": 22,
                             "column": 13,
+                            "nameLine": 22,
+                            "nameColumn": 13,
                             "name": "normalized",
                             "identifierKind": "NONE"
                           },
@@ -842,6 +994,8 @@
                           "index": 2,
                           "line": 22,
                           "column": 28,
+                          "nameLine": 22,
+                          "nameColumn": 28,
                           "name": "cos",
                           "arguments": [
                             {
@@ -850,6 +1004,8 @@
                               "index": 14,
                               "line": 22,
                               "column": 32,
+                              "nameLine": 22,
+                              "nameColumn": 32,
                               "name": "angle",
                               "identifierKind": "NONE"
                             }
@@ -869,12 +1025,16 @@
                           "index": 2,
                           "line": 22,
                           "column": 51,
+                          "nameLine": 22,
+                          "nameColumn": 52,
                           "object": {
                             "id": "IDENTIFIER:15",
                             "type": "IDENTIFIER",
                             "index": 15,
                             "line": 22,
                             "column": 41,
+                            "nameLine": 22,
+                            "nameColumn": 41,
                             "name": "normalized",
                             "identifierKind": "NONE"
                           },
@@ -887,6 +1047,8 @@
                           "index": 3,
                           "line": 22,
                           "column": 56,
+                          "nameLine": 22,
+                          "nameColumn": 56,
                           "name": "sin",
                           "arguments": [
                             {
@@ -895,6 +1057,8 @@
                               "index": 17,
                               "line": 22,
                               "column": 60,
+                              "nameLine": 22,
+                              "nameColumn": 60,
                               "name": "angle",
                               "identifierKind": "NONE"
                             }
@@ -922,12 +1086,16 @@
                           "index": 3,
                           "line": 23,
                           "column": 23,
+                          "nameLine": 23,
+                          "nameColumn": 24,
                           "object": {
                             "id": "IDENTIFIER:18",
                             "type": "IDENTIFIER",
                             "index": 18,
                             "line": 23,
                             "column": 13,
+                            "nameLine": 23,
+                            "nameColumn": 13,
                             "name": "normalized",
                             "identifierKind": "NONE"
                           },
@@ -940,6 +1108,8 @@
                           "index": 4,
                           "line": 23,
                           "column": 28,
+                          "nameLine": 23,
+                          "nameColumn": 28,
                           "name": "sin",
                           "arguments": [
                             {
@@ -948,6 +1118,8 @@
                               "index": 20,
                               "line": 23,
                               "column": 32,
+                              "nameLine": 23,
+                              "nameColumn": 32,
                               "name": "angle",
                               "identifierKind": "NONE"
                             }
@@ -967,12 +1139,16 @@
                           "index": 4,
                           "line": 23,
                           "column": 51,
+                          "nameLine": 23,
+                          "nameColumn": 52,
                           "object": {
                             "id": "IDENTIFIER:21",
                             "type": "IDENTIFIER",
                             "index": 21,
                             "line": 23,
                             "column": 41,
+                            "nameLine": 23,
+                            "nameColumn": 41,
                             "name": "normalized",
                             "identifierKind": "NONE"
                           },
@@ -985,6 +1161,8 @@
                           "index": 5,
                           "line": 23,
                           "column": 56,
+                          "nameLine": 23,
+                          "nameColumn": 56,
                           "name": "cos",
                           "arguments": [
                             {
@@ -993,6 +1171,8 @@
                               "index": 23,
                               "line": 23,
                               "column": 60,
+                              "nameLine": 23,
+                              "nameColumn": 60,
                               "name": "angle",
                               "identifierKind": "NONE"
                             }
@@ -1022,6 +1202,8 @@
                     "index": 24,
                     "line": 25,
                     "column": 16,
+                    "nameLine": 25,
+                    "nameColumn": 16,
                     "name": "center",
                     "identifierKind": "NONE"
                   },
@@ -1031,6 +1213,8 @@
                     "index": 25,
                     "line": 25,
                     "column": 25,
+                    "nameLine": 25,
+                    "nameColumn": 25,
                     "name": "result",
                     "identifierKind": "NONE"
                   }
@@ -1052,11 +1236,22 @@
           "column": 5,
           "endLine": 9,
           "endColumn": 6,
+          "nameLine": 2,
+          "nameColumn": 12,
+          "sourceFile": "example.bwsl",
           "name": "Circle",
           "fields": [
             {
+              "id": "STRUCT_DECL:0/field:0",
+              "line": 3,
+              "column": 15,
+              "nameLine": 3,
+              "nameColumn": 15,
+              "typeLine": 3,
+              "typeColumn": 9,
               "name": "radius",
-              "type": {
+              "dataType": "float",
+              "typeInfo": {
                 "coreType": "FLOAT",
                 "componentCount": 1,
                 "arrayDimensions": 0,
@@ -1066,8 +1261,16 @@
               "arraySize": 0
             },
             {
+              "id": "STRUCT_DECL:0/field:1",
+              "line": 4,
+              "column": 13,
+              "nameLine": 4,
+              "nameColumn": 13,
+              "typeLine": 4,
+              "typeColumn": 9,
               "name": "segments",
-              "type": {
+              "dataType": "int",
+              "typeInfo": {
                 "coreType": "INT",
                 "componentCount": 1,
                 "arrayDimensions": 0,
@@ -1086,6 +1289,8 @@
               "column": 9,
               "endLine": 8,
               "endColumn": 10,
+              "nameLine": 6,
+              "nameColumn": 9,
               "name": "area",
               "parameters": [],
               "returnType": "float",
@@ -1124,6 +1329,8 @@
                           "index": 0,
                           "line": 7,
                           "column": 20,
+                          "nameLine": 7,
+                          "nameColumn": 20,
                           "name": "radius",
                           "identifierKind": "NONE"
                         },
@@ -1133,6 +1340,8 @@
                           "index": 1,
                           "line": 7,
                           "column": 29,
+                          "nameLine": 7,
+                          "nameColumn": 29,
                           "name": "radius",
                           "identifierKind": "NONE"
                         }
@@ -1175,9 +1384,13 @@
       "column": 1,
       "endLine": 55,
       "endColumn": 2,
+      "nameLine": 29,
+      "nameColumn": 10,
+      "sourceFile": "example.bwsl",
       "name": "BasicShading",
       "imports": [],
       "usingImports": [],
+      "consts": [],
       "attributes": [
         {
           "id": "ATTRIBUTE_DECL:0",
@@ -1185,9 +1398,12 @@
           "index": 0,
           "line": 31,
           "column": 19,
+          "nameLine": 31,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "position",
           "dataType": "float3",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 0,
           "isInstance": false
         },
@@ -1197,9 +1413,12 @@
           "index": 1,
           "line": 32,
           "column": 17,
+          "nameLine": 32,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "normal",
           "dataType": "float3",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 1,
           "isInstance": false
         },
@@ -1209,9 +1428,12 @@
           "index": 2,
           "line": 33,
           "column": 13,
+          "nameLine": 33,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "uv",
           "dataType": "float2",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 2,
           "isInstance": false
         }
@@ -1223,6 +1445,9 @@
           "index": 0,
           "line": 37,
           "column": 9,
+          "nameLine": 37,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "lightDir",
           "typeName": "float3",
           "resourceIndex": 0
@@ -1239,15 +1464,33 @@
           "column": 5,
           "endLine": 54,
           "endColumn": 6,
+          "nameLine": 40,
+          "nameColumn": 11,
+          "sourceFile": "example.bwsl",
           "name": "Main",
           "usedAttributes": [
             {
+              "id": "PASS:0/used-attribute:0",
+              "line": 41,
+              "column": 26,
+              "nameLine": 41,
+              "nameColumn": 26,
               "name": "position"
             },
             {
+              "id": "PASS:0/used-attribute:1",
+              "line": 41,
+              "column": 36,
+              "nameLine": 41,
+              "nameColumn": 36,
               "name": "normal"
             },
             {
+              "id": "PASS:0/used-attribute:2",
+              "line": 41,
+              "column": 44,
+              "nameLine": 41,
+              "nameColumn": 44,
               "name": "uv"
             }
           ],
@@ -1287,12 +1530,16 @@
                     "index": 5,
                     "line": 44,
                     "column": 19,
+                    "nameLine": 44,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:26",
                       "type": "IDENTIFIER",
                       "index": 26,
                       "line": 44,
                       "column": 13,
+                      "nameLine": 44,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1305,6 +1552,8 @@
                     "index": 6,
                     "line": 44,
                     "column": 31,
+                    "nameLine": 44,
+                    "nameColumn": 31,
                     "name": "float4",
                     "arguments": [
                       {
@@ -1313,6 +1562,8 @@
                         "index": 28,
                         "line": 44,
                         "column": 38,
+                        "nameLine": 44,
+                        "nameColumn": 38,
                         "name": "position",
                         "identifierKind": "NONE"
                       },
@@ -1343,12 +1594,16 @@
                     "index": 6,
                     "line": 45,
                     "column": 19,
+                    "nameLine": 45,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:29",
                       "type": "IDENTIFIER",
                       "index": 29,
                       "line": 45,
                       "column": 13,
+                      "nameLine": 45,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1361,6 +1616,8 @@
                     "index": 30,
                     "line": 45,
                     "column": 25,
+                    "nameLine": 45,
+                    "nameColumn": 25,
                     "name": "uv",
                     "identifierKind": "NONE"
                   },
@@ -1402,6 +1659,15 @@
                   "column": 13,
                   "name": "c",
                   "declaredType": "MathUtils::Circle",
+                  "typeQualifier": {
+                    "id": "VARIABLE_DECL:4/type-qualifier",
+                    "type": "IDENTIFIER",
+                    "line": 49,
+                    "column": 13,
+                    "nameLine": 49,
+                    "nameColumn": 13,
+                    "name": "MathUtils"
+                  },
                   "typeLine": 49,
                   "typeColumn": 13,
                   "nameLine": 49,
@@ -1425,12 +1691,16 @@
                     "index": 7,
                     "line": 50,
                     "column": 14,
+                    "nameLine": 50,
+                    "nameColumn": 15,
                     "object": {
                       "id": "IDENTIFIER:31",
                       "type": "IDENTIFIER",
                       "index": 31,
                       "line": 50,
                       "column": 13,
+                      "nameLine": 50,
+                      "nameColumn": 13,
                       "name": "c",
                       "identifierKind": "NONE"
                     },
@@ -1480,6 +1750,8 @@
                       "index": 7,
                       "line": 51,
                       "column": 33,
+                      "nameLine": 51,
+                      "nameColumn": 34,
                       "name": "area",
                       "arguments": [],
                       "receiver": {
@@ -1488,6 +1760,8 @@
                         "index": 32,
                         "line": 51,
                         "column": 32,
+                        "nameLine": 51,
+                        "nameColumn": 32,
                         "name": "c",
                         "identifierKind": "NONE"
                       }
@@ -1517,12 +1791,16 @@
                     "index": 9,
                     "line": 52,
                     "column": 19,
+                    "nameLine": 52,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:33",
                       "type": "IDENTIFIER",
                       "index": 33,
                       "line": 52,
                       "column": 13,
+                      "nameLine": 52,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1535,6 +1813,8 @@
                     "index": 8,
                     "line": 52,
                     "column": 28,
+                    "nameLine": 52,
+                    "nameColumn": 28,
                     "name": "float4",
                     "arguments": [
                       {
@@ -1550,12 +1830,16 @@
                           "index": 10,
                           "line": 52,
                           "column": 40,
+                          "nameLine": 52,
+                          "nameColumn": 41,
                           "object": {
                             "id": "IDENTIFIER:35",
                             "type": "IDENTIFIER",
                             "index": 35,
                             "line": 52,
                             "column": 35,
+                            "nameLine": 52,
+                            "nameColumn": 35,
                             "name": "input",
                             "identifierKind": "INPUT"
                           },
@@ -1568,6 +1852,8 @@
                           "index": 36,
                           "line": 52,
                           "column": 46,
+                          "nameLine": 52,
+                          "nameColumn": 46,
                           "name": "brightness",
                           "identifierKind": "NONE"
                         }
@@ -1631,9 +1917,13 @@
       "column": 1,
       "endLine": 84,
       "endColumn": 2,
+      "nameLine": 58,
+      "nameColumn": 10,
+      "sourceFile": "example.bwsl",
       "name": "BasicShading2",
       "imports": [],
       "usingImports": [],
+      "consts": [],
       "attributes": [
         {
           "id": "ATTRIBUTE_DECL:3",
@@ -1641,9 +1931,12 @@
           "index": 3,
           "line": 60,
           "column": 19,
+          "nameLine": 60,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "position",
           "dataType": "float3",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 0,
           "isInstance": false
         },
@@ -1653,9 +1946,12 @@
           "index": 4,
           "line": 61,
           "column": 17,
+          "nameLine": 61,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "normal",
           "dataType": "float3",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 1,
           "isInstance": false
         },
@@ -1665,9 +1961,12 @@
           "index": 5,
           "line": 62,
           "column": 13,
+          "nameLine": 62,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "uv",
           "dataType": "float2",
-          "compression": "<hash:0x00000000>",
+          "compression": null,
           "attributeIndex": 2,
           "isInstance": false
         }
@@ -1679,6 +1978,9 @@
           "index": 1,
           "line": 66,
           "column": 9,
+          "nameLine": 66,
+          "nameColumn": 9,
+          "sourceFile": "example.bwsl",
           "name": "lightDir",
           "typeName": "float3",
           "resourceIndex": 0
@@ -1695,15 +1997,33 @@
           "column": 5,
           "endLine": 83,
           "endColumn": 6,
+          "nameLine": 69,
+          "nameColumn": 11,
+          "sourceFile": "example.bwsl",
           "name": "Main",
           "usedAttributes": [
             {
+              "id": "PASS:1/used-attribute:0",
+              "line": 70,
+              "column": 26,
+              "nameLine": 70,
+              "nameColumn": 26,
               "name": "position"
             },
             {
+              "id": "PASS:1/used-attribute:1",
+              "line": 70,
+              "column": 36,
+              "nameLine": 70,
+              "nameColumn": 36,
               "name": "normal"
             },
             {
+              "id": "PASS:1/used-attribute:2",
+              "line": 70,
+              "column": 44,
+              "nameLine": 70,
+              "nameColumn": 44,
               "name": "uv"
             }
           ],
@@ -1743,12 +2063,16 @@
                     "index": 11,
                     "line": 73,
                     "column": 19,
+                    "nameLine": 73,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:37",
                       "type": "IDENTIFIER",
                       "index": 37,
                       "line": 73,
                       "column": 13,
+                      "nameLine": 73,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1761,6 +2085,8 @@
                     "index": 9,
                     "line": 73,
                     "column": 31,
+                    "nameLine": 73,
+                    "nameColumn": 31,
                     "name": "float4",
                     "arguments": [
                       {
@@ -1769,6 +2095,8 @@
                         "index": 39,
                         "line": 73,
                         "column": 38,
+                        "nameLine": 73,
+                        "nameColumn": 38,
                         "name": "position",
                         "identifierKind": "NONE"
                       },
@@ -1799,12 +2127,16 @@
                     "index": 12,
                     "line": 74,
                     "column": 19,
+                    "nameLine": 74,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:40",
                       "type": "IDENTIFIER",
                       "index": 40,
                       "line": 74,
                       "column": 13,
+                      "nameLine": 74,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1817,6 +2149,8 @@
                     "index": 41,
                     "line": 74,
                     "column": 25,
+                    "nameLine": 74,
+                    "nameColumn": 25,
                     "name": "uv",
                     "identifierKind": "NONE"
                   },
@@ -1858,6 +2192,15 @@
                   "column": 13,
                   "name": "c",
                   "declaredType": "MathUtils::Circle",
+                  "typeQualifier": {
+                    "id": "VARIABLE_DECL:6/type-qualifier",
+                    "type": "IDENTIFIER",
+                    "line": 78,
+                    "column": 13,
+                    "nameLine": 78,
+                    "nameColumn": 13,
+                    "name": "MathUtils"
+                  },
                   "typeLine": 78,
                   "typeColumn": 13,
                   "nameLine": 78,
@@ -1881,12 +2224,16 @@
                     "index": 13,
                     "line": 79,
                     "column": 14,
+                    "nameLine": 79,
+                    "nameColumn": 15,
                     "object": {
                       "id": "IDENTIFIER:42",
                       "type": "IDENTIFIER",
                       "index": 42,
                       "line": 79,
                       "column": 13,
+                      "nameLine": 79,
+                      "nameColumn": 13,
                       "name": "c",
                       "identifierKind": "NONE"
                     },
@@ -1936,6 +2283,8 @@
                       "index": 10,
                       "line": 80,
                       "column": 33,
+                      "nameLine": 80,
+                      "nameColumn": 34,
                       "name": "area",
                       "arguments": [],
                       "receiver": {
@@ -1944,6 +2293,8 @@
                         "index": 43,
                         "line": 80,
                         "column": 32,
+                        "nameLine": 80,
+                        "nameColumn": 32,
                         "name": "c",
                         "identifierKind": "NONE"
                       }
@@ -1973,12 +2324,16 @@
                     "index": 15,
                     "line": 81,
                     "column": 19,
+                    "nameLine": 81,
+                    "nameColumn": 20,
                     "object": {
                       "id": "IDENTIFIER:44",
                       "type": "IDENTIFIER",
                       "index": 44,
                       "line": 81,
                       "column": 13,
+                      "nameLine": 81,
+                      "nameColumn": 13,
                       "name": "output",
                       "identifierKind": "OUTPUT"
                     },
@@ -1991,6 +2346,8 @@
                     "index": 11,
                     "line": 81,
                     "column": 28,
+                    "nameLine": 81,
+                    "nameColumn": 28,
                     "name": "float4",
                     "arguments": [
                       {
@@ -2006,12 +2363,16 @@
                           "index": 16,
                           "line": 81,
                           "column": 40,
+                          "nameLine": 81,
+                          "nameColumn": 41,
                           "object": {
                             "id": "IDENTIFIER:46",
                             "type": "IDENTIFIER",
                             "index": 46,
                             "line": 81,
                             "column": 35,
+                            "nameLine": 81,
+                            "nameColumn": 35,
                             "name": "input",
                             "identifierKind": "INPUT"
                           },
@@ -2024,6 +2385,8 @@
                           "index": 47,
                           "line": 81,
                           "column": 46,
+                          "nameLine": 81,
+                          "nameColumn": 46,
                           "name": "brightness",
                           "identifierKind": "NONE"
                         }
@@ -2116,7 +2479,7 @@
   },
   "referenceIndex": {
     "format": "bwsl.references.v1",
-    "unit": "src\\test\\resources\\lexer_test_files\\example.bwsl",
+    "unit": "example.bwsl",
     "nodeIdFormat": "TYPE:index",
     "syntheticIdFormat": "<owner-id>/<kind>:<index-or-name>",
     "stableIdFormat": "qualified semantic path for externally addressable symbols",
@@ -2329,6 +2692,14 @@
         "stableId": "module:MathUtils/type:Circle/method:area()->float"
       },
       {
+        "id": "builtin:type:float",
+        "kind": "core-type",
+        "name": "float",
+        "declaration": "builtin:type:float",
+        "owner": "builtin",
+        "stableId": "builtin:type:float"
+      },
+      {
         "id": "FUNCTION:1",
         "kind": "function",
         "name": "sumArray",
@@ -2347,12 +2718,12 @@
         "stableId": "module:MathUtils/function:rotate(float2,float2,float)->float2"
       },
       {
-        "id": "builtin:type:float",
+        "id": "builtin:type:float2",
         "kind": "core-type",
-        "name": "float",
-        "declaration": "builtin:type:float",
+        "name": "float2",
+        "declaration": "builtin:type:float2",
         "owner": "builtin",
-        "stableId": "builtin:type:float"
+        "stableId": "builtin:type:float2"
       },
       {
         "id": "builtin:type:int",
@@ -2371,14 +2742,6 @@
         "stableId": "builtin:type:float3"
       },
       {
-        "id": "builtin:type:float2",
-        "kind": "core-type",
-        "name": "float2",
-        "declaration": "builtin:type:float2",
-        "owner": "builtin",
-        "stableId": "builtin:type:float2"
-      },
-      {
         "id": "FUNCTION:1/parameter:0",
         "kind": "parameter",
         "name": "values",
@@ -2386,14 +2749,6 @@
         "owner": "FUNCTION:1",
         "type": "float",
         "stableId": "module:MathUtils/function:sumArray(float)->float/parameter:0"
-      },
-      {
-        "id": "builtin:type:length",
-        "kind": "core-type",
-        "name": "length",
-        "declaration": "builtin:type:length",
-        "owner": "builtin",
-        "stableId": "builtin:type:length"
       },
       {
         "id": "FUNCTION:2/parameter:0",
@@ -2569,46 +2924,6 @@
         "role": "type"
       },
       {
-        "from": "VARIABLE_DECL:0",
-        "to": "builtin:type:float",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:1",
-        "to": "builtin:type:int",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:2",
-        "to": "builtin:type:float2",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:3",
-        "to": "builtin:type:float2",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:4",
-        "to": "STRUCT_DECL:0",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:5",
-        "to": "builtin:type:float",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:6",
-        "to": "STRUCT_DECL:0",
-        "role": "type"
-      },
-      {
-        "from": "VARIABLE_DECL:7",
-        "to": "builtin:type:float",
-        "role": "type"
-      },
-      {
         "from": "FUNCTION:1",
         "to": "builtin:type:float",
         "role": "return-type"
@@ -2616,6 +2931,16 @@
       {
         "from": "FUNCTION:1/parameter:0",
         "to": "builtin:type:float",
+        "role": "type"
+      },
+      {
+        "from": "VARIABLE_DECL:0",
+        "to": "builtin:type:float",
+        "role": "type"
+      },
+      {
+        "from": "VARIABLE_DECL:1",
+        "to": "builtin:type:int",
         "role": "type"
       },
       {
@@ -2627,11 +2952,6 @@
         "from": "IDENTIFIER:3",
         "to": "FUNCTION:1/parameter:0",
         "role": "read"
-      },
-      {
-        "from": "FUNCTION_CALL:0",
-        "to": "builtin:type:length",
-        "role": "construct"
       },
       {
         "from": "IDENTIFIER:4",
@@ -2692,6 +3012,11 @@
         "from": "IDENTIFIER:10",
         "to": "FUNCTION:2/parameter:1",
         "role": "read"
+      },
+      {
+        "from": "VARIABLE_DECL:2",
+        "to": "builtin:type:float2",
+        "role": "type"
       },
       {
         "from": "IDENTIFIER:12",
@@ -2759,6 +3084,11 @@
         "role": "construct"
       },
       {
+        "from": "VARIABLE_DECL:3",
+        "to": "builtin:type:float2",
+        "role": "type"
+      },
+      {
         "from": "IDENTIFIER:24",
         "to": "FUNCTION:2/parameter:1",
         "role": "read"
@@ -2774,6 +3104,31 @@
         "role": "return-type"
       },
       {
+        "from": "IDENTIFIER:0",
+        "to": "STRUCT_DECL:0/field:0",
+        "role": "read"
+      },
+      {
+        "from": "IDENTIFIER:1",
+        "to": "STRUCT_DECL:0/field:0",
+        "role": "read"
+      },
+      {
+        "from": "PASS:0/used-attribute:0",
+        "to": "ATTRIBUTE_DECL:0",
+        "role": "attribute"
+      },
+      {
+        "from": "PASS:0/used-attribute:1",
+        "to": "ATTRIBUTE_DECL:1",
+        "role": "attribute"
+      },
+      {
+        "from": "PASS:0/used-attribute:2",
+        "to": "ATTRIBUTE_DECL:2",
+        "role": "attribute"
+      },
+      {
         "from": "MEMBER_ACCESS:5",
         "to": "PASS:0/interface:position",
         "role": "output"
@@ -2787,6 +3142,16 @@
         "from": "MEMBER_ACCESS:6",
         "to": "PASS:0/interface:uv",
         "role": "output"
+      },
+      {
+        "from": "VARIABLE_DECL:4",
+        "to": "STRUCT_DECL:0",
+        "role": "type"
+      },
+      {
+        "from": "VARIABLE_DECL:4/type-qualifier",
+        "to": "MODULE:0",
+        "role": "qualifier"
       },
       {
         "from": "IDENTIFIER:31",
@@ -2809,6 +3174,11 @@
         "role": "call"
       },
       {
+        "from": "VARIABLE_DECL:5",
+        "to": "builtin:type:float",
+        "role": "type"
+      },
+      {
         "from": "MEMBER_ACCESS:9",
         "to": "PASS:0/fragment-output:color",
         "role": "output"
@@ -2829,6 +3199,21 @@
         "role": "construct"
       },
       {
+        "from": "PASS:1/used-attribute:0",
+        "to": "ATTRIBUTE_DECL:3",
+        "role": "attribute"
+      },
+      {
+        "from": "PASS:1/used-attribute:1",
+        "to": "ATTRIBUTE_DECL:4",
+        "role": "attribute"
+      },
+      {
+        "from": "PASS:1/used-attribute:2",
+        "to": "ATTRIBUTE_DECL:5",
+        "role": "attribute"
+      },
+      {
         "from": "MEMBER_ACCESS:11",
         "to": "PASS:1/interface:position",
         "role": "output"
@@ -2842,6 +3227,16 @@
         "from": "MEMBER_ACCESS:12",
         "to": "PASS:1/interface:uv",
         "role": "output"
+      },
+      {
+        "from": "VARIABLE_DECL:6",
+        "to": "STRUCT_DECL:0",
+        "role": "type"
+      },
+      {
+        "from": "VARIABLE_DECL:6/type-qualifier",
+        "to": "MODULE:0",
+        "role": "qualifier"
       },
       {
         "from": "IDENTIFIER:42",
@@ -2862,6 +3257,11 @@
         "from": "FUNCTION_CALL:10",
         "to": "FUNCTION:0",
         "role": "call"
+      },
+      {
+        "from": "VARIABLE_DECL:7",
+        "to": "builtin:type:float",
+        "role": "type"
       },
       {
         "from": "MEMBER_ACCESS:15",

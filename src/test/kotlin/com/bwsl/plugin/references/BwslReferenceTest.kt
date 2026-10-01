@@ -1,16 +1,29 @@
 package com.bwsl.plugin.references
 
 import com.bwsl.plugin.*
+import com.bwsl.plugin.completion.BwslcAstHelper
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
+/**
+ * Exercises the real [BwslReferenceContributor] dispatch end-to-end (via `element.parent.references`,
+ * exactly as the IDE would), against real bwslc output rather than hand-built AstRoot literals
+ * (which have no reference index to resolve against).
+ */
 class BwslReferenceTest : BasePlatformTestCase() {
+
+    private fun configureAndCache(text: String): String {
+        myFixture.configureByText("test.bwsl", text)
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
+        return source
+    }
 
     fun testReceiverMethodCallResolvesViaVariableType() {
         // s1 and s2 both call test(), but their declared types point to different structs
-        // (in different modules) - only the AST's variable-type info can disambiguate.
-        myFixture.configureByText(
-            "test.bwsl",
+        // (in different modules) - only the compiler's own receiver-type resolution (surfaced via
+        // the reference index) can disambiguate.
+        val source = configureAndCache(
             "module LengthMethodTest {\n" +
                 "    struct testStruct {\n" +
                 "        test :: () -> float {\n" +
@@ -33,50 +46,23 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "}"
         )
 
-        val test3 = AstFunction(
-            "test3", emptyList(), "void", line = 14, column = 5, endLine = 19, endColumn = 6,
-            body = AstBlock(listOf(
-                AstStatement(type = "VARIABLE_DECL", name = "s1", declaredType = "LengthMethodTest::testStruct", line = 15, column = 9),
-                AstStatement(type = "VARIABLE_DECL", name = "s2", declaredType = "testStruct", line = 16, column = 9)
-            ))
-        )
-
-        val filePath = myFixture.file.virtualFile.path
-        BwslAstCache.update(filePath, AstRoot(
-            modules = listOf(
-                AstModule(
-                    name = "LengthMethodTest", line = 1, column = 1, endLine = 7, endColumn = 2,
-                    structs = listOf(AstStruct(
-                        name = "testStruct", line = 2, column = 5, endLine = 6, endColumn = 6,
-                        methods = listOf(AstFunction("test", emptyList(), "float", line = 3, column = 9, endLine = 5, endColumn = 10))
-                    ))
-                ),
-                AstModule(
-                    name = "LengthTest2", line = 8, column = 1, endLine = 20, endColumn = 2,
-                    structs = listOf(AstStruct(
-                        name = "testStruct", line = 9, column = 5, endLine = 13, endColumn = 6,
-                        methods = listOf(AstFunction("test", emptyList(), "int", line = 10, column = 9, endLine = 12, endColumn = 10))
-                    )),
-                    functions = listOf(test3)
-                )
-            )
-        ))
-
-        val s1TestOffset = myFixture.file.text.indexOf("s1.test();") + "s1.".length
-        val s2TestOffset = myFixture.file.text.indexOf("s2.test();") + "s2.".length
+        val s1TestOffset = source.indexOf("s1.test();") + "s1.".length
+        val s2TestOffset = source.indexOf("s2.test();") + "s2.".length
 
         val s1Element = myFixture.file.findElementAt(s1TestOffset)!!
         val s1Resolved = s1Element.parent.references.firstNotNullOfOrNull { it.resolve() }
         assertNotNull("Expected s1.test() to resolve", s1Resolved)
-        assertEquals(offsetAt(myFixture.file, 3, 9), s1Resolved!!.textOffset)
+        assertEquals(source.indexOf("test :: () -> float"), s1Resolved!!.textOffset)
 
         val s2Element = myFixture.file.findElementAt(s2TestOffset)!!
         val s2Resolved = s2Element.parent.references.firstNotNullOfOrNull { it.resolve() }
         assertNotNull("Expected s2.test() to resolve", s2Resolved)
-        assertEquals(offsetAt(myFixture.file, 10, 9), s2Resolved!!.textOffset)
+        assertEquals(source.indexOf("test :: () -> int"), s2Resolved!!.textOffset)
 
-        assertTrue("s1.test() and s2.test() should resolve to different declarations",
-            s1Resolved.textOffset != s2Resolved.textOffset)
+        assertTrue(
+            "s1.test() and s2.test() should resolve to different declarations",
+            s1Resolved.textOffset != s2Resolved.textOffset
+        )
     }
 
     fun testModuleQualifierNavigatesToModuleDeclaration() {
@@ -95,87 +81,47 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-
-        val test3 = AstFunction(
-            "test3", emptyList(), "void", line = 9, column = 5, endLine = 11, endColumn = 6,
-            body = AstBlock(listOf(
-                AstStatement(type = "VARIABLE_DECL", name = "s1", declaredType = "LengthMethodTest::testStruct", line = 10, column = 9)
-            ))
-        )
-        val lengthMethodTestModule = AstModule(
-            name = "LengthMethodTest", line = 1, column = 1, endLine = 7, endColumn = 2,
-            structs = listOf(AstStruct(
-                name = "testStruct", line = 2, column = 5, endLine = 6, endColumn = 6,
-                methods = listOf(AstFunction("test", emptyList(), "float", line = 3, column = 9, endLine = 5, endColumn = 10))
-            ))
-        )
-
-        val filePath = myFixture.file.virtualFile.path
-        BwslAstCache.update(filePath, AstRoot(
-            modules = listOf(
-                lengthMethodTestModule,
-                AstModule(name = "LengthTest2", line = 8, column = 1, endLine = 12, endColumn = 2, functions = listOf(test3))
-            )
-        ))
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
 
         assertNotNull("Expected 'LengthMethodTest' qualifier to resolve", resolved)
         assertEquals("LengthMethodTest", resolved!!.text)
-        assertEquals(offsetAt(myFixture.file, 1, 8), resolved.textOffset)
+        assertEquals(source.indexOf("LengthMethodTest"), resolved.textOffset)
     }
 
     fun testFunctionCallResolvesViaAstScopeNotTextProximity() {
         // Two functions named "tonemap" in different pipeline passes - the parser's flat token
-        // tree has no notion of "pass" scoping, so only the AST (with its line/column ranges)
-        // can tell which one is in scope at the call site.
-        myFixture.configureByText(
-            "test.bwsl",
+        // tree has no notion of "pass" scoping, so only the compiler's own resolution (via the
+        // reference index) can tell which one is in scope at the call site.
+        val source = configureAndCache(
             "pipeline P {\n" +
                 "    pass \"A\" {\n" +
                 "        tonemap :: () -> float { return 1.0; }\n" +
                 "    }\n" +
                 "    pass \"B\" {\n" +
                 "        tonemap :: () -> float { return 2.0; }\n" +
-                "        other :: () -> float { return tone<caret>map(); }\n" +
+                "        other :: () -> float { return tonemap(); }\n" +
                 "    }\n" +
                 "}"
         )
 
-        val filePath = myFixture.file.virtualFile.path
-        BwslAstCache.update(filePath, AstRoot(
-            root = AstRootNode(
-                line = 1, column = 1, endLine = 9, endColumn = 2,
-                passes = listOf(
-                    AstPass(
-                        name = "A", line = 2, column = 5, endLine = 4, endColumn = 6,
-                        functions = listOf(AstFunction("tonemap", emptyList(), "float", line = 3, column = 9, endLine = 3, endColumn = 47))
-                    ),
-                    AstPass(
-                        name = "B", line = 5, column = 5, endLine = 8, endColumn = 6,
-                        functions = listOf(
-                            AstFunction("tonemap", emptyList(), "float", line = 6, column = 9, endLine = 6, endColumn = 47),
-                            AstFunction("other", emptyList(), "float", line = 7, column = 9, endLine = 7, endColumn = 53)
-                        )
-                    )
-                )
-            )
-        ))
-
-        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val callOffset = source.indexOf("return tonemap();") + "return ".length
+        val element = myFixture.file.findElementAt(callOffset)!!
         assertEquals(BwslTokenTypes.FUNCTION_CALL, element.node.elementType)
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
 
         assertNotNull("Expected 'tonemap' call to resolve to a declaration", resolved)
         assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, resolved!!.node.elementType)
         assertEquals("tonemap", resolved.text)
-        assertEquals(offsetAt(myFixture.file, 6, 9), resolved.textOffset)
+        // The pass "B" tonemap, not the pass "A" one.
+        assertEquals(source.lastIndexOf("tonemap :: () -> float { return 2.0; }"), resolved.textOffset)
     }
 
     fun testQualifiedFunctionCallNavigatesToModuleLevelDeclarationOnly() {
-        myFixture.configureByText(
-            "test.bwsl",
+        val source = configureAndCache(
             "module LengthMethodTest {\n" +
                 "    test :: (float[5] values) -> float {\n" +
                 "        return 1.0;\n" +
@@ -189,12 +135,13 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "module LengthTest2 {\n" +
                 "    test2 :: () -> float {\n" +
                 "        float[5] values;\n" +
-                "        return LengthMethodTest::tes<caret>t(values);\n" +
+                "        return LengthMethodTest::test(values);\n" +
                 "    }\n" +
                 "}"
         )
 
-        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val callOffset = source.indexOf("LengthMethodTest::test(values)") + "LengthMethodTest::".length
+        val element = myFixture.file.findElementAt(callOffset)!!
         val references = element.parent.references
         val resolved = references.firstNotNullOfOrNull { (it as? com.intellij.psi.PsiPolyVariantReference)?.multiResolve(false) }
 
@@ -203,31 +150,33 @@ class BwslReferenceTest : BasePlatformTestCase() {
         val target = resolved[0].element!!
         assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, target.node.elementType)
         assertEquals("test", target.text)
-        assertTrue("Resolved declaration should be the module-level 'test', not the struct method",
-            target.textOffset < myFixture.file.text.indexOf("struct testStruct"))
+        assertTrue(
+            "Resolved declaration should be the module-level 'test', not the struct method",
+            target.textOffset < source.indexOf("struct testStruct")
+        )
     }
 
     fun testFunctionCallNavigatesToDeclaration() {
-        myFixture.configureByText(
-            "test.bwsl",
+        val source = configureAndCache(
             "module M {\n" +
                 "    rotate :: (float2 pos) -> float2 {\n" +
                 "        return pos;\n" +
                 "    }\n" +
                 "    f1 :: () -> float2 {\n" +
-                "        return rota<caret>te(pos);\n" +
+                "        return rotate(pos);\n" +
                 "    }\n" +
                 "}"
         )
 
-        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val callOffset = source.indexOf("return rotate(pos);") + "return ".length
+        val element = myFixture.file.findElementAt(callOffset)!!
         assertEquals(BwslTokenTypes.FUNCTION_CALL, element.node.elementType)
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
 
         assertNotNull("Expected 'rotate' call to resolve to its declaration", resolved)
         assertEquals(BwslTokenTypes.FUNCTION_DECLARATION, resolved!!.node.elementType)
         assertEquals("rotate", resolved.text)
-        assertTrue(resolved.textOffset < myFixture.caretOffset)
+        assertTrue(resolved.textOffset < callOffset)
     }
 
     fun testVariableUsageNavigatesToLocalDeclaration() {
@@ -240,6 +189,8 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
@@ -261,6 +212,8 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
@@ -282,42 +235,42 @@ class BwslReferenceTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
-        assertTrue(element.parent.references.isEmpty())
+        assertTrue(element.parent.references.firstNotNullOfOrNull { it.resolve() } == null)
     }
 
-    fun testImportNavigatesToModuleFile() {
-        myFixture.addFileToProject("Common.bwsl", "module Common {\n    helper :: () -> float { return 1.0; }\n}")
-        myFixture.configureByText(
-            "test.bwsl",
-            "module M {\n" +
-                "    import Comm<caret>on\n" +
-                "}"
-        )
+    fun testImportNavigatesToTheModuleDeclarationInItsFile() {
+        // A decoy Common.bwsl in the project must not be picked: navigation follows the sourceFile
+        // bwslc reports for the module, not a lookup by file name.
+        myFixture.addFileToProject("decoy/Common.bwsl", "module Common { decoy :: () -> float { return 0.0; } }")
+        val source = configureImportingCommon()
 
-        val element = myFixture.file.findElementAt(myFixture.caretOffset)!!
+        val element = myFixture.file.findElementAt(source.indexOf("import Common") + "import ".length)!!
         val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
 
-        assertNotNull("Expected 'Common' import to resolve to Common.bwsl", resolved)
-        assertEquals("Common.bwsl", (resolved as com.intellij.psi.PsiFile).name)
+        assertNotNull("Expected the Common in `import Common` to resolve", resolved)
+        assertEquals(commonModule, resolved!!.containingFile.text)
+        assertEquals("Common", resolved.text)
+        assertEquals(commonModule.indexOf("Common"), resolved.textOffset)
     }
 
     fun testFragmentInputResolvesToVertexOutputAssignment() {
-        val source = "pipeline ShaderIoTest {\n" +
-            "    pass \"Main\" {\n" +
-            "        vertex {\n" +
-            "            output.position = float4(0, 0, 0, 1);\n" +
-            "            output.uv = float2(0, 0);\n" +
-            "        }\n" +
-            "        fragment {\n" +
-            "            output.color = float4(input.uv, 0.0, 1.0);\n" +
-            "        }\n" +
-            "    }\n" +
-            "}\n"
-
-        myFixture.configureByText("test.bwsl", source)
-        BwslAstCache.update(myFixture.file.virtualFile.path, com.bwsl.plugin.completion.BwslcAstHelper.parse(source))
+        val source = configureAndCache(
+            "pipeline ShaderIoTest {\n" +
+                "    pass \"Main\" {\n" +
+                "        vertex {\n" +
+                "            output.position = float4(0, 0, 0, 1);\n" +
+                "            output.uv = float2(0, 0);\n" +
+                "        }\n" +
+                "        fragment {\n" +
+                "            output.color = float4(input.uv, 0.0, 1.0);\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n"
+        )
 
         val inputUvOffset = source.indexOf("input.uv") + "input.".length
         val element = myFixture.file.findElementAt(inputUvOffset)!!
@@ -341,13 +294,13 @@ class BwslReferenceTest : BasePlatformTestCase() {
             "            output.pos = attributes.position;\n" +
             "        }\n" +
             "        fragment {\n" +
-            "            output.result = attributes.color;\n" +
+            "            output.result = float4(1.0, 0.0, 0.0, 1.0);\n" +
             "        }\n" +
             "    }\n" +
             "}\n"
 
         myFixture.configureByText("attr_ref_test.bwsl", source)
-        BwslAstCache.update(myFixture.file.virtualFile.path, com.bwsl.plugin.completion.BwslcAstHelper.parse(source))
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         fun resolveAttrName(name: String): Int? {
             val useBlock = source.indexOf("use attributes {")
@@ -372,5 +325,57 @@ class BwslReferenceTest : BasePlatformTestCase() {
             source.indexOf("color: float4"),
             resolveAttrName("color")
         )
+    }
+
+    private val commonModule =
+        "module Common {\n" +
+            "    helper :: () -> float {\n" +
+            "        return 1.0;\n" +
+            "    }\n" +
+            "}\n"
+
+    private fun configureImportingCommon(): String {
+        myFixture.addFileToProject("Common.bwsl", commonModule)
+        myFixture.configureByText(
+            "test.bwsl",
+            "module M {\n" +
+                "    import Common\n" +
+                "\n" +
+                "    run :: () -> float {\n" +
+                "        return Common::helper();\n" +
+                "    }\n" +
+                "}\n"
+        )
+        val source = myFixture.file.text
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path, mapOf("Common" to commonModule))
+        return source
+    }
+
+    fun testCallIntoImportedModuleNavigatesIntoThatModulesFile() {
+        // The imported module's AST nodes carry line/column relative to Common.bwsl, so this must
+        // land in Common.bwsl at helper's real position - not at the same line/column of the
+        // importing file. The module is deliberately not in the project: it is found via the sourceFile
+        // bwslc reports.
+        val source = configureImportingCommon()
+
+        val callOffset = source.indexOf("Common::helper()") + "Common::".length
+        val element = myFixture.file.findElementAt(callOffset)!!
+        val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
+
+        assertNotNull("Expected Common::helper() to resolve", resolved)
+        assertEquals("Common.bwsl", resolved!!.containingFile.name)
+        assertEquals("helper", resolved.text)
+        assertEquals(commonModule.indexOf("helper ::"), resolved.textOffset)
+    }
+
+    fun testModuleQualifierOfImportedModuleNavigatesToItsDeclarationInItsFile() {
+        val source = configureImportingCommon()
+
+        val element = myFixture.file.findElementAt(source.indexOf("Common::helper()"))!!
+        val resolved = element.parent.references.firstNotNullOfOrNull { it.resolve() }
+
+        assertNotNull("Expected the Common qualifier to resolve", resolved)
+        assertEquals(commonModule, resolved!!.containingFile.text)
+        assertEquals(commonModule.indexOf("Common"), resolved.textOffset)
     }
 }

@@ -1,7 +1,5 @@
 package com.bwsl.plugin.completion
 
-import com.bwsl.plugin.*
-
 /**
  * Completion tests for positions directly inside a `pipeline { ... }` block (not inside any of
  * its subblocks) — i.e. the gaps before/between/after `attributes`/`resources`/`variants`/`pass`.

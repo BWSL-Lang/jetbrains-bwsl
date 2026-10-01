@@ -1,5 +1,4 @@
 package com.bwsl.plugin
-import com.bwsl.plugin.references.nextNonWhitespace
 import com.bwsl.plugin.references.previousNonWhitespace
 
 import com.intellij.lang.parameterInfo.CreateParameterInfoContext
@@ -21,11 +20,9 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
             return null
         }
         val nameToken = callExpr.firstChild?.firstChild ?: return null
-        val name = nameToken.text
-        val tokenType = nameToken.node.elementType
         val hasReceiver = previousNonWhitespace(callExpr)?.node?.elementType == BwslTokenTypes.DOT
-        val signatures = findSignatures(context.file, name, tokenType, hasReceiver)
-        log.warn("findElementForParameterInfo: name=$name tokenType=$tokenType signatures=${signatures.size} cacheKeys=${BwslAstCache.keys()}")
+        val signatures = signaturesFor(nameToken, hasReceiver)
+        log.warn("findElementForParameterInfo: name=${nameToken.text} tokenType=${nameToken.node.elementType} signatures=${signatures.size}")
         if (signatures.isEmpty()) return null
         context.itemsToShow = signatures.toTypedArray()
         return callExpr
@@ -61,7 +58,7 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         val callExpr = findEnclosingCallExpression(file, offset) ?: return emptyList()
         val nameToken = callExpr.firstChild?.firstChild ?: return emptyList()
         val hasReceiver = previousNonWhitespace(callExpr)?.node?.elementType == BwslTokenTypes.DOT
-        return findSignatures(file, nameToken.text, nameToken.node.elementType, hasReceiver)
+        return signaturesFor(nameToken, hasReceiver)
     }
 
     fun findEnclosingCallExpression(file: PsiFile, offset: Int): PsiElement? {
@@ -75,8 +72,14 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
         return null
     }
 
-    fun findSignatures(file: PsiFile, name: String, tokenType: com.intellij.psi.tree.IElementType, hasReceiver: Boolean = false): List<BwslFunctionSignature> {
-        if (tokenType == BwslTokenTypes.INTRINSIC_CALL) {
+    /**
+     * The signature(s) of the function called at [nameToken]: an intrinsic's from the built-in
+     * table, any other call's from the compiler's reference index - the declaration the call
+     * resolves to, so same-named functions in different modules or passes can't be mixed up.
+     */
+    private fun signaturesFor(nameToken: PsiElement, hasReceiver: Boolean): List<BwslFunctionSignature> {
+        val name = nameToken.text
+        if (nameToken.node.elementType == BwslTokenTypes.INTRINSIC_CALL) {
             if (hasReceiver && name == "length") {
                 return listOf(BwslFunctionSignature("length", emptyList(), "int"))
             }
@@ -84,8 +87,10 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
                 BwslFunctionSignature(fn.name, fn.params.map { "${it.type} ${it.name}" }, fn.returnType)
             }
         }
-        val filePath = file.virtualFile?.path ?: return emptyList()
-        return listOfNotNull(BwslAstCache.getSignatures(filePath)[name])
+        val index = buildAstIndex(nameToken.containingFile) ?: return emptyList()
+        return declarationIdsAt(index, nameToken.textOffset)
+            .mapNotNull { index.symbolsById[it] }
+            .mapNotNull { functionSignatureOf(index, it) }
     }
 
     private fun countCommasBefore(callExpr: PsiElement, offset: Int): Int {

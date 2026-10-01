@@ -9,14 +9,15 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
 
     private fun docAt(caretOffset: Int): String? {
         val file = myFixture.file
-        var element = file.findElementAt(caretOffset)!!
+        val original = file.findElementAt(caretOffset)!!
+        var element = original
         val custom = provider.getCustomDocumentationElement(myFixture.editor, file, element, caretOffset)
         if (custom != null) {
             element = custom
         } else {
             element.parent?.references?.firstNotNullOfOrNull { it.resolve() }?.let { element = it }
         }
-        return provider.generateDoc(element, element)
+        return provider.generateDoc(element, original)
     }
 
     fun testIntrinsicCallShowsSignatureAndDescription() {
@@ -68,27 +69,23 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         assertTrue("Expected cosine description, got: $doc", doc.contains("Cosine"))
     }
 
-    fun testLocalVariableUsageShowsDeclaredType() {
-        myFixture.configureByText(
-            "test.bwsl",
-            "module M {\n" +
-                "    f1 :: () -> float2 {\n" +
-                "        float2 normalized = float2(1.0, 2.0);\n" +
-                "        return normali<caret>zed;\n" +
-                "    }\n" +
-                "}"
-        )
+    /** Configures [textWithCaret] and caches the real bwslc AST for it. */
+    private fun configureAndCache(textWithCaret: String) {
+        myFixture.configureByText("test.bwsl", textWithCaret)
+        BwslcAstHelper.parseAndCache(myFixture.file.text, myFixture.file.virtualFile.path)
+    }
 
-        val filePath = myFixture.file.virtualFile.path
-        val fn = AstFunction(
-            "f1", emptyList(), "float2", line = 2, column = 5, endLine = 5, endColumn = 6,
-            body = AstBlock(listOf(
-                AstStatement(type = "VARIABLE_DECL", name = "normalized", declaredType = "float2", line = 3, column = 9)
-            ))
+    fun testLocalVariableUsageShowsDeclaredType() {
+        configureAndCache(
+            """
+            module M {
+                f1 :: () -> float2 {
+                    float2 normalized = float2(1.0, 2.0);
+                    return normali<caret>zed;
+                }
+            }
+            """.trimIndent()
         )
-        BwslAstCache.update(filePath, AstRoot(
-            modules = listOf(AstModule(name = "M", line = 1, column = 1, endLine = 6, endColumn = 2, functions = listOf(fn)))
-        ))
 
         val doc = docAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'normalized'", doc)
@@ -97,29 +94,80 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     }
 
     fun testParameterUsageShowsDeclaredType() {
-        myFixture.configureByText(
-            "test.bwsl",
-            "module M {\n" +
-                "    rotate :: (float2 pos, float2 center) -> float2 {\n" +
-                "        return po<caret>s - center;\n" +
-                "    }\n" +
-                "}"
+        configureAndCache(
+            """
+            module M {
+                rotate :: (float2 pos, float2 center) -> float2 {
+                    return po<caret>s - center;
+                }
+            }
+            """.trimIndent()
         )
-
-        val filePath = myFixture.file.virtualFile.path
-        val fn = AstFunction(
-            "rotate",
-            listOf(AstParam("pos", "float2"), AstParam("center", "float2")),
-            "float2", line = 2, column = 5, endLine = 4, endColumn = 6
-        )
-        BwslAstCache.update(filePath, AstRoot(
-            modules = listOf(AstModule(name = "M", line = 1, column = 1, endLine = 5, endColumn = 2, functions = listOf(fn)))
-        ))
 
         val doc = docAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'pos'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 pos"))
         assertTrue("Expected 'parameter' label, got: $doc", doc.contains("parameter"))
+    }
+
+    fun testSameNamedVariablesInDifferentFunctionsEachShowTheirOwnType() {
+        // Two functions declare a local `v` with different types; the compiler's reference index
+        // says which one a use belongs to.
+        val source = """
+            module M {
+                first :: () -> float {
+                    float v = 1.0;
+                    return v;
+                }
+                second :: () -> float2 {
+                    float2 v = float2(1.0);
+                    return v;
+                }
+            }
+        """.trimIndent()
+        configureAndCache(source)
+
+        val inFirst = docAt(source.indexOf("return v;") + "return ".length)
+        val inSecond = docAt(source.lastIndexOf("return v;") + "return ".length)
+
+        assertTrue("Expected 'float v' in the first function, got: $inFirst", inFirst!!.contains("float v"))
+        assertFalse("First function's v is not a float2, got: $inFirst", inFirst.contains("float2"))
+        assertTrue("Expected 'float2 v' in the second function, got: $inSecond", inSecond!!.contains("float2 v"))
+    }
+
+    fun testConstantUsageShowsItsType() {
+        configureAndCache(
+            """
+            module M {
+                f1 :: () -> float {
+                    const float K = 2.0;
+                    return <caret>K * 3.0;
+                }
+            }
+            """.trimIndent()
+        )
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'K'", doc)
+        assertTrue("Expected declared type, got: $doc", doc!!.contains("float K"))
+        assertTrue("Expected 'constant' label, got: $doc", doc.contains("constant"))
+    }
+
+    fun testHoveringADeclarationsOwnNameShowsItsType() {
+        configureAndCache(
+            """
+            module M {
+                f1 :: () -> float2 {
+                    float2 nor<caret>malized = float2(1.0, 2.0);
+                    return normalized;
+                }
+            }
+            """.trimIndent()
+        )
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the declaration of 'normalized'", doc)
+        assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 normalized"))
     }
 
     fun testAttributesQualifierShowsUsedAttributeList() {
@@ -137,8 +185,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             "    }\n" +
             "}\n"
 
-        myFixture.configureByText("test.bwsl", source)
-        BwslAstCache.update(myFixture.file.virtualFile.path, BwslcAstHelper.parse(source.replace("<caret>", "")))
+        configureAndCache(source)
 
         val doc = docAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'attributes'", doc)
@@ -162,8 +209,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             "    }\n" +
             "}\n"
 
-        myFixture.configureByText("test.bwsl", source)
-        BwslAstCache.update(myFixture.file.virtualFile.path, BwslcAstHelper.parse(source.replace("<caret>", "")))
+        configureAndCache(source)
 
         val doc = docAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'attributes.position'", doc)
@@ -172,34 +218,148 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     }
 
     fun testCustomFunctionCallShowsQualifiedNameAndSignature() {
-        myFixture.configureByText(
-            "test.bwsl",
-            "module M {\n" +
-                "    rotate :: (float2 pos) -> float2 {\n" +
-                "        return pos;\n" +
-                "    }\n" +
-                "    f1 :: () -> float2 {\n" +
-                "        return rota<caret>te(pos);\n" +
-                "    }\n" +
-                "}"
-        )
+        val source = "module M {\n" +
+            "    rotate :: (float2 pos) -> float2 {\n" +
+            "        return pos;\n" +
+            "    }\n" +
+            "    f1 :: () -> float2 {\n" +
+            "        return rotate(pos);\n" +
+            "    }\n" +
+            "}"
 
-        val filePath = myFixture.file.virtualFile.path
-        BwslAstCache.update(filePath, AstRoot(
-            modules = listOf(
-                AstModule(
-                    name = "M", line = 1, column = 1, endLine = 7, endColumn = 2,
-                    functions = listOf(
-                        AstFunction("rotate", listOf(AstParam("pos", "float2")), "float2", line = 2, column = 5, endLine = 4, endColumn = 6),
-                        AstFunction("f1", emptyList(), "float2", line = 5, column = 5, endLine = 7, endColumn = 6)
-                    )
-                )
-            )
-        ))
+        myFixture.configureByText("test.bwsl", source)
+        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
-        val doc = docAt(myFixture.caretOffset)
+        val caretOffset = source.indexOf("rotate(pos)")
+        val doc = docAt(caretOffset)
         assertNotNull("Expected documentation for 'rotate' call", doc)
         assertTrue("Expected qualified name, got: $doc", doc!!.contains("M::rotate()"))
         assertTrue("Expected signature with parameter, got: $doc", doc.contains("float2 rotate(float2 pos)"))
+    }
+
+    private val stageIoSource = """
+        pipeline P {
+            attributes {
+                position: float4
+                uv: float2
+                id: int
+            }
+            pass "Main" {
+                use attributes { position, uv, id }
+                outputs {
+                    result: float4
+                }
+                vertex {
+                    output.pos = attributes.position;
+                    output.n = attributes.uv * 2.0;
+                    output.unit = normalize(attributes.uv);
+                    @flat output.index = attributes.id;
+                }
+                fragment {
+                    output.result = float4(input.n, input.unit);
+                }
+            }
+        }
+    """.trimIndent()
+
+    fun testInputMemberShowsTheTypeTheCompilerInferred() {
+        // The type shown is the one on the compiler's stage-interface symbol.
+        configureAndCache(stageIoSource.replace("input.n,", "input.<caret>n,"))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'input.n'", doc)
+        assertTrue("Expected the inferred type float2, got: $doc", doc!!.contains("float2 n"))
+        assertTrue("Expected the input.n name, got: $doc", doc.contains("input.n"))
+    }
+
+    fun testStageValueTheCompilerLeftUntypedShowsAQuestionMarkNotAGuess() {
+        // `normalize(...)` gets no type in the AST (BWSLC_GAPS.md #2). The doc must say so rather
+        // than invent one, such as the called function's name.
+        configureAndCache(stageIoSource.replace("input.unit", "input.un<caret>it"))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'input.unit'", doc)
+        assertTrue("Expected an unknown type, got: $doc", doc!!.contains("? unit"))
+        assertFalse("Must not claim the function name as the type, got: $doc", doc.contains("normalize"))
+    }
+
+    fun testOutputMemberShowsItsInterpolationQualifier() {
+        configureAndCache(stageIoSource.replace("output.index", "output.ind<caret>ex"))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for 'output.index'", doc)
+        assertTrue("Expected the int type, got: $doc", doc!!.contains("int index"))
+        assertTrue("Expected the @flat qualifier, got: $doc", doc.contains("@flat"))
+    }
+
+    fun testFragmentOutputMemberIsDocumentedAsAFragmentOutput() {
+        configureAndCache(stageIoSource.replace("output.result", "output.res<caret>ult"))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the fragment output 'result'", doc)
+        assertTrue("Expected the declared type, got: $doc", doc!!.contains("float4 result"))
+        assertTrue("Expected a fragment-output description, got: $doc", doc.contains("Fragment output"))
+    }
+
+    fun testInputQualifierInTheFragmentStageListsTheVertexOutputsWithTheirTypes() {
+        configureAndCache(stageIoSource.replace("float4(input.n", "float4(inp<caret>ut.n"))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the 'input' qualifier", doc)
+        assertTrue("Expected float2 n listed, got: $doc", doc!!.contains("<b>float2</b> n"))
+        assertTrue("Expected int index listed, got: $doc", doc.contains("<b>int</b> index"))
+        assertTrue("Expected the @flat qualifier next to index, got: $doc", doc.contains("@flat"))
+    }
+
+    fun testOutputQualifierInTheVertexStageListsTheVertexOutputs() {
+        configureAndCache(stageIoSource.replace("output.n =", "outp<caret>ut.n ="))
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the 'output' qualifier", doc)
+        assertTrue("Expected the vertex stage description, got: $doc", doc!!.contains("Built-in vertex stage qualifier"))
+        assertTrue("Expected float2 n listed, got: $doc", doc.contains("<b>float2</b> n"))
+    }
+
+    fun testFunctionDeclarationShowsItsQualifiedNameAndSignature() {
+        configureAndCache(
+            """
+            module M {
+                struct S {
+                    float w;
+
+                    sca<caret>le :: (float k) -> float { return w * k; }
+                }
+            }
+            """.trimIndent()
+        )
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the method declaration", doc)
+        assertTrue("Expected the qualified name, got: $doc", doc!!.contains("M::S::scale()"))
+        assertTrue("Expected the signature, got: $doc", doc.contains("float scale(float k)"))
+    }
+
+    fun testCallToAnImportedFunctionShowsItsDocumentation() {
+        // The function is declared in another file, which has no cached AST of its own: the
+        // documentation comes from the compiled file's index, which includes the imported module.
+        myFixture.configureByText(
+            "test.bwsl",
+            """
+            module M {
+                import Common
+
+                run :: () -> float { return Common::hel<caret>per(1.0, 2.0); }
+            }
+            """.trimIndent()
+        )
+        BwslcAstHelper.parseAndCache(
+            myFixture.file.text, myFixture.file.virtualFile.path,
+            mapOf("Common" to "module Common {\n    helper :: (float a, float b) -> float { return a + b; }\n}\n")
+        )
+
+        val doc = docAt(myFixture.caretOffset)
+        assertNotNull("Expected documentation for the imported 'helper'", doc)
+        assertTrue("Expected the qualified name, got: $doc", doc!!.contains("Common::helper()"))
+        assertTrue("Expected the signature, got: $doc", doc.contains("float helper(float a, float b)"))
     }
 }

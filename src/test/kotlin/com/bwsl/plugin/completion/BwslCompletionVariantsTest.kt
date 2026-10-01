@@ -1,7 +1,5 @@
 package com.bwsl.plugin.completion
 
-import com.bwsl.plugin.*
-
 /** Completion tests for positions inside a pipeline's `variants { ... }` block. */
 class BwslCompletionVariantsTest : BwslCompletionScopeTestCase() {
 

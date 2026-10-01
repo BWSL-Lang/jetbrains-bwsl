@@ -1,7 +1,5 @@
 package com.bwsl.plugin.completion
 
-import com.bwsl.plugin.*
-
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class BwslCompletionContributorTest : BasePlatformTestCase() {

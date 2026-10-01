@@ -8,29 +8,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.elementType
 
-/** Finds the AstFunction (and its qualified path, e.g. ["LengthMethodTest", "testStruct"]) whose
- *  declaration site matches the given 1-based line/column. */
-private fun findFunctionAndPath(root: AstRoot, line: Int, column: Int): Pair<AstFunction, List<String>>? {
-    fun matches(fn: AstFunction) = fn.line == line && fn.column == column
-
-    for (module in root.modules) {
-        module.functions.firstOrNull(::matches)?.let { return it to listOf(module.name) }
-        for (struct in module.structs) {
-            struct.methods.firstOrNull(::matches)?.let { return it to listOf(module.name, struct.name) }
-        }
-    }
-    root.root?.let { rootNode ->
-        rootNode.functions.firstOrNull(::matches)?.let { return it to emptyList() }
-        for (struct in rootNode.structs) {
-            struct.methods.firstOrNull(::matches)?.let { return it to listOf(struct.name) }
-        }
-        for (pass in rootNode.passes) {
-            pass.functions.firstOrNull(::matches)?.let { return it to listOf(pass.name) }
-        }
-    }
-    return null
-}
-
 private fun signatureHtml(returnType: String, name: String, params: List<String>): String =
     "${returnType.ifBlank { "void" }} ${name}(${params.joinToString(", ")})"
 
@@ -65,28 +42,48 @@ private fun interpolationLabel(interp: String): String? = when (interp) {
     else             -> null
 }
 
-private fun outputListHtml(outputs: Map<String, VertexOutput>): String {
+/** A value the vertex stage writes with `output.<name> = ...`, as the compiler typed it. */
+private data class StageValue(val name: String, val type: String, val interpolation: String)
+
+/**
+ * The values [pass]'s vertex stage writes for the fragment stage: the pass's stage-interface
+ * symbols, in the compiler's order. The type is the compiler's own; the interpolation qualifier is
+ * on the first assignment that defines the value.
+ */
+private fun stageValues(index: BwslAstIndex, pass: AstNodePos): List<StageValue> =
+    index.symbolsById.values
+        .filter { it.kind == "stage-interface" && it.owner == pass.id }
+        .map { symbol ->
+            val interpolation = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it]?.interpolation } ?: "DEFAULT"
+            StageValue(symbol.name, symbol.type.ifBlank { "?" }, interpolation)
+        }
+
+/** The attributes [pass] lists in its `use attributes { ... }`, in that order, as the compiler resolved them. */
+private fun usedAttributes(index: BwslAstIndex, pass: AstNodePos): List<AstSymbol> =
+    index.nodesById.values
+        .filter { it.id.startsWith("${pass.id}/used-attribute:") }
+        .sortedBy { it.id.substringAfterLast(':').toIntOrNull() ?: Int.MAX_VALUE }
+        .mapNotNull { node ->
+            index.refsByFrom[node.id].orEmpty().firstOrNull { it.role == "attribute" }
+                ?.let { index.symbolsById[it.to] }
+        }
+
+private fun outputListHtml(outputs: List<StageValue>): String {
     if (outputs.isEmpty()) return "(none)"
-    return outputs.values.joinToString("<br/>") { vo ->
-        val type = vo.type ?: "?"
+    return outputs.joinToString("<br/>") { vo ->
         val interp = interpolationLabel(vo.interpolation)?.let { " &nbsp;<i>$it</i>" } ?: ""
-        "<code><b>$type</b> ${vo.member}</code>$interp"
+        "<code><b>${vo.type}</b> ${vo.name}</code>$interp"
     }
 }
 
 /** Tooltip for the `attributes` qualifier, listing the attributes available in the current pass. */
 private fun attributesQualifierDoc(element: PsiElement): String? {
     if (element.text != "attributes") return null
-    val file = element.containingFile
-    val filePath = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(filePath) ?: return null
-    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-    val scope = findScope(root, line, column)
-    val pass = scope.pass ?: return null
-    val pipeline = scope.pipeline ?: return null
-    val used = passUsedAttributes(pass, pipeline)
+    val index = buildAstIndex(element.containingFile) ?: return null
+    val pass = index.enclosingNodeOfType("PASS", element.textOffset) ?: return null
+    val used = usedAttributes(index, pass)
     val listHtml = if (used.isEmpty()) "(none)" else
-        used.joinToString("<br/>") { "<code><b>${it.dataType}</b> ${it.name}</code>" }
+        used.joinToString("<br/>") { "<code><b>${it.type}</b> ${it.name}</code>" }
     return renderDoc("attributes", "Pipeline attribute inputs",
         "Per-vertex attributes available in this pass via <code>use attributes { ... }</code>.<br/><br/>$listHtml")
 }
@@ -95,30 +92,26 @@ private fun attributesQualifierDoc(element: PsiElement): String? {
 private fun shaderQualifierDoc(element: PsiElement): String? {
     val name = element.text
     if (name != "input" && name != "output") return null
-    val file = element.containingFile
-    val filePath = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(filePath) ?: return null
-    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-    val scope = findScope(root, line, column)
-    val pass = scope.pass ?: return null
-    val attrs = scope.pipeline?.attributes ?: emptyList()
+    val index = buildAstIndex(element.containingFile) ?: return null
+    val offset = element.textOffset
+    val pass = index.enclosingNodeOfType("PASS", offset) ?: return null
+    val inFragmentStage = index.enclosingNodeOfType("FRAGMENT_STAGE", offset) != null
+    val inVertexStage = index.enclosingNodeOfType("VERTEX_STAGE", offset) != null
 
     return when (name) {
-        "input" if isInsideFragmentStage(pass, line, column) -> {
-            val outputs = vertexOutputAssignments(pass, attrs)
+        "input" if inFragmentStage -> {
             renderDoc("input", "Built-in fragment stage qualifier",
                 "Provides access to values written to <code>output.*</code> in the vertex stage, " +
                         "interpolated across the triangle.<br/><br/>" +
-                        "Vertex outputs available here:<br/>${outputListHtml(outputs)}")
+                        "Vertex outputs available here:<br/>${outputListHtml(stageValues(index, pass))}")
         }
         "input" -> renderDoc("input", "Built-in stage qualifier",
             "In a vertex stage: provides per-vertex built-in values such as <code>vertex_id</code>, <code>instance_id</code>.<br/>" +
                     "In a compute stage: provides dispatch-grid built-ins such as <code>global_id</code>, <code>local_id</code>.")
-        "output" if isInsideVertexStage(pass, line, column) -> {
-            val outputs = vertexOutputAssignments(pass, attrs)
+        "output" if inVertexStage -> {
             renderDoc("output", "Built-in vertex stage qualifier",
                 "Writes per-vertex output attributes passed to the fragment stage as <code>input.*</code>.<br/><br/>" +
-                        "Outputs declared in this vertex block:<br/>${outputListHtml(outputs)}")
+                        "Outputs declared in this vertex block:<br/>${outputListHtml(stageValues(index, pass))}")
         }
         else -> renderDoc("output", "Built-in stage qualifier",
             "Writes values to render targets or depth. " +
@@ -126,85 +119,79 @@ private fun shaderQualifierDoc(element: PsiElement): String? {
     }
 }
 
-private fun isInsideVertexStage(pass: AstPass, line: Int, column: Int): Boolean {
-    val vs = pass.vertexShader ?: return false
-    return astContains(line, column, vs.line, vs.column, vs.endLine, vs.endColumn)
-}
-
-private fun isInsideFragmentStage( pass: AstPass, line: Int, column: Int): Boolean {
-    val fs = pass.fragmentShader ?: return false
-    return astContains(line, column, fs.line, fs.column, fs.endLine, fs.endColumn)
-}
-
-/** Tooltip for a member identifier accessed via `input.<member>` or `output.<member>`. */
+/**
+ * Tooltip for the member in `attributes.<member>`, `input.<member>` or `output.<member>`: whichever
+ * declaration the compiler's reference edge for that member points at.
+ */
 private fun shaderMemberDoc(element: PsiElement): String? {
-    val file = element.containingFile
-    val filePath = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(filePath) ?: return null
-    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-    val scope = findScope(root, line, column)
-    val pass = scope.pass ?: return null
-    val attrs = scope.pipeline?.attributes ?: emptyList()
+    val index = buildAstIndex(element.containingFile) ?: return null
+    val edge = referenceEdgesAt(index, element.textOffset)
+        .firstOrNull { it.role == "attribute" || it.role == "input" || it.role == "output" } ?: return null
+    val symbol = index.symbolsById[edge.to] ?: return null
+    val member = symbol.name
+    val type = symbol.type.ifBlank { "?" }
 
-    val memberName = element.text
-    val parentRef = element.parent ?: return null
-    val prev = previousNonWhitespace(parentRef)
-    val beforeDot = if (prev?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prev) else null
-    val qualifier = beforeDot?.text ?: return null
-
-    if (qualifier == "attributes") {
-        val pipeline = scope.pipeline ?: return null
-        val decl = passUsedAttributes(pass, pipeline).firstOrNull { it.name == memberName } ?: return null
-        return renderDoc("attributes.$memberName", "${decl.dataType} $memberName", "Pipeline vertex attribute")
-    }
-
-    if (qualifier != "input" && qualifier != "output") return null
-
-    val vo = vertexOutputAssignments(pass, attrs)[memberName] ?: return null
-    val typePart = vo.type ?: "?"
-    val interpLabel = interpolationLabel(vo.interpolation)
-    val details = buildString {
-        append("Vertex output attribute")
-        if (interpLabel != null) append(", interpolated as <code>$interpLabel</code>")
-    }
-    return when (qualifier) {
-        "input"  -> renderDoc("input.$memberName", "$typePart $memberName", details)
-        "output" -> renderDoc("output.$memberName", "$typePart $memberName", details)
-        else     -> null
+    return when (symbol.kind) {
+        "attribute" -> renderDoc("attributes.$member", "$type $member", "Pipeline vertex attribute")
+        "stage-interface" -> {
+            val interpolation = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it]?.interpolation }
+                ?.let { interpolationLabel(it) }
+            val details = buildString {
+                append("Vertex output attribute")
+                if (interpolation != null) append(", interpolated as <code>$interpolation</code>")
+            }
+            renderDoc("${edge.role}.$member", "$type $member", details)
+        }
+        "fragment-output" -> renderDoc("output.$member", "$type $member", "Fragment output (render target)")
+        else -> null
     }
 }
 
-/** Shows the declared type of a variable/parameter usage or declaration, via the AST. */
+/**
+ * Shows the declared type of the variable, parameter, constant or struct field the caret is on or
+ * refers to - at a declaration's own name or at a use of it. The compiler's reference index says
+ * which declaration a use belongs to, so same-named variables in different scopes can't be mixed up.
+ */
 private fun variableTypeDoc(element: PsiElement): String? {
-    val file = element.containingFile
-    val filePath = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(filePath) ?: return null
-    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-    val scope = findScope(root, line, column)
-    val fn = findEnclosingFunction(root, scope, line, column) ?: return null
-    val name = element.text
-
-    fn.parameters.firstOrNull { it.name == name }?.let {
-        return renderDoc(null, "${it.type} ${it.name}", "parameter")
+    val index = buildAstIndex(element.containingFile) ?: return null
+    val symbol = symbolAt(index, element.textOffset) ?: return null
+    val description = when (symbol.kind) {
+        "parameter" -> "parameter"
+        "variable" -> "local variable"
+        "constant" -> "constant"
+        "struct-field" -> "field"
+        else -> return null
     }
-
-    val decl = collectVariableDecls(fn.body)
-        .filter { it.name == name && (it.line < line || (it.line == line && it.column <= column)) }
-        .maxWithOrNull(compareBy({ it.line }, { it.column }))
-    val declaredType = decl?.declaredType?.takeIf { it.isNotBlank() } ?: return null
-    return renderDoc(null, "$declaredType $name", "local variable")
+    val type = symbol.type.takeIf { it.isNotBlank() } ?: return null
+    return renderDoc(null, "$type ${symbol.name}", description)
 }
 
-private fun customFunctionDoc(element: PsiElement): String? {
-    val file = element.containingFile
-    val filePath = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(filePath) ?: return null
-    val (line, column) = lineColumnAt(file, element.textOffset) ?: return null
-    val (fn, path) = findFunctionAndPath(root, line, column) ?: return null
+/** The names of the module/struct/pass that enclose [symbol], outermost first (a pipeline is not part of a function's path). */
+private fun qualifiedPathOf(index: BwslAstIndex, symbol: AstSymbol): List<String> {
+    val path = ArrayList<String>()
+    var owner = symbol.owner
+    var depth = 0
+    while (owner.isNotEmpty() && depth++ < 8) {
+        val ownerSymbol = index.symbolsById[owner] ?: break
+        if (ownerSymbol.kind == "module" || ownerSymbol.kind == "struct" || ownerSymbol.kind == "pass") {
+            path.add(0, ownerSymbol.name)
+        }
+        owner = ownerSymbol.owner
+    }
+    return path
+}
 
-    val signature = signatureHtml(fn.returnType, fn.name, fn.parameters.map { "${it.type} ${it.name}" })
-    val qualifiedName = (path + fn.name).joinToString("::") + "()"
-    return renderDoc(qualifiedName, signature, null)
+/**
+ * Documentation for the function or method the caret is on or calls: its qualified name and
+ * signature, from the symbol. [at] is the element in the file that has the cached AST - a call, or
+ * the declaration itself - not a declaration the call resolved into another file.
+ */
+private fun functionDoc(at: PsiElement): String? {
+    val index = buildAstIndex(at.containingFile) ?: return null
+    val symbol = symbolAt(index, at.textOffset) ?: return null
+    val signature = functionSignatureOf(index, symbol) ?: return null
+    val qualifiedName = (qualifiedPathOf(index, symbol) + symbol.name).joinToString("::") + "()"
+    return renderDoc(qualifiedName, signatureHtml(signature.returnType, signature.name, signature.params), null)
 }
 
 class BwslDocumentationProvider : AbstractDocumentationProvider() {
@@ -217,7 +204,7 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
         if (element.parent?.elementType == BwslTokenTypes.REFERENCE && element.parent?.firstChild?.elementType == BwslTokenTypes.INTRINSIC_CALL) {
             return element.parent
         }
-        // Variable/parameter identifiers resolve to their declaration via BwslVariableReference,
+        // Variable/parameter identifiers resolve to their declaration via BwslAstReference,
         // but the type lookup works identically for the usage and the declaration itself, so
         // skip reference resolution entirely and document the hovered element directly.
         if (element.elementType == BwslTokenTypes.IDENTIFIER) return element
@@ -235,10 +222,12 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
                 val hasReceiver = previousNonWhitespace(outer)?.elementType == BwslTokenTypes.DOT
                 intrinsicDoc(callElement.text, hasReceiver)
             }
-            BwslTokenTypes.FUNCTION_DECLARATION -> customFunctionDoc(element)
+            // The target of a hover is the declaration a call resolved to, which may be in another
+            // file with no cached AST of its own: document it from the hovered element instead.
+            BwslTokenTypes.FUNCTION_DECLARATION -> functionDoc(originalElement ?: element)
             // A method-style call (e.g. "values.cos()") is lexed as FUNCTION_CALL rather than
             // INTRINSIC_CALL because it has a receiver, but it may still name an intrinsic.
-            BwslTokenTypes.FUNCTION_CALL -> customFunctionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
+            BwslTokenTypes.FUNCTION_CALL -> functionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
             BwslTokenTypes.KW_ATTRIBUTES -> attributesQualifierDoc(element)
             BwslTokenTypes.IDENTIFIER -> {
                 // Highest priority: input/output qualifier keywords and their member identifiers.

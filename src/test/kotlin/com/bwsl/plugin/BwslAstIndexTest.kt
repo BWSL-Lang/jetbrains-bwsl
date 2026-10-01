@@ -8,9 +8,9 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Verifies the position-semantics table in FUCK_THE_LEXER.md §3 against real bwslc output.
- * This is the gate for Phase 2: every later phase's resolution logic depends on [BwslAstIndex]'s
- * [BwslAstIndex.nameRangeOf] landing on the actual identifier text, not just "close to" it.
+ * Verifies against real bwslc output that [BwslAstIndex.nameRangeOf] - which is just a node's
+ * nameLine/nameColumn plus its name - lands on the actual identifier text, not just "close to" it.
+ * Every resolution in the plugin depends on that.
  */
 class BwslAstIndexTest {
 
@@ -43,18 +43,29 @@ class BwslAstIndexTest {
 
         var checked = 0
         for (ref in references) {
-            // Synthetic ids (FUNCTION:n/parameter:n, STRUCT_DECL:n/field:n) have no source
-            // position - out of scope here, see FUCK_THE_LEXER.md gap #1.
             val node = index.nodesById[ref.from] ?: continue
             val expected = node.member ?: node.name ?: continue
-            // A for-loop's `int i = 0` init clause is a VARIABLE_DECL with no nameLine/nameColumn
-            // at all (line/column there points at the type, "int") - nameRangeOf deliberately
-            // fails closed rather than guess. Documented gap, not a bug; see FUCK_THE_LEXER.md.
-            if (node.type == "VARIABLE_DECL" && node.nameLine == null) continue
             assertNameRangeIs(index, source, ref.from, expected)
             checked++
         }
         assertTrue(checked > 20, "Expected to have actually verified a meaningful number of edges, got $checked")
+    }
+
+    @Test
+    fun forLoopInitVariableDeclHasBothNameAndTypeRanges() {
+        // A for-loop's `int i = 0` init clause is a VARIABLE_DECL under the loop node rather than in a
+        // block's statements; it must have both a name ("i") and a declared-type ("int") range.
+        val source = moduleBwslSource()
+        val (index, _) = buildIndex(source)
+        val forInit = index.nodesById["VARIABLE_DECL:3"]
+        assertNotNull(forInit) { "Expected VARIABLE_DECL:3 (the for-loop's 'int i') in the index" }
+        assertEquals("i", forInit!!.name)
+
+        assertNameRangeIs(index, source, "VARIABLE_DECL:3", "i")
+
+        val typeRange = index.typeRangeOf(forInit)
+        assertNotNull(typeRange) { "Expected a resolvable type range for the for-loop's 'int i'" }
+        assertEquals("int", source.substring(typeRange!!.first, typeRange.last + 1))
     }
 
     @Test
@@ -79,17 +90,54 @@ class BwslAstIndexTest {
         val source = moduleBwslSource()
         val (index, _) = buildIndex(source)
 
-        // "values.length()" - receiver-based, line/column is the dot.
-        val receiverCall = index.nodesById.values.first {
-            it.type == "FUNCTION_CALL" && it.hasReceiver && it.name == "length"
-        }
-        assertNameRangeIs(index, source, receiverCall.id, "length")
+        // line/column of "values.length()" is the dot and of "Mod::test(values)" the "::", but
+        // nameLine/nameColumn is the name in both - check the character just before it.
+        val calls = index.nodesById.values.filter { it.type == "FUNCTION_CALL" && it.name != null }
+        for (call in calls) assertNameRangeIs(index, source, call.id, call.name!!)
+        val before = calls.map { source[index.nameRangeOf(it)!!.first - 1] }
+        assertTrue('.' in before, "Expected a receiver call (recv.f()) in module.bwsl")
+        assertTrue(':' in before, "Expected a module-qualified call (Mod::f()) in module.bwsl")
+    }
 
-        // "LengthMethodTest::test(values)" - module-qualified, line/column is the '::'.
-        val qualifiedCall = index.nodesById.values.first {
-            it.type == "FUNCTION_CALL" && it.hasModuleQualifier
+    @Test
+    fun everyNamedNodeIncludingMembersOfADeclarationPointsAtItsNameText() {
+        // Every named node has nameLine/nameColumn: struct fields, parameters,
+        // attributes, used attributes, fragment outputs, consts and import/using entries included.
+        val source = """
+            pipeline AllNames {
+                attributes {
+                    position: float4
+                }
+                const float SCALE = 2.0;
+                struct Box {
+                    float width;
+                }
+                pass "Main" {
+                    use attributes { position }
+                    outputs {
+                        result: float4
+                    }
+                    vertex {
+                        output.pos = attributes.position;
+                    }
+                    fragment {
+                        output.result = float4(SCALE);
+                    }
+                }
+            }
+        """.trimIndent() + "\n"
+        val (index, _) = buildIndex(source)
+
+        val expectedKinds = listOf("/field:", "/used-attribute:", "/fragment-output:", "ATTRIBUTE_DECL:", "PIPELINE:", "PASS:")
+        for (kind in expectedKinds) {
+            val node = index.nodesById.values.firstOrNull { it.id.contains(kind) }
+            assertNotNull(node) { "Expected a node with id containing $kind" }
+            val expected = node!!.name ?: error("$kind node has no name")
+            assertNameRangeIs(index, source, node.id, expected)
         }
-        assertNameRangeIs(index, source, qualifiedCall.id, "test")
+        val constDecl = index.nodesById.values.firstOrNull { it.type == "VARIABLE_DECL" && it.name == "SCALE" }
+        assertNotNull(constDecl) { "Expected the pipeline-level const SCALE as a VARIABLE_DECL" }
+        assertNameRangeIs(index, source, constDecl!!.id, "SCALE")
     }
 
     @Test
@@ -111,13 +159,13 @@ class BwslAstIndexTest {
             "}\n"
         val (index, root) = buildIndex(source)
 
-        // PIPELINE keyword-skip.
+        // PIPELINE: line/column is the keyword, nameLine/nameColumn the name.
         assertNameRangeIs(index, source, "PIPELINE:0", "ShaderIoTest")
 
-        // ATTRIBUTE_DECL: line/column points at the type ("float4"), not the name.
+        // ATTRIBUTE_DECL: line/column points at the type ("float4"), nameLine/nameColumn the name.
         assertNameRangeIs(index, source, "ATTRIBUTE_DECL:0", "position")
 
-        // MEMBER_ACCESS: line/column is the dot, member starts right after it.
+        // MEMBER_ACCESS: line/column is the dot, nameLine/nameColumn the member.
         val memberAccessRefs = root.referenceIndex!!.references.filter { it.role == "output" || it.role == "input" }
         assertTrue(memberAccessRefs.isNotEmpty(), "Expected output/input MEMBER_ACCESS edges in the pipeline probe")
         for (ref in memberAccessRefs) {
