@@ -130,6 +130,13 @@
         <spellchecker.bundledDictionaryProvider
             implementation="com.bwsl.plugin.BwslBundledDictionaryProvider"/>
 
+        <lang.smartEnterProcessor
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSmartEnterProcessor"/>
+
+        <extendWordSelectionHandler
+            implementation="com.bwsl.plugin.BwslExtendWordSelectionHandler"/>
+
         <lang.foldingBuilder
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslFoldingBuilder"/>

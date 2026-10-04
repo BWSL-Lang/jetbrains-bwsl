@@ -232,6 +232,21 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
+  (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
+  `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).
+  Both work on tokens. `collectSelectionRanges` pairs every bracket (`findGroups`), then for each
+  group around the caret, innermost first, adds: for `( )`/`[ ]` the argument, the contents, the group;
+  for `{ }` the statement, the contents, the block, and the header statement (found in the parent
+  region) with the block. A statement (`findStatementBounds`) starts after the previous `;` or `}`
+  (not a `}` before `else`) at the region's level, skipping whole groups, and ends at its `;` or at the
+  `}` that closes a block (not one followed by `else`). The platform picks the smallest returned range
+  that is larger than the selection. `planStatementCompletion` returns *edits* (closing brackets, then
+  `;` or ` {\n\n}`), not a text, so it can be tested without touching the document; the processor
+  applies them last-to-first and re-indents the two new lines with `adjustLineIndent`. A `;` is only
+  added where the enclosing `{`'s owner is not `attributes`/`resources`/`variants`/`outputs`/`inputs`
+  or a `module`/`pipeline`/`submodule`/`enum` body (except a `const`), and never for `import`, `using`,
+  `case`/`default` or a line ending in a continuing token. Returning null makes the platform start a new line.
 - Formatter options (`BwslCodeStyleSettings` in `BwslCodeStyle.kt`, used in `BwslFormatting.kt`):
   `BRACE_STYLE` (`BraceStyle`: keep/end of line/next line), `WRAP_CALL_ARGUMENTS`,
   `ALIGN_CONTINUED_EXPRESSIONS`, all off by default so the "no token moves" guarantee holds. Facts

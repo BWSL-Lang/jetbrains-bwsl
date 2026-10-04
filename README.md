@@ -20,6 +20,22 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **File icons** — `.bwsl` files get one icon for pipeline files and another for
   module files
 
+### Extend Selection and Smart Enter
+
+- **Extend Selection** (Ctrl+W, and Ctrl+Shift+W to shrink) grows from the
+  caret outwards: the argument, the contents of the parentheses or brackets
+  around it, the group with its brackets, the statement, the contents of the
+  block, the block with its braces, and the header that owns it (the whole
+  function, struct, pass or `if`). An `if` with its `else` is one statement
+- **Complete Current Statement** (Ctrl+Shift+Enter) works on the caret's line
+  wherever the caret is on it: it closes the parentheses and brackets opened on
+  the line, adds the `;` a statement lacks, and adds a `{ }` block after a
+  header (`if (...)`, `for`, `else`, a function declaration, `struct`,
+  `module`, `pass`, ...), leaving the caret inside it on an indented line.
+  Where no `;` is written (an `attributes` entry, an `import`, a `case` label,
+  a line that ends in an operator) it adds none, and a line that is complete
+  just starts a new one
+
 ### Brackets, quotes, comments and folding
 
 - **Comment with Line Comment** (Ctrl+/) toggles `//` on the caret's line or
@@ -333,7 +349,6 @@ Not implemented yet:
 **Refactoring and editing**
 - [ ] Live templates and snippets for common shapes (`pipeline`, `pass`,
       functions, loops)
-- [ ] Extend selection and smart Enter
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
