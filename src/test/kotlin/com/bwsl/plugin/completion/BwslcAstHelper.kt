@@ -57,7 +57,7 @@ object BwslcAstHelper {
             ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
         val raw = Gson().fromJson(json, JsonObject::class.java)
             ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
-        BwslAstCache.update(filePath, root, raw)
+        BwslAstCache.update(filePath, root, raw, source)
     }
 
     private val modulesRoot: File by lazy {

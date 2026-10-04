@@ -38,6 +38,14 @@ Every reference resolves through the compiler's own reference index, so scoping 
 - Works from the declaration's name or from any use of it
 - Finds usages across files, including declarations in a module file that is outside the project
 
+### Rename (Shift+F6)
+
+- Renames a declaration and every usage in one step: functions, methods, structs, fields, parameters, locals, constants, attributes, fragment outputs and modules
+- Works from the declaration's name or from any use of it, and respects scope: a parameter renamed in one function is untouched in another, and so are same-named functions in other modules
+- Renaming a module that lives in a file of the same name **renames the file too**, since the compiler finds a module by its file name
+- Rejects names that aren't plain identifiers, such as keywords and type names
+- Refuses, with an explanation, when the compiler's view is out of date: a file with unsaved changes, or any compiled file that has changed since the compiler last checked it. A rename from a stale view would leave a new usage pointing at the old name
+
 ### Quick documentation (hover / Ctrl+Q)
 
 - **Variables, parameters, constants and fields** — declared type and kind
@@ -73,6 +81,7 @@ Every reference resolves through the compiler's own reference index, so scoping 
 
 - Navigation, find usages, documentation, parameter info and the locals in completion read the compiler's AST for the **saved** file. After you edit a file the AST is refreshed in the background; until it has been saved and re-checked, those features reflect the last successful compile.
 - A file that doesn't compile keeps its previous AST, so navigation keeps working while you type.
+- Rename and find usages only see files the compiler has checked in this IDE session. A usage in a file that was never opened or compiled is not found, so check the result of a rename in files you haven't had open.
 - With no compiler configured, or a file the compiler has never been able to read, those features return nothing rather than guessing from the text. Highlighting and keyword completion don't depend on the compiler.
 
 ## Roadmap
@@ -80,7 +89,8 @@ Every reference resolves through the compiler's own reference index, so scoping 
 Not implemented yet:
 
 **Refactoring and editing**
-- [ ] Rename refactoring (the reference data is already there)
+- [ ] Rename conflict detection: warn before renaming to a name already used in the same scope
+- [ ] Rename for stage values (`output.uv` / `input.uv`), which have no declaration to start from
 - [ ] Code formatter, auto-indent and **Reformat Code**
 - [ ] Comment / uncomment with the comment shortcut
 - [ ] Brace and quote matching and auto-closing
@@ -106,7 +116,7 @@ Not implemented yet:
 
 **Navigation and search**
 - [ ] Find Usages on stage values (`output.uv` / `input.uv`)
-- [ ] Find Usages in files that have never been compiled in the IDE (project-wide index)
+- [ ] Find Usages and Rename in files that have never been compiled in the IDE (project-wide index)
 - [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs, modules and passes
 - [ ] File Structure view and breadcrumbs
 - [ ] Go to Type Declaration

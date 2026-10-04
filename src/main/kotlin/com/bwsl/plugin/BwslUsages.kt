@@ -23,7 +23,7 @@ data class DeclarationIdentity(val symbol: AstSymbol, val payloadPath: String) {
 }
 
 /** The project's BWSL files that have a cached AST - the compiles whose edges can name a usage. */
-private fun collectPayloadFiles(project: Project): List<PsiFile> {
+internal fun collectPayloadFiles(project: Project): List<PsiFile> {
     val manager = PsiManager.getInstance(project)
     return FileTypeIndex.getFiles(BwslFileType, GlobalSearchScope.allScope(project))
         .filter { BwslAstCache.findRoot(it.path) != null && BwslAstCache.findRawRoot(it.path) != null }

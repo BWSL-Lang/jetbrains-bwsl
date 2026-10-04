@@ -88,6 +88,14 @@
         <useScopeEnlarger
             implementation="com.bwsl.plugin.BwslUseScopeEnlarger"/>
 
+        <renamePsiElementProcessor
+            implementation="com.bwsl.plugin.BwslRenameProcessor"
+            order="first"/>
+
+        <lang.namesValidator
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslNamesValidator"/>
+
         <completion.contributor
             language="BWSL"
             implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>

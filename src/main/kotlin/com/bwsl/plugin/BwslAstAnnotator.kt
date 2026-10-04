@@ -4,12 +4,14 @@ import com.google.gson.Gson
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.psi.PsiFile
 import java.util.concurrent.TimeUnit
 
 private val log = logger<BwslAstAnnotator>()
 
-data class AstCollectedInfo(val filePath: String)
+/** [compiledText] is the saved text of the file at collection time, which is what bwslc is about to compile. */
+data class AstCollectedInfo(val filePath: String, val compiledText: String)
 
 class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
 
@@ -18,8 +20,8 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
             log.warn("bwslc compiler path is not set; skipping AST collection for ${file.virtualFile?.path}")
             return null
         }
-        val path = file.virtualFile?.path ?: return null
-        return AstCollectedInfo(path)
+        val virtualFile = file.virtualFile ?: return null
+        return AstCollectedInfo(virtualFile.path, LoadTextUtil.loadText(virtualFile).toString())
     }
 
     override fun doAnnotate(info: AstCollectedInfo): Boolean? {
@@ -54,7 +56,7 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
             }
             val rawJson = Gson().fromJson(json, com.google.gson.JsonObject::class.java)
             log.warn("bwslc -ast-json parsed for ${info.filePath}: modules=${root.modules.size} pipelines=${root.pipelines.size}")
-            BwslAstCache.update(info.filePath, root, rawJson)
+            BwslAstCache.update(info.filePath, root, rawJson, info.compiledText)
             return true
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${info.filePath}", e)

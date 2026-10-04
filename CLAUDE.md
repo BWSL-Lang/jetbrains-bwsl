@@ -94,7 +94,18 @@ predicates, …); that file says which verb to use for which kind of function.
   through the normal resolver. `BwslUseScopeEnlarger` widens the use scope to the project, since a
   module file outside it would otherwise only be searched in itself. Limits: a file with no cached
   AST has no known usages; a stage-interface value (`output.uv`) has no declaration so it is not a
-  target; there is no rename.
+  target.
+- Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
+  default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
+  reference search found and replaces each occurrence's text itself, last-to-first within a file.
+  A module declared in a file of the same name also renames the file (`prepareRenaming`), because
+  bwslc finds a module by its file name. `BwslNamesValidator` accepts only plain identifiers (a
+  keyword or type name lexes to something else). The rename works from the compiler's last result,
+  so it refuses to run, instead of editing the wrong text or missing a usage, when a file it would
+  edit has unsaved changes, when any compiled project file no longer matches the text its AST was
+  built from (`BwslAstCache.doesTextMatchCompiledText`, which compares a hash the annotator
+  records from the saved text it hands to bwslc), or when the text at an occurrence is not the old
+  name. An AST cached without its compiled text counts as stale.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line
