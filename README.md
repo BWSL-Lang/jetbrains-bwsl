@@ -193,6 +193,14 @@ is exactly the compiler's:
 - **Variables, parameters, constants and fields** — declared type and kind
 - **Functions and methods** — qualified name (`Module::Struct::name()`) and
   signature, including calls into other files
+- **Documentation comments** — the `///` lines (or `/** */` block) written
+  directly above a function, constant, struct, enum or field are shown in its
+  popup, for a call and for the declaration itself. Blank lines separate
+  paragraphs, text in `backticks` is code, and web addresses are links. A
+  doc comment in another file is shown for a call into it, and so is one in a
+  standard module once its source has been fetched. A blank line or an
+  ordinary `//` comment between the comment and the declaration means it is not
+  about it
 - **Intrinsics** — signature and description
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
@@ -298,7 +306,6 @@ Not implemented yet:
 - [ ] Inlay hints: parameter names at call sites, inferred types, array lengths
 - [ ] Semantic highlighting that colours parameters, locals, fields and
       constants differently
-- [ ] Documentation comments shown in hover docs
 
 **Completion**
 - [ ] Struct fields and swizzles after `.`, and fields inside methods

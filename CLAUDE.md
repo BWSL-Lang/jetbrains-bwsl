@@ -232,6 +232,17 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
+  the AST: from the name's token it goes back to the first token of that line (the declaration's
+  start, so `const float PI` and `struct Point` work), then collects the comments directly above
+  (exactly one newline between each and what follows). `///` lines (not `////`) and `/** */`
+  blocks count; a blank line or an ordinary `//` stops the walk. `findDocumentationFor` in the
+  provider resolves the hovered symbol to its declaration element with `resolveSymbolAt` (so a call
+  into another file, or into a fetched copy of a standard module, reads *that* file's text) or, on
+  a declaration's own name, uses the own node, and `renderDocCommentHtml` escapes, joins
+  paragraphs, marks up `code` and links. It is a separate CONTENT block between the signature and
+  the qualified name. A struct or enum has no signature popup, so `renderTypeDoc` only shows one
+  when it has a doc comment.
 - Spell-checking (`BwslSpellchecking.kt`). `BwslSpellcheckingStrategy` returns the text tokenizer for
   `LINE_COMMENT`, `BLOCK_COMMENT` and `STRING_LIT` and nothing for anything else (BWSL's comments
   are plain tokens, not `PsiComment`, so the platform's default strategy sees none of them).

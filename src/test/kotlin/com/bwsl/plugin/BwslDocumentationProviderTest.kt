@@ -4,21 +4,6 @@ import com.bwsl.plugin.completion.BwslcAstHelper
 
 class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
 
-    private val provider = BwslDocumentationProvider()
-
-    private fun generateDocAt(caretOffset: Int): String? {
-        val file = myFixture.file
-        val original = file.findElementAt(caretOffset)!!
-        var element = original
-        val custom = provider.getCustomDocumentationElement(myFixture.editor, file, element, caretOffset)
-        if (custom != null) {
-            element = custom
-        } else {
-            element.parent?.references?.firstNotNullOfOrNull { it.resolve() }?.let { element = it }
-        }
-        return provider.generateDoc(element, original)
-    }
-
     fun testIntrinsicCallShowsSignatureAndDescription() {
         myFixture.configureByText(
             "test.bwsl",

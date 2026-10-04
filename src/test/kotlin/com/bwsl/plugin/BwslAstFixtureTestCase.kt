@@ -41,6 +41,22 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
         return text
     }
 
+    private val documentationProvider = BwslDocumentationProvider()
+
+    /** The documentation popup the IDE would show for the element at [caretOffset] of the configured file, resolving what is hovered as the IDE does. */
+    protected fun generateDocAt(caretOffset: Int): String? {
+        val file = myFixture.file
+        val original = file.findElementAt(caretOffset)!!
+        var element = original
+        val custom = documentationProvider.getCustomDocumentationElement(myFixture.editor, file, element, caretOffset)
+        if (custom != null) {
+            element = custom
+        } else {
+            element.parent?.references?.firstNotNullOfOrNull { it.resolve() }?.let { element = it }
+        }
+        return documentationProvider.generateDoc(element, original)
+    }
+
     /** The failure's message and its causes' messages, so a refusal wrapped by the refactoring framework is still recognisable. */
     protected fun describeFailure(failure: Throwable?): String =
         generateSequence(failure) { it.cause }.joinToString(" <- ") { it.message.orEmpty() }.ifEmpty { "no failure" }
