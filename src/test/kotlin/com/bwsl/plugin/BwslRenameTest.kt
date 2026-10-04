@@ -431,10 +431,6 @@ class BwslRenameTest : BwslAstFixtureTestCase() {
         assertTrue("the new caller is renamed too", myFixture.file.text.contains("return adjust(2.0);"))
     }
 
-    /** The failure's message and its causes' messages, so a refusal wrapped by the refactoring framework is still recognisable. */
-    private fun describeFailure(failure: Throwable?): String =
-        generateSequence(failure) { it.cause }.joinToString(" <- ") { it.message.orEmpty() }.ifEmpty { "no failure" }
-
     fun testNamesValidatorAcceptsPlainIdentifiers() {
         val validator = BwslNamesValidator()
 

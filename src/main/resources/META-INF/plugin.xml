@@ -78,6 +78,9 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslFindUsagesProvider"/>
 
+        <findUsagesHandlerFactory
+            implementation="com.bwsl.plugin.BwslFindUsagesHandlerFactory"/>
+
         <targetElementEvaluator
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslTargetElementEvaluator"/>
@@ -100,7 +103,15 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>
 
+        <postStartupActivity
+            implementation="com.bwsl.plugin.BwslProjectIndexStartup"/>
+
     </extensions>
+
+    <applicationListeners>
+        <listener class="com.bwsl.plugin.BwslFileChangeListener"
+                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </applicationListeners>
 
     <actions>
         <action id="Bwsl.CompileFile"

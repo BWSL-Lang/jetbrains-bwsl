@@ -36,7 +36,33 @@ Every reference resolves through the compiler's own reference index, so scoping 
 
 - On any declaration: functions, methods, structs, fields, parameters, locals, constants, attributes, fragment outputs and modules
 - Works from the declaration's name or from any use of it
-- Finds usages across files, including declarations in a module file that is outside the project
+- Finds usages across every BWSL file in the project and in the module paths,
+  including files you have never opened. It waits for any file that is not up
+  to date before it searches (see [Project index](#project-index))
+
+### Project index
+
+- When a project opens, the plugin compiles every BWSL file in the project and
+  in the module paths, so the compiler's view covers all of them
+- After that it only recompiles what a change affects. Each file's result
+  records the files it was built from: itself and the modules it imports.
+  Whenever a `.bwsl` file or `bwsl.json` changes, the plugin checks those
+  records and recompiles only the files whose inputs changed. Editing a module
+  recompiles that module and the files that import it, and nothing else
+- A file that doesn't compile is not retried until a file it could have read
+  changes: the file itself, a `.bwsl` file beside it, or one in a module path.
+  Without a result there is no list of what it imports, so it can be retried
+  once for a change to an unrelated neighbour
+- Optional **`bwsl.json`** in the project root, to share the build configuration with the team:
+
+  ```json
+  {
+    "modulePaths": ["shaders/lib"],
+    "exclude": ["scratch", "vendor/old.bwsl"]
+  }
+  ```
+
+  `modulePaths` are added to the module paths in the IDE settings (relative to the project root). `exclude` lists files and directories the index leaves out, such as shaders that are not meant to compile on their own
 
 ### Rename (Shift+F6)
 
@@ -44,7 +70,8 @@ Every reference resolves through the compiler's own reference index, so scoping 
 - Works from the declaration's name or from any use of it, and respects scope: a parameter renamed in one function is untouched in another, and so are same-named functions in other modules
 - Renaming a module that lives in a file of the same name **renames the file too**, since the compiler finds a module by its file name
 - Rejects names that aren't plain identifiers, such as keywords and type names
-- Refuses, with an explanation, when the compiler's view is out of date: a file with unsaved changes, or any compiled file that has changed since the compiler last checked it. A rename from a stale view would leave a new usage pointing at the old name
+- Brings the project index up to date first (behind a progress dialog, only when something is stale), so usages in files you never opened are renamed too, including module files outside the project
+- Refuses, with an explanation, when the compiler's view of any project file is not current: it has unsaved changes, has changed since the compiler last checked it, has never been compiled, or doesn't compile. A rename from a stale view would leave a usage pointing at the old name. Exclude a file that can't compile on its own in `bwsl.json`
 
 ### Quick documentation (hover / Ctrl+Q)
 
@@ -81,7 +108,8 @@ Every reference resolves through the compiler's own reference index, so scoping 
 
 - Navigation, find usages, documentation, parameter info and the locals in completion read the compiler's AST for the **saved** file. After you edit a file the AST is refreshed in the background; until it has been saved and re-checked, those features reflect the last successful compile.
 - A file that doesn't compile keeps its previous AST, so navigation keeps working while you type.
-- Rename and find usages only see files the compiler has checked in this IDE session. A usage in a file that was never opened or compiled is not found, so check the result of a rename in files you haven't had open.
+- Find usages and rename search the project index, and both bring it up to date first (behind a progress dialog, only when something is stale), so files the background pass has not reached yet are still covered. Highlighting usages in the editor does not wait.
+- Files that are not on the local disk, or that `bwsl.json` excludes, are not indexed.
 - With no compiler configured, or a file the compiler has never been able to read, those features return nothing rather than guessing from the text. Highlighting and keyword completion don't depend on the compiler.
 
 ## Roadmap
@@ -116,7 +144,6 @@ Not implemented yet:
 
 **Navigation and search**
 - [ ] Find Usages on stage values (`output.uv` / `input.uv`)
-- [ ] Find Usages and Rename in files that have never been compiled in the IDE (project-wide index)
 - [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs, modules and passes
 - [ ] File Structure view and breadcrumbs
 - [ ] Go to Type Declaration
@@ -128,7 +155,7 @@ Not implemented yet:
 - [ ] Validate and analyse the editor's unsaved text for navigation and completion (today only diagnostics do; `bwslc` has a `-stdin` mode worth evaluating)
 - [ ] Problems tool window entries and compiler output with clickable locations
 - [ ] Run configurations and compile-on-save
-- [ ] Per-project compiler path and module paths (they are application-wide now)
+- [ ] Per-project compiler path (module paths can already be set per project in `bwsl.json`)
 - [ ] Show the compiled output (SPIR-V disassembly, GLSL, HLSL, Metal) next to the source
 - [ ] Shader variant selection in the compile action
 - [ ] Notice a newer `bwslc` release and offer to update
@@ -152,7 +179,7 @@ After installing the plugin, point it at the compiler:
 
 **Settings → BWSL → Compiler path** — select the `bwslc` executable, or press **Download Latest…** to fetch one.
 
-Add any directories you import modules from under **Module paths**.
+Add any directories you import modules from under **Module paths**, or list them in a `bwsl.json` in the project root (see [Project index](#project-index)).
 
 ## Building
 

@@ -197,30 +197,42 @@ data class AstRoot(
 object BwslAstCache {
     private val roots = ConcurrentHashMap<String, AstRoot>()
     private val rawRoots = ConcurrentHashMap<String, com.google.gson.JsonObject>()
-    private val compiledTextHashes = ConcurrentHashMap<String, Int>()
+    private val compiledInputs = ConcurrentHashMap<String, Map<String, Int>>()
+    private val uncompilableInputs = ConcurrentHashMap<String, Map<String, Int>>()
 
     /**
      * [rawJson] is the same bwslc -ast-json payload as [root], parsed generically. It's needed
      * because the typed [AstRoot] model doesn't (and can't practically) mirror every node type -
      * a generic id -> position index built from the raw tree is used instead (see BwslAstIndex).
      *
-     * [compiledText] is the exact text bwslc compiled; only its hash is kept, so
-     * [doesTextMatchCompiledText] can tell whether the file has changed since.
+     * [inputs] are the files the AST was built from - the compiled file and every file it imported
+     * from - as [normalizePathKey] -> [hashText] of the text bwslc read, so [findCompiledInputs]
+     * can tell whether any of them has changed since.
      */
     fun update(
         filePath: String,
         root: AstRoot,
         rawJson: com.google.gson.JsonObject? = null,
-        compiledText: String? = null
+        inputs: Map<String, Int>? = null
     ) {
         roots[filePath] = root
         if (rawJson != null) rawRoots[filePath] = rawJson else rawRoots.remove(filePath)
-        if (compiledText != null) compiledTextHashes[filePath] = compiledText.hashCode() else compiledTextHashes.remove(filePath)
+        if (inputs != null) compiledInputs[filePath] = inputs else compiledInputs.remove(filePath)
+        uncompilableInputs.remove(filePath)
     }
 
-    /** Whether [currentText] is exactly the text the cached AST for [filePath] was compiled from. False if that is not known. */
-    fun doesTextMatchCompiledText(filePath: String, currentText: String): Boolean =
-        compiledTextHashes[filePath] == currentText.hashCode()
+    /** Records that bwslc produced no AST for [filePath] when its candidate inputs were [inputs]. */
+    fun recordUncompilable(filePath: String, inputs: Map<String, Int>) {
+        uncompilableInputs[filePath] = inputs
+    }
+
+    /** The inputs the cached AST for [filePath] was built from, or null if none is cached or they are not known. */
+    fun findCompiledInputs(filePath: String): Map<String, Int>? = compiledInputs[filePath]
+
+    /** The inputs bwslc last failed to produce an AST from for [filePath], or null if it has not failed since the last AST. */
+    fun findUncompilableInputs(filePath: String): Map<String, Int>? = uncompilableInputs[filePath]
+
+    fun hashText(text: String): Int = text.hashCode()
 
     fun findRoot(filePath: String): AstRoot? = roots[filePath]
 

@@ -27,20 +27,22 @@ data class CompilerOutput(
     val diagnostics: List<Diagnostic> = emptyList()
 )
 
-class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
+/** The editor text to check, and the directories bwslc searches for the modules it imports. */
+data class DiagnosticsRequest(val fileContent: String, val modulePaths: List<String> = emptyList())
 
-    override fun collectInformation(file: PsiFile): String? {
+class BwslExternalAnnotator : ExternalAnnotator<DiagnosticsRequest, List<Diagnostic>>() {
+
+    override fun collectInformation(file: PsiFile): DiagnosticsRequest? {
         if (resolveCompilerPath() == null) return null
-        return file.text
+        return DiagnosticsRequest(file.text, collectModulePaths(file.project))
     }
 
-    override fun doAnnotate(fileContent: String): List<Diagnostic> {
+    override fun doAnnotate(request: DiagnosticsRequest): List<Diagnostic> {
         val compilerPath = resolveCompilerPath() ?: return emptyList()
         val tempFile = Files.createTempFile("bwsl_", ".bwsl").toFile()
         try {
-            tempFile.writeText(fileContent)
-            val moduleArgs = BwslSettings.getInstance().modulePaths
-                .flatMap { listOf("-modules", it) }
+            tempFile.writeText(request.fileContent)
+            val moduleArgs = request.modulePaths.flatMap { listOf("-modules", it) }
             // -check: diagnostics only. Without it bwslc also writes <stem>.<stage>.spv for every pass
             // into the working directory, and nothing here would ever delete them.
             val process = ProcessBuilder(
@@ -74,14 +76,6 @@ class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
                 .range(range)
                 .create()
         }
-    }
-
-    /** The configured compiler path, falling back to a previously downloaded copy if present. */
-    private fun resolveCompilerPath(): String? {
-        val configured = BwslSettings.getInstance().compilerPath
-        if (configured.isNotBlank()) return configured
-        val downloaded = BwslCompilerDownloader.getInstallPath()
-        return if (downloaded.toFile().exists()) downloaded.toString() else null
     }
 }
 

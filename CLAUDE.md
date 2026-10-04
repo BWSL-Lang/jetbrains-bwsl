@@ -43,9 +43,29 @@ predicates, …); that file says which verb to use for which kind of function.
   other reference classes: `import`/`using`, `Mod::` qualifiers (calls and declared types),
   `use attributes { ... }` names, struct fields and fragment outputs are all positioned nodes with
   an edge in the reference index, so they need no special handling.
-- `BwslAstAnnotator.kt` — runs `bwslc <file> -ast-json -modules <paths...>` as an
-  `ExternalAnnotator`, parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot`
-  and a raw `JsonObject` via Gson, and stores both in `BwslAstCache`.
+- `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
+  `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
+  parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
+  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from.
+- **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
+  features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
+  the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
+  so each file is its own compile. `collectIndexedFiles` is the set: the project's BWSL files plus the
+  files *directly inside* each module path (bwslc looks for `<Module>.bwsl` beside the compiled file
+  and in each `-modules` directory, not in their subdirectories), minus `bwsl.json`'s `exclude`.
+  The `BwslProjectIndex` project service compiles the stale ones (up to four at a time) at startup
+  (`BwslProjectIndexStartup`) and, debounced, whenever `BwslFileChangeListener` sees a `.bwsl` file or
+  `bwsl.json` change. Only files on the local disk are compiled (bwslc needs a real path).
+  Freshness is per input: `BwslAstCache` records, for each AST, `normalizePathKey -> hashText` of the
+  saved text of the file and of every file the payload names by `sourceFile` (its imports), taken
+  *before* the compile from `snapshotCandidateInputs` (the file, its siblings, the module-path files)
+  so a save during the compile cannot be mistaken for what bwslc read. `hasCurrentAst` compares
+  those with the files now; an edit to a module therefore also stales its importers. A file bwslc
+  produces no AST for is recorded with `recordUncompilable` against the whole candidate snapshot and
+  is not retried until something it could read changes; a compile that could not run at all
+  (`IOException`) records nothing. `bwsl.json` (project root, `modulePaths` relative to the root and
+  `exclude`) is read by `readProjectConfig`; `collectModulePaths` is the IDE setting's module paths
+  plus the config's, and every compile, diagnostic run and the Compile action use it.
 - `BwslAstCache.kt` — data classes mirroring the `bwslc -ast-json` schema (`AstRoot`, `AstModule`,
   `AstStruct`, `AstFunction`, `AstStatement`, `AstBlock`, `AstSymbol`, `AstReference`,
   `AstReferenceIndex`, ...) plus a cache keyed by file path, storing both the typed root and the
@@ -91,21 +111,26 @@ predicates, …); that file says which verb to use for which kind of function.
   compile (a local has no `stableId` and exists only in its own file's AST). A declaration in a
   file with no AST of its own (an imported module) is found through the importing file's AST, where
   it is a node written in that file. Each candidate reference must resolve back to the target
-  through the normal resolver. `BwslUseScopeEnlarger` widens the use scope to the project, since a
-  module file outside it would otherwise only be searched in itself. Limits: a file with no cached
-  AST has no known usages; a stage-interface value (`output.uv`) has no declaration so it is not a
-  target.
+  through the normal resolver. `BwslUseScopeEnlarger` widens the use scope to the indexed files, since
+  a module file outside the project would otherwise only be searched in itself. `collectPayloadFiles`
+  is the indexed files that have an AST. `BwslFindUsagesHandlerFactory` brings the index up to date
+  (modal progress, only when stale) before a real Find Usages, then returns no handler so the default
+  one runs; it skips highlight-usages requests. Limits: a file that does not compile has no known
+  usages; a stage-interface value (`output.uv`) has no declaration so it
+  is not a target.
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.
   A module declared in a file of the same name also renames the file (`prepareRenaming`), because
   bwslc finds a module by its file name. `BwslNamesValidator` accepts only plain identifiers (a
-  keyword or type name lexes to something else). The rename works from the compiler's last result,
-  so it refuses to run, instead of editing the wrong text or missing a usage, when a file it would
-  edit has unsaved changes, when any compiled project file no longer matches the text its AST was
-  built from (`BwslAstCache.doesTextMatchCompiledText`, which compares a hash the annotator
-  records from the saved text it hands to bwslc), or when the text at an occurrence is not the old
-  name. An AST cached without its compiled text counts as stale.
+  keyword or type name lexes to something else). `substituteElementToRename` first brings the
+  project index up to date behind a modal progress (only when some file is stale), and
+  `findReferences` searches the indexed files, since the platform's rename scope (project content)
+  would miss a module file in an outside `-modules` directory. The rename works from the compiler's
+  last result, so it refuses to run, instead of editing the wrong text or missing a usage, when
+  `checkCompilerViewOf` finds any *indexed* file whose view is not current (unsaved changes; changed
+  since its AST was built; produces no AST; never compiled), or when the text at an occurrence is
+  not the old name. An AST cached without its inputs counts as stale.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line

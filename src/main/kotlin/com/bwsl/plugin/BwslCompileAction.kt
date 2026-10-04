@@ -40,6 +40,7 @@ class BwslCompileAction : AnAction() {
         val project = e.project ?: return
         val virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
         val settings = BwslSettings.getInstance()
+        val modulePaths = collectModulePaths(project)
 
         val outputDir = settings.outputDirectory.takeIf { it.isNotBlank() }
             ?: virtualFile.parent?.path
@@ -52,7 +53,7 @@ class BwslCompileAction : AnAction() {
             override fun run(indicator: ProgressIndicator) {
                 val cmd = mutableListOf(settings.compilerPath, virtualFile.path)
                 format.flag?.let { cmd += it }
-                settings.modulePaths.forEach { cmd += listOf("-modules", it) }
+                modulePaths.forEach { cmd += listOf("-modules", it) }
 
                 val process = try {
                     ProcessBuilder(cmd)

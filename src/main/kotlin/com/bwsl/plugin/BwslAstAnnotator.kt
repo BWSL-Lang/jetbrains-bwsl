@@ -1,68 +1,43 @@
 package com.bwsl.plugin
 
-import com.google.gson.Gson
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.psi.PsiFile
-import java.util.concurrent.TimeUnit
 
 private val log = logger<BwslAstAnnotator>()
 
-/** [compiledText] is the saved text of the file at collection time, which is what bwslc is about to compile. */
-data class AstCollectedInfo(val filePath: String, val compiledText: String)
+/**
+ * What the compile of one file needs, taken when it is collected: [candidateInputs] is the saved text
+ * of every file bwslc could read (see [snapshotCandidateInputs]), which is what it is about to compile.
+ */
+data class AstCollectedInfo(
+    val compilerPath: String,
+    val filePath: String,
+    val modulePaths: List<String>,
+    val candidateInputs: Map<String, Int>
+)
 
 class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
 
     override fun collectInformation(file: PsiFile): AstCollectedInfo? {
-        if (BwslSettings.getInstance().compilerPath.isBlank()) {
-            log.warn("bwslc compiler path is not set; skipping AST collection for ${file.virtualFile?.path}")
+        val virtualFile = file.virtualFile ?: return null
+        val compilerPath = resolveCompilerPath()
+        if (compilerPath == null) {
+            log.warn("bwslc compiler path is not set; skipping AST collection for ${virtualFile.path}")
             return null
         }
-        val virtualFile = file.virtualFile ?: return null
-        return AstCollectedInfo(virtualFile.path, LoadTextUtil.loadText(virtualFile).toString())
+        val modulePaths = collectModulePaths(file.project)
+        return AstCollectedInfo(compilerPath, virtualFile.path, modulePaths, snapshotCandidateInputs(virtualFile, modulePaths))
     }
 
-    override fun doAnnotate(info: AstCollectedInfo): Boolean? {
-        val compilerPath = BwslSettings.getInstance().compilerPath
+    override fun doAnnotate(info: AstCollectedInfo): Boolean? =
         try {
-            val moduleArgs = BwslSettings.getInstance().modulePaths
-                .flatMap { listOf("-modules", it) }
-            val process = ProcessBuilder(
-                listOf(compilerPath, info.filePath, "-ast-json") + moduleArgs
-            ).start()
-            val rawBytes = process.inputStream.readBytes()
-            val stderrText = process.errorStream.bufferedReader().readText()
-            if (!process.waitFor(15, TimeUnit.SECONDS)) {
-                process.destroy()
-                log.warn("bwslc -ast-json timed out for ${info.filePath}")
-                return null
-            }
-            if (stderrText.isNotBlank()) {
-                log.warn("bwslc -ast-json stderr for ${info.filePath}: $stderrText")
-            }
-            if (rawBytes.isEmpty()) {
-                log.warn("bwslc -ast-json produced no output for ${info.filePath} (exit code ${process.exitValue()})")
-                return null
-            }
-            // Detect encoding: UTF-16 LE output starts with BOM bytes FF FE
-            val hasUtf16Bom = rawBytes.size >= 2 && rawBytes[0] == 0xFF.toByte() && rawBytes[1] == 0xFE.toByte()
-            val json = if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)
-            val root = Gson().fromJson(json, AstRoot::class.java)
-            if (root == null) {
-                log.warn("bwslc -ast-json returned invalid JSON for ${info.filePath}: ${json.take(200)}")
-                return null
-            }
-            val rawJson = Gson().fromJson(json, com.google.gson.JsonObject::class.java)
-            log.warn("bwslc -ast-json parsed for ${info.filePath}: modules=${root.modules.size} pipelines=${root.pipelines.size}")
-            BwslAstCache.update(info.filePath, root, rawJson, info.compiledText)
-            return true
+            compileAndCache(info.compilerPath, info.filePath, info.modulePaths, info.candidateInputs).takeIf { it }
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${info.filePath}", e)
-            return null
+            null
         }
-    }
 
     override fun apply(file: PsiFile, result: Boolean, holder: AnnotationHolder) {
         // AST is stored in BwslAstCache; no annotations to apply here

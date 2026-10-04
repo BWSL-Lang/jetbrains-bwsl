@@ -57,7 +57,7 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
     fun testAValidPipelineLeavesNoSpirvFilesBehind() {
         val before = collectSpirvFiles()
 
-        val diagnostics = BwslExternalAnnotator().doAnnotate(buildPipelineSource("output.uv = float2(0.0);"))
+        val diagnostics = BwslExternalAnnotator().doAnnotate(DiagnosticsRequest(buildPipelineSource("output.uv = float2(0.0);")))
 
         val created = collectSpirvFiles() - before
         try {
@@ -72,7 +72,7 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
         val before = collectSpirvFiles()
 
         val diagnostics = BwslExternalAnnotator().doAnnotate(
-            buildPipelineSource("output.uv = float2(0.0); output.uv = float3(0.0);")
+            DiagnosticsRequest(buildPipelineSource("output.uv = float2(0.0); output.uv = float3(0.0);"))
         )
 
         val created = collectSpirvFiles() - before

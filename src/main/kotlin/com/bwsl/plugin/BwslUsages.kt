@@ -1,14 +1,11 @@
 package com.bwsl.plugin
 
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiPolyVariantReference
 import com.intellij.psi.PsiReference
-import com.intellij.psi.search.FileTypeIndex
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiSearchScopeUtil
 import com.intellij.psi.search.SearchScope
 
@@ -22,19 +19,15 @@ data class DeclarationIdentity(val symbol: AstSymbol, val payloadPath: String) {
     val stableId: String get() = symbol.stableId
 }
 
-/** The project's BWSL files that have a cached AST - the compiles whose edges can name a usage. */
+/** The indexed BWSL files ([collectIndexedFiles]) that have a cached AST - the compiles whose edges can name a usage. */
 internal fun collectPayloadFiles(project: Project): List<PsiFile> {
     val manager = PsiManager.getInstance(project)
-    return FileTypeIndex.getFiles(BwslFileType, GlobalSearchScope.allScope(project))
+    return collectIndexedFiles(project)
         .filter { BwslAstCache.findRoot(it.path) != null && BwslAstCache.findRawRoot(it.path) != null }
         .mapNotNull { manager.findFile(it) }
 }
 
-private fun doesPathMatch(a: String, b: String): Boolean {
-    val x = a.replace('\\', '/')
-    val y = b.replace('\\', '/')
-    return if (SystemInfo.isFileSystemCaseSensitive) x == y else x.equals(y, ignoreCase = true)
-}
+private fun doesPathMatch(a: String, b: String): Boolean = normalizePathKey(a) == normalizePathKey(b)
 
 /**
  * The declaration whose *name* is [element], or null if [element] is not a declaration name. Looks

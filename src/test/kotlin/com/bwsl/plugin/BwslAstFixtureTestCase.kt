@@ -20,4 +20,8 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
         BwslcAstHelper.parseAndCache(text, myFixture.file.virtualFile.path, modules)
         return text
     }
+
+    /** The failure's message and its causes' messages, so a refusal wrapped by the refactoring framework is still recognisable. */
+    protected fun describeFailure(failure: Throwable?): String =
+        generateSequence(failure) { it.cause }.joinToString(" <- ") { it.message.orEmpty() }.ifEmpty { "no failure" }
 }

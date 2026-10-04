@@ -1,12 +1,16 @@
 package com.bwsl.plugin
 
 import com.intellij.lang.refactoring.NamesValidator
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiReference
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.SearchScope
 import com.intellij.refactoring.listeners.RefactoringElementListener
 import com.intellij.refactoring.rename.RenamePsiElementProcessor
 import com.intellij.usageView.UsageInfo
@@ -21,13 +25,24 @@ private data class RenameEdit(val file: PsiFile, val range: TextRange)
  * (see [findUsagesOf]); the edits replace each occurrence's text.
  *
  * BWSL's PSI has no named elements, so the platform's default rename can't edit it: this processor
- * applies the edits itself. It works from the compiler's last result, so it refuses to rename when
- * a file has unsaved changes, or any compiled file no longer matches the text the compiler saw: a
- * usage added since would be missed and a moved one would be edited at the wrong place.
+ * applies the edits itself. It works from the compiler's last result for every indexed file (see
+ * [BwslProjectIndex]), so it refuses to rename when a file has unsaved changes, has changed since the
+ * compiler saw it, does not compile, or has never been compiled: a usage added since would be missed
+ * and a moved one would be edited at the wrong place.
  */
 class BwslRenameProcessor : RenamePsiElementProcessor() {
 
     override fun canProcessElement(element: PsiElement): Boolean = findDeclarationIdentityOf(element) != null
+
+    /**
+     * Before the rename starts, brings the compiler's view of the whole project up to date, so the
+     * usages it finds include files that were never opened. Runs behind a progress dialog, and only
+     * when some file has no current AST.
+     */
+    override fun substituteElementToRename(element: PsiElement, editor: Editor?): PsiElement? {
+        BwslProjectIndex.getInstance(element.project).refreshWithProgress()
+        return element
+    }
 
     /**
      * A module is found by the compiler in a file named after it, so renaming a module that lives in
@@ -37,6 +52,20 @@ class BwslRenameProcessor : RenamePsiElementProcessor() {
         val symbol = findDeclarationIdentityOf(element)?.symbol ?: return
         val file = element.containingFile ?: return
         if (symbol.kind == "module" && file.name == "${symbol.name}.bwsl") allRenames[file] = "$newName.bwsl"
+    }
+
+    /**
+     * The platform's rename scope is the project's content, which leaves out a module file in a shared
+     * `-modules` directory; the indexed files ([collectIndexedFiles]) are all searched.
+     */
+    override fun findReferences(element: PsiElement, searchScope: SearchScope, searchInCommentsAndStrings: Boolean): Collection<PsiReference> {
+        val project = element.project
+        val scope = if (searchScope is GlobalSearchScope) {
+            searchScope.uniteWith(GlobalSearchScope.filesScope(project, collectIndexedFiles(project)))
+        } else {
+            searchScope
+        }
+        return findUsagesOf(element, scope)
     }
 
     override fun renameElement(
@@ -111,18 +140,16 @@ private fun checkEdits(edits: List<RenameEdit>, oldName: String): String? {
 }
 
 /**
- * Checks that every compiled BWSL file in the project is still exactly the text its cached AST was
- * built from, and returns what is wrong, or null if all are. A file that has changed may hold usages
- * the compiler has not seen, which a rename would silently leave behind.
+ * Checks that the compiler's view of every indexed BWSL file ([collectIndexedFiles]) is current -
+ * see [checkCompilerViewOf] - and returns what is wrong, or null if all are. A file the compiler
+ * has not seen, or has not seen in its present state, may hold usages a rename would silently leave
+ * behind.
  */
 private fun checkCompilerViewIsCurrent(project: Project): String? {
-    for (file in collectPayloadFiles(project)) {
-        val path = file.virtualFile?.path ?: continue
-        if (!BwslAstCache.doesTextMatchCompiledText(path, file.text)) {
-            return "${file.name} has changed since the compiler last checked it. Save it and let the compiler re-check it, then rename."
-        }
-    }
-    return null
+    val files = collectIndexedFiles(project)
+    val filesByKey = files.associateBy { normalizePathKey(it.path) }
+    val modulePaths = collectModulePaths(project)
+    return files.firstNotNullOfOrNull { checkCompilerViewOf(it, filesByKey, modulePaths) }
 }
 
 /** Replaces each edit's text with [newName]; within a file the edits go last-to-first so offsets stay valid. */

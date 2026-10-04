@@ -1,6 +1,8 @@
 package com.bwsl.plugin
 
 import com.intellij.codeInsight.TargetElementEvaluatorEx2
+import com.intellij.find.findUsages.FindUsagesHandler
+import com.intellij.find.findUsages.FindUsagesHandlerFactory
 import com.intellij.lang.cacheBuilder.DefaultWordsScanner
 import com.intellij.lang.cacheBuilder.WordsScanner
 import com.intellij.lang.findUsages.FindUsagesProvider
@@ -38,6 +40,22 @@ class BwslFindUsagesProvider : FindUsagesProvider {
         findDeclarationIdentityOf(element)?.symbol?.name ?: element.text
 
     override fun getNodeText(element: PsiElement, useFullName: Boolean): String = getDescriptiveName(element)
+}
+
+/**
+ * Brings the project index up to date before a Find Usages starts, behind a cancellable progress
+ * dialog and only when some file is stale, so the usages cover files the background pass had not
+ * reached yet. It never supplies a handler of its own: the platform's default one does the search.
+ * Highlighting usages in the editor asks for a handler on every caret move, so it is left alone.
+ */
+class BwslFindUsagesHandlerFactory : FindUsagesHandlerFactory() {
+
+    override fun canFindUsages(element: PsiElement): Boolean = findDeclarationIdentityOf(element) != null
+
+    override fun createFindUsagesHandler(element: PsiElement, forHighlightUsages: Boolean): FindUsagesHandler? {
+        if (!forHighlightUsages) BwslProjectIndex.getInstance(element.project).refreshWithProgress()
+        return null
+    }
 }
 
 /**
