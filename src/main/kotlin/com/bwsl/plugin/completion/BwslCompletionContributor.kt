@@ -17,6 +17,7 @@ import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.editor.EditorModificationUtil
 import com.intellij.patterns.PlatformPatterns
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.tree.TokenSet
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
@@ -61,6 +62,9 @@ private const val LOCAL_PRIORITY = 100.0
 
 // Names the file declares or imports: after the locals, ahead of keywords, types and intrinsics.
 private const val NAME_PRIORITY = 50.0
+
+// Names that need an import first: after everything the file can use as it is.
+private const val IMPORTABLE_PRIORITY = 10.0
 
 // Where a name can be completed: an identifier, or a name that is followed by `(` or lexes as a module name.
 private val NAME_TOKENS = TokenSet.create(
@@ -135,6 +139,35 @@ private fun buildLookupElementFor(name: DeclaredName): LookupElement {
         DeclaredName.Kind.STRUCT, DeclaredName.Kind.ENUM -> base.withTypeText(name.kind.label)
     }
     return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY)
+}
+
+/**
+ * A member of a module the file does not import yet. Choosing it adds `import Module` to the module or
+ * pipeline the caret is in and, unless the qualifier is already typed ([qualify] false), writes `Module::` before it.
+ */
+private fun buildImportingLookupElement(importable: ImportableName, qualify: Boolean): LookupElement {
+    val name = importable.name
+    val base = LookupElementBuilder.create(name.name)
+        .withTypeText(name.type?.takeIf { it.isNotEmpty() } ?: name.kind.label)
+        .withTailText((if (name.kind == DeclaredName.Kind.FUNCTION) "(${name.parameters.orEmpty().joinToString(", ")})" else "") +
+            " ${importable.module} (import)", true)
+        .withInsertHandler(InsertHandler<LookupElement> { context, item ->
+            val start = context.startOffset
+            if (qualify) context.document.insertString(start, "${importable.module}::")
+            if (name.kind == DeclaredName.Kind.FUNCTION) {
+                ParenthesesInsertHandler.getInstance(name.parameters.orEmpty().isNotEmpty()).handleInsert(context, item)
+            }
+            PsiDocumentManager.getInstance(context.project).commitDocument(context.document)
+            findImportInsertion(context.file, start, importable.module)?.let { context.document.insertString(it.offset, it.text) }
+        })
+    return PrioritizedLookupElement.withPriority(base, IMPORTABLE_PRIORITY)
+}
+
+/** The modules this file imports (by name, not alias) and the one the caret is in: their names need no import. */
+private fun collectModulesNotToImport(parameters: CompletionParameters, ast: CompletionAst?): Set<String> {
+    val imported = collectImportDeclarationsOf(parameters.originalFile).map { it.module }
+    val enclosing = ast?.let { findEnclosingDeclarationName(it.root, it.raw, it.line, it.column) }
+    return (imported + listOfNotNull(enclosing)).toSet()
 }
 
 /**
@@ -218,8 +251,14 @@ class BwslCompletionContributor : CompletionContributor() {
                         if (qualifier != null && ast != null) {
                             val aliases = collectImportDeclarationsOf(parameters.originalFile)
                                 .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
-                            for (member in collectMembersOf(ast.root, ast.raw, ast.line, ast.column, qualifier, aliases)) {
-                                result.addElement(buildLookupElementFor(member))
+                            val members = collectMembersOf(ast.root, ast.raw, ast.line, ast.column, qualifier, aliases)
+                            for (member in members) result.addElement(buildLookupElementFor(member))
+                            // A module the file does not import yet: its members, and choosing one imports it.
+                            if (members.isEmpty()) {
+                                val excluded = collectModulesNotToImport(parameters, ast)
+                                for (importable in collectImportableNames(excluded).filter { it.module == qualifier }) {
+                                    result.addElement(buildImportingLookupElement(importable, qualify = false))
+                                }
                             }
                         }
                         return
@@ -291,6 +330,18 @@ class BwslCompletionContributor : CompletionContributor() {
                                 val isExpressionName = name.kind == DeclaredName.Kind.FUNCTION || name.kind == DeclaredName.Kind.CONSTANT
                                 if (isExpressionName && blockContext != BwslBlockContext.STATEMENT_BODY) continue
                                 result.addElement(buildLookupElementFor(name))
+                            }
+
+                            // Names of modules that are not imported yet; choosing one writes `Module::name` and imports the module.
+                            val importable = collectImportableNames(collectModulesNotToImport(parameters, ast)).filter { candidate ->
+                                val kind = candidate.name.kind
+                                !(kind == DeclaredName.Kind.FUNCTION || kind == DeclaredName.Kind.CONSTANT) ||
+                                    blockContext == BwslBlockContext.STATEMENT_BODY
+                            }
+                            if (parameters.invocationCount >= 2) {
+                                for (candidate in importable) result.addElement(buildImportingLookupElement(candidate, qualify = true))
+                            } else if (importable.isNotEmpty()) {
+                                result.addLookupAdvertisement("Press Ctrl+Space again for names from modules that are not imported yet")
                             }
                         }
                     }

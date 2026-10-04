@@ -234,6 +234,17 @@ object BwslAstCache {
 
     fun hashText(text: String): Int = text.hashCode()
 
+    /** Forgets every cached AST. For tests, which share the cache. */
+    internal fun clear() {
+        roots.clear()
+        rawRoots.clear()
+        compiledInputs.clear()
+        uncompilableInputs.clear()
+    }
+
+    /** The path of every file that has a cached AST. */
+    fun collectPaths(): Set<String> = roots.keys.toSet()
+
     fun findRoot(filePath: String): AstRoot? = roots[filePath]
 
     fun findRawRoot(filePath: String): com.google.gson.JsonObject? = rawRoots[filePath]

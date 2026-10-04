@@ -88,9 +88,7 @@ fun collectMembersOf(
     qualifier: String,
     aliases: Map<String, String> = emptyMap()
 ): List<DeclaredName> {
-    findModuleNamed(rawJson, aliases[qualifier] ?: qualifier)?.let { module ->
-        return describeFunctionsOf(module) + describeTypesOf(module) + describeConstantsOf(module)
-    }
+    findModuleNamed(rawJson, aliases[qualifier] ?: qualifier)?.let { module -> return describeMembersOfModule(module) }
     val enclosing = findEnclosingEntry(root, rawJson, line, column)
     val enums = listOfNotNull(enclosing).flatMap { it.getObjectsOrEmpty("enums") } +
         rawJson.getObjectsOrEmpty("modules").flatMap { it.getObjectsOrEmpty("enums") }
@@ -101,7 +99,7 @@ fun collectMembersOf(
 }
 
 /** The compiled file's own module or pipeline whose range holds the position. */
-private fun findEnclosingEntry(root: AstRoot, rawJson: JsonObject, line: Int, column: Int): JsonObject? {
+internal fun findEnclosingEntry(root: AstRoot, rawJson: JsonObject, line: Int, column: Int): JsonObject? {
     val own = root.roots.toSet()
     return listOf("modules", "pipelines").asSequence()
         .flatMap { rawJson.getObjectsOrEmpty(it).asSequence() }
@@ -110,6 +108,10 @@ private fun findEnclosingEntry(root: AstRoot, rawJson: JsonObject, line: Int, co
 
 private fun findModuleNamed(rawJson: JsonObject, name: String?): JsonObject? =
     if (name == null) null else rawJson.getObjectsOrEmpty("modules").firstOrNull { it.getStringOrNull("name") == name }
+
+/** The functions, structs, enums and constants a module declares. */
+internal fun describeMembersOfModule(module: JsonObject): List<DeclaredName> =
+    describeFunctionsOf(module) + describeTypesOf(module) + describeConstantsOf(module)
 
 private fun describeFunctionsOf(container: JsonObject): List<DeclaredName> =
     container.getObjectsOrEmpty("functions").mapNotNull { function ->

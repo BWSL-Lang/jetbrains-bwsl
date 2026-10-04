@@ -14,6 +14,8 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
     /** Points the plugin at the real bwslc, for the features that run it themselves (the project index, rename's conflict check). */
     override fun setUp() {
         super.setUp()
+        // The cache is global: what an earlier test cached must not be seen by this one.
+        BwslAstCache.clear()
         originalCompilerPath = BwslSettings.getInstance().compilerPath
         BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
             ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")

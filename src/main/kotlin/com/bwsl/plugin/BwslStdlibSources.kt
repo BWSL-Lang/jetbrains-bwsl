@@ -3,6 +3,7 @@ package com.bwsl.plugin
 import com.google.gson.JsonParser
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.io.File
@@ -45,6 +46,10 @@ object BwslStdlibSources {
     @Volatile
     internal var cacheRoot: Path = Path.of(PathManager.getSystemPath(), "bwsl", "stdlib")
 
+    /** Where the probe modules are written, outside [cacheRoot] so that they are not taken for copies. */
+    @Volatile
+    internal var probeRoot: Path = Path.of(PathManager.getSystemPath(), "bwsl", "stdlib-probes")
+
     /** Reads the text at a URL, or null when it cannot be read. Replaced in tests. */
     @Volatile
     internal var fetchText: (String) -> String? = ::fetchTextFromGitHub
@@ -81,6 +86,29 @@ object BwslStdlibSources {
     /** Whether [path] is one of the local copies, which are not the user's to edit. */
     fun isCopy(path: String): Boolean = findSourceKeyOf(path) != null
 
+    /**
+     * One tiny module per standard module that does nothing but import it (`Probe_Math.bwsl` holds
+     * `module BwslProbeMath { import Math }`), and the files, written if they are not there. A standard
+     * module cannot be compiled from its copy (it would declare a module the compiler already has), but
+     * a module that imports it can, and its AST then holds the imported module's members.
+     */
+    fun writeProbeFiles(): List<File> {
+        val directory = probeRoot.toFile().also { it.mkdirs() }
+        return collectModuleNames().map { module ->
+            File(directory, "Probe_$module.bwsl").also { file ->
+                val text = "module BwslProbe$module {\n    import $module\n}\n"
+                if (!file.isFile || file.readText() != text) file.writeText(text)
+            }
+        }
+    }
+
+    /** Every local copy fetched so far. */
+    fun collectCopies(): List<File> {
+        val root = cacheRoot.toFile()
+        if (!root.isDirectory) return emptyList()
+        return root.walkTopDown().filter { it.isFile && it.extension == "bwsl" }.sortedBy { it.path }.toList()
+    }
+
     /** The names of the modules declared in the copies fetched so far. */
     fun collectModuleNames(): List<String> {
         val root = cacheRoot.toFile()
@@ -95,7 +123,13 @@ object BwslStdlibSources {
         if (sourceUrls.none { parseLocation(it) != null }) return
         AppExecutorUtil.getAppExecutorService().execute {
             val written = download(sourceUrls)
-            if (written.isNotEmpty()) LocalFileSystem.getInstance().refreshIoFiles(written, true, false, null)
+            if (written.isNotEmpty()) {
+                LocalFileSystem.getInstance().refreshIoFiles(written, true, false, null)
+                // The compiler checks the new files, so that their members can be completed.
+                for (project in ProjectManager.getInstance().openProjects) {
+                    if (!project.isDisposed) BwslProjectIndex.getInstance(project).scheduleRefresh(0)
+                }
+            }
         }
     }
 

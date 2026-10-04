@@ -215,6 +215,13 @@ is exactly the compiler's:
   module (an `import ... as` alias works too), or the values of an enum after
   `Enum::`. Nothing else is offered there, also when the caret is inside an
   existing call name
+- **Auto-import** — press Ctrl+Space a second time to also see the functions,
+  structs, enums and constants of modules the file does not import yet (the
+  module files of the project and the module paths, and the compiler's
+  standard modules once they have been fetched). Choosing one writes
+  `Module::name` and adds `import Module` to the module or pipeline you are in,
+  after its last import. After typing `Module::` for a module that is not
+  imported, its members are offered at once and choosing one adds the import
 - **`using`** makes a module's functions and constants available without a
   qualifier, so they are suggested too
 - **After `import`**, the modules that can be imported: the standard modules
@@ -280,7 +287,6 @@ Not implemented yet:
 - [ ] Unresolved-reference highlighting
 - [ ] Inspections and quick fixes (unused variables and parameters, unused
       imports, missing import for a used module)
-- [ ] Auto-import when completing a name from a module that isn't imported yet
 - [ ] Inlay hints: parameter names at call sites, inferred types, array lengths
 - [ ] Semantic highlighting that colours parameters, locals, fields and
       constants differently

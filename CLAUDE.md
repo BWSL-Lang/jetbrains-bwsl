@@ -216,6 +216,22 @@ is wrapped at 80 characters.
   tokens. After `::` only members are offered (the contributor used to offer keywords there). The
   trigger accepts every name token (`FUNCTION_CALL`, `MODULE_NAME`, ...), not only `IDENTIFIER`, so
   it also works inside an existing `Mod::name(...)`.
+- Auto-import (`BwslImports.kt`, the contributor). `collectImportableNames` takes the members of
+  **every module entry in every cached AST** (own or imported), minus the modules the file imports
+  (read from the tokens) and the one the caret is in, deduplicated; so it works for project module
+  files and module paths as soon as the index has compiled them. The standard modules have no file to
+  compile (compiling a copy of `math.bwsl` fails: it redeclares the embedded `Math`), so
+  `BwslStdlibSources.writeProbeFiles` writes `Probe_<Module>.bwsl` = `module BwslProbe<Module> { import
+  <Module> }` into a directory *outside* the cache, one per module found in the copies, and the
+  background index compiles those (`refreshNow(includeStandardModules = true)`, not the modal one that
+  rename and Find Usages wait on); the imported module's entry then holds its members. Names
+  starting `BwslProbe` are never offered. Importable names appear from the second invocation
+  (`parameters.invocationCount >= 2`; the first adds an advertisement), or at once after a typed
+  `Module::` that names no visible module. The insert handler writes `Module::` (unless typed),
+  runs the parentheses handler, commits, then `findImportInsertion` (token-based, so right for text
+  newer than the last compile) inserts `import Module` after the last import of the enclosing
+  top-level `{}` with that import's indent, or first in the block. A module imported under an alias
+  counts as imported.
 - Reading a process: **read stdout and stderr at the same time** (`compileAst`, the test helper).
   Reading one to its end first deadlocks when a file with many errors fills the other pipe, and the
   15 s timeout never starts because it comes after the reads.
