@@ -141,7 +141,7 @@ object BwslStdlibSources {
 }
 
 /** The text at [url] (GitHub, with `GITHUB_TOKEN` if set), or null when it cannot be read. */
-private fun fetchTextFromGitHub(url: String): String? =
+internal fun fetchTextFromGitHub(url: String): String? =
     try {
         val request = HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofSeconds(20))

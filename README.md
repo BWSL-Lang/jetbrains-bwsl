@@ -235,6 +235,13 @@ Aliases and imports are read from the text, so they are current.
 
 - **Compiler path**, with a **Download Latest…** button that fetches the right
   `bwslc` for your OS and architecture from the BWSL GitHub releases
+- **Check for a newer compiler release on startup** — on by default. When a
+  project opens (at most once a day, in the background) the plugin asks GitHub
+  for the newest `bwslc` release and compares it with your compiler's version.
+  If yours is older, a notification offers **Update** (downloads it, makes it
+  the compiler path) or **Skip this version**. A development build (`0.0.0-dev`)
+  is not compared and never nagged. **Tools → Check for BWSL Compiler Update**
+  asks right away and says what it found
 - **Module paths** — the directories passed to `bwslc` as `-modules`
 - **Output format** — SPIR-V, all formats, Metal, HLSL, GLSL 450 or GLSL ES /
   WebGL
@@ -304,7 +311,6 @@ Not implemented yet:
 - [ ] Show the compiled output (SPIR-V disassembly, GLSL, HLSL, Metal) next to
       the source
 - [ ] Shader variant selection in the compile action
-- [ ] Notice a newer `bwslc` release and offer to update
 
 **Platform and ecosystem**
 - [ ] BWSL code blocks highlighted inside Markdown

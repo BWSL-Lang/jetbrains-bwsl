@@ -135,6 +135,9 @@
         <postStartupActivity
             implementation="com.bwsl.plugin.BwslProjectIndexStartup"/>
 
+        <postStartupActivity
+            implementation="com.bwsl.plugin.BwslCompilerUpdateStartup"/>
+
     </extensions>
 
     <applicationListeners>
@@ -149,6 +152,12 @@
                 description="Compile the current BWSL shader file with bwslc">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="Bwsl.CheckCompilerUpdate"
+                class="com.bwsl.plugin.BwslCheckCompilerUpdateAction"
+                text="Check for BWSL Compiler Update"
+                description="Check whether a newer bwslc release is available">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>

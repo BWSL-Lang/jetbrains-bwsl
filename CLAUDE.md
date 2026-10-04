@@ -183,6 +183,16 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
+  its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
+  does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for
+  that, a pre-release or anything non-numeric, so such a compiler is never "out of date".
+  `BwslCompilerDownloader.findLatestReleaseTag` reads GitHub's `releases/latest`; `decideUpdate`
+  offers a newer tag unless it is the one in `skippedCompilerVersion`. The check runs in the
+  background once per session and at most once a day (`lastCompilerUpdateCheck`), can be turned off
+  (`checkForCompilerUpdates`), and **Tools → Check for BWSL Compiler Update** asks at once and also
+  offers a skipped version. **Update** downloads to the plugin's install path and sets it as the
+  compiler path. The version reader and tag lookup are injectable for tests.
 - Standard-library sources (`BwslStdlibSources.kt`). The compiler embeds its standard modules: the
   AST gives them `sourceFile` `stdlib://modules/<file>.bwsl` and a `sourceUrl`
   (`https://github.com/<owner>/<repo>/blob/<ref>/modules/<file>`, `<ref>` the release tag, or

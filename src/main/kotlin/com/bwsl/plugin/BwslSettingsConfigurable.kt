@@ -9,6 +9,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.ui.dsl.builder.Align
+import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
@@ -77,6 +78,10 @@ class BwslSettingsConfigurable : Configurable {
                     }
                     field.component.text = installed.toString()
                 }
+            }
+            row {
+                checkBox("Check for a newer compiler release on startup")
+                    .bindSelected(settings::checkForCompilerUpdates)
             }
             row("Output format:") {
                 cell(formatCombo!!)

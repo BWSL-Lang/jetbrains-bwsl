@@ -14,7 +14,12 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
         var compilerPath: String = "",
         var modulePaths: MutableList<String> = mutableListOf(),
         var outputFormat: String = BwslOutputFormat.SPIRV_ONLY.name,
-        var outputDirectory: String = ""
+        var outputDirectory: String = "",
+        var checkForCompilerUpdates: Boolean = true,
+        /** When the newest release was last asked for, in epoch milliseconds. */
+        var lastCompilerUpdateCheck: Long = 0,
+        /** A release the user chose not to be reminded about. */
+        var skippedCompilerVersion: String = ""
     )
 
     private var state = State()
@@ -37,6 +42,18 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
     var outputDirectory: String
         get() = state.outputDirectory
         set(value) { state.outputDirectory = value }
+
+    var checkForCompilerUpdates: Boolean
+        get() = state.checkForCompilerUpdates
+        set(value) { state.checkForCompilerUpdates = value }
+
+    var lastCompilerUpdateCheck: Long
+        get() = state.lastCompilerUpdateCheck
+        set(value) { state.lastCompilerUpdateCheck = value }
+
+    var skippedCompilerVersion: String
+        get() = state.skippedCompilerVersion
+        set(value) { state.skippedCompilerVersion = value }
 
     companion object {
         fun getInstance(): BwslSettings =
