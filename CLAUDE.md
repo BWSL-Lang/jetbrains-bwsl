@@ -240,6 +240,14 @@ is wrapped at 80 characters.
   target module is the owner (through `owner` links) of no edge's target other than other
   import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
+- File Structure and breadcrumbs (`BwslStructure.kt`): token-based on purpose (they must follow text
+  being typed, like folding), not AST-driven. `collectOutline` pairs braces and walks each region
+  statement by statement (a statement ends at its `;` or at the `}` of its block; `import`/`using` have
+  no `;`): container keywords (module, submodule, pipeline, struct, enum, pass) recurse, `name :: (`
+  is a function (method in a struct), `vertex`/`fragment`/`compute` a stage, `const … name =` a
+  constant, `Type name;` in a struct a field. The structure view's elements are not PSI (the PSI has no
+  named elements) and navigate with an `OpenFileDescriptor`; the breadcrumbs provider overrides
+  `getParent` to walk the outline, since the PSI is flat.
 - Go to Type Declaration (`BwslTypeDeclarations.kt`, `typeDeclarationProvider`; the platform hands
   over the declaration's name element, so the provider works from its offset): the symbol's
   `type`/`return-type` edge to a `struct` symbol, resolved with `resolveDeclarationPosition`.

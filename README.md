@@ -132,6 +132,18 @@ unsaved edits.
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
 
+### File Structure and breadcrumbs
+
+- **File Structure** (Ctrl+F12) and the Structure tool window list modules,
+  pipelines, structs (with fields and methods), enums, passes (with their
+  stages), functions and constants, in source order, with autoscroll from the
+  caret
+- **Breadcrumbs** under the editor name the declarations around the caret, from
+  the module or pipeline inwards (`Shapes > Circle > area()`)
+- Both are read from the tokens, so they follow the text as you type and work
+  while the file does not compile. The inside of a function or stage is not
+  listed
+
 ### Go to Type Declaration (Ctrl+Shift+B)
 
 From a variable, parameter, struct field or function (on its declaration or any
@@ -410,7 +422,6 @@ Not implemented yet:
 - [ ] Completion that sees code typed since the last save
 
 **Navigation and search**
-- [ ] File Structure view and breadcrumbs
 - [ ] Call hierarchy
 - [ ] Ctrl+click on intrinsics, with their documentation
 

@@ -99,6 +99,12 @@
 
         <typeDeclarationProvider implementation="com.bwsl.plugin.BwslTypeDeclarationProvider"/>
 
+        <lang.psiStructureViewFactory
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslStructureViewFactory"/>
+
+        <breadcrumbsInfoProvider implementation="com.bwsl.plugin.BwslBreadcrumbsProvider"/>
+
         <gotoClassContributor implementation="com.bwsl.plugin.BwslGotoClassContributor"/>
         <gotoSymbolContributor implementation="com.bwsl.plugin.BwslGotoSymbolContributor"/>
 
