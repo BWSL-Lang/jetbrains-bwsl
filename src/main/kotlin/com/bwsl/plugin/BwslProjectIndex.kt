@@ -130,7 +130,7 @@ class BwslProjectIndex(private val project: Project) : Disposable {
 
     /** The files on the local disk (bwslc needs a real path) that have no current AST and no known failure. */
     internal fun collectFilesToCompile(modulePaths: List<String> = collectModulePaths(project)): List<VirtualFile> {
-        val files = collectIndexedFiles(project).filter { it.isInLocalFileSystem }
+        val files = collectIndexedFiles(project).filter { it.fileSystem == LocalFileSystem.getInstance() }
         val filesByKey = files.associateBy { normalizePathKey(it.path) }
         return files.filter { !hasCurrentAst(it, filesByKey) && !isKnownUncompilable(it, modulePaths) }
     }

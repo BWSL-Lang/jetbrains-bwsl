@@ -19,6 +19,22 @@ data class DeclarationIdentity(val symbol: AstSymbol, val payloadPath: String) {
     val stableId: String get() = symbol.stableId
 }
 
+/**
+ * The symbol that [node] is the declaration of, or null if it declares nothing. A node declares its
+ * own symbol; a stage value (`output.uv`) has no declaration node, so it is declared by the target
+ * of the first assignment the symbol lists - the same place the resolver sends a reference to it.
+ */
+internal fun findSymbolDeclaredBy(index: BwslAstIndex, node: AstNodePos): AstSymbol? {
+    index.symbolsById[node.id]?.let { return it }
+    return index.refsByFrom[node.id].orEmpty()
+        .filter { it.role == "output" || it.role == "input" }
+        .mapNotNull { index.symbolsById[it.to] }
+        .firstOrNull { symbol ->
+            symbol.kind == "stage-interface" &&
+                symbol.definitions.firstNotNullOfOrNull { index.findAssignmentTargetOf(it) } == node.id
+        }
+}
+
 /** The indexed BWSL files ([collectIndexedFiles]) that have a cached AST - the compiles whose edges can name a usage. */
 internal fun collectPayloadFiles(project: Project): List<PsiFile> {
     val manager = PsiManager.getInstance(project)
@@ -41,7 +57,7 @@ fun findDeclarationIdentityOf(element: PsiElement): DeclarationIdentity? {
     val offset = element.textOffset
 
     buildAstIndex(file)?.let { index ->
-        val symbol = index.findNodeAtOffset(offset)?.let { index.symbolsById[it.id] }
+        val symbol = index.findNodeAtOffset(offset)?.let { findSymbolDeclaredBy(index, it) }
         if (symbol != null) return DeclarationIdentity(symbol, path)
     }
 

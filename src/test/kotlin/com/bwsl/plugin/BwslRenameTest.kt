@@ -247,6 +247,46 @@ class BwslRenameTest : BwslAstFixtureTestCase() {
             """
             pipeline P {
                 attributes {
+                    position: float4
+                    nor<caret>mal: float3
+                }
+                pass "Main" {
+                    use attributes { position, normal }
+                    vertex {
+                        output.pos = attributes.position;
+                        output.n = attributes.normal;
+                    }
+                }
+            }
+            """.trimIndent(),
+            "direction"
+        )
+
+        assertEquals(
+            """
+            pipeline P {
+                attributes {
+                    position: float4
+                    direction: float3
+                }
+                pass "Main" {
+                    use attributes { position, direction }
+                    vertex {
+                        output.pos = attributes.position;
+                        output.n = attributes.direction;
+                    }
+                }
+            }
+            """.trimIndent(),
+            result
+        )
+    }
+
+    fun testRenamingTheFirstAttributeIsReportedBecauseTheCompilerRequiresItsName() {
+        val failure = renameFailureAtCaret(
+            """
+            pipeline P {
+                attributes {
                     posi<caret>tion: float4
                 }
                 pass "Main" {
@@ -260,22 +300,7 @@ class BwslRenameTest : BwslAstFixtureTestCase() {
             "vertexPosition"
         )
 
-        assertEquals(
-            """
-            pipeline P {
-                attributes {
-                    vertexPosition: float4
-                }
-                pass "Main" {
-                    use attributes { vertexPosition }
-                    vertex {
-                        output.pos = attributes.vertexPosition;
-                    }
-                }
-            }
-            """.trimIndent(),
-            result
-        )
+        assertTrue("expected the compiler's rule, got: $failure", failure.contains("First attribute must be 'position'"))
     }
 
     fun testRenameFragmentOutputRenamesItsAssignments() {
@@ -429,6 +454,142 @@ class BwslRenameTest : BwslAstFixtureTestCase() {
             myFixture.file.text
         )
         assertTrue("the new caller is renamed too", myFixture.file.text.contains("return adjust(2.0);"))
+    }
+
+    /** Configures [sourceWithCaret], tries to rename the target at the caret, and returns why it was refused or "no failure". */
+    private fun renameFailureAtCaret(sourceWithCaret: String, newName: String): String {
+        configureAndCache(sourceWithCaret)
+        return describeFailure(runCatching { myFixture.renameElementAtCaret(newName) }.exceptionOrNull())
+    }
+
+    fun testRenameToAnotherNameInTheSameBlockIsReportedAsAConflict() {
+        val source = """
+            module M {
+                f :: (float a) -> float {
+                    float first = a;
+                    float sec<caret>ond = first;
+                    return second;
+                }
+            }
+        """.trimIndent()
+
+        val failure = renameFailureAtCaret(source, "first")
+
+        assertTrue("expected the compiler's duplicate-variable error, got: $failure", failure.contains("already declared in this scope"))
+        assertTrue("the original text must be untouched", myFixture.file.text.contains("float second = first;"))
+    }
+
+    fun testRenameLocalToAParameterNameItWouldCaptureIsReportedAsAConflict() {
+        val failure = renameFailureAtCaret(
+            """
+            module M {
+                f :: (float v) -> float {
+                    float <caret>t = 1.0;
+                    return t + v;
+                }
+            }
+            """.trimIndent(),
+            "v"
+        )
+
+        assertTrue("expected the changed-meaning conflict, got: $failure", failure.contains("'v' would refer to the variable 'v' instead of the parameter 'v'"))
+    }
+
+    fun testRenameFunctionToAnExistingOverloadIsReportedAsAConflict() {
+        val failure = renameFailureAtCaret(
+            """
+            module M {
+                f :: (float x) -> float { return x; }
+                g<caret> :: (float y) -> float { return y; }
+            }
+            """.trimIndent(),
+            "f"
+        )
+
+        assertTrue("expected the compiler's overload error, got: $failure", failure.contains("overload already declared"))
+    }
+
+    fun testRenameStructToAnExistingStructNameIsReportedAsAConflict() {
+        val failure = renameFailureAtCaret(
+            """
+            module M {
+                struct Box { float a; }
+                struct Cra<caret>te { float b; }
+            }
+            """.trimIndent(),
+            "Box"
+        )
+
+        assertTrue("expected the compiler's duplicate-struct error, got: $failure", failure.contains("Duplicate struct"))
+    }
+
+    fun testRenameToAnUnusedNameReportsNoConflict() {
+        val source = """
+            module M {
+                f :: (float v) -> float {
+                    float <caret>t = 1.0;
+                    return t + v;
+                }
+            }
+        """.trimIndent()
+
+        assertEquals("no failure", renameFailureAtCaret(source, "w"))
+        assertTrue(myFixture.file.text.contains("float w = 1.0;"))
+    }
+
+    private val stagePipeline = """
+        pipeline P {
+            attributes {
+                position: float4
+            }
+            pass "Main" {
+                use attributes { position }
+                outputs {
+                    result: float4
+                }
+                vertex {
+                    output.pos = attributes.position;
+                    output.uv = float2(0.0);
+                    output.st = float2(1.0);
+                }
+                fragment {
+                    float2 t = input.uv;
+                    output.result = float4(t.x, input.uv.y, input.st.x, 1.0);
+                }
+            }
+        }
+    """.trimIndent()
+
+    fun testRenameStageValueFromItsFirstAssignmentRenamesEveryWriteAndRead() {
+        val result = renameTargetAtCaret(stagePipeline.replace("output.uv", "output.<caret>uv"), "texcoord")
+
+        assertEquals(stagePipeline.replace("uv", "texcoord"), result)
+    }
+
+    fun testRenameStageValueFromAFragmentReadRenamesTheVertexAssignmentToo() {
+        val result = renameTargetAtCaret(stagePipeline.replace("input.uv.y", "input.<caret>uv.y"), "texcoord")
+
+        assertEquals(stagePipeline.replace("uv", "texcoord"), result)
+    }
+
+    fun testRenameStageValueLeavesOtherStageValuesAlone() {
+        val result = renameTargetAtCaret(stagePipeline.replace("output.uv", "output.<caret>uv"), "texcoord")
+
+        assertTrue(result.contains("output.st = float2(1.0);"))
+        assertTrue(result.contains("input.st.x"))
+    }
+
+    fun testRenameStageValueToAnExistingOneIsReportedAsAMerge() {
+        val failure = renameFailureAtCaret(stagePipeline.replace("output.uv", "output.<caret>uv"), "st")
+
+        assertTrue("expected the merge conflict, got: $failure", failure.contains("'st' is already a stage value in this pass"))
+    }
+
+    fun testRenameStageValueToTheClipPositionIsReportedAsAConflict() {
+        val failure = renameFailureAtCaret(stagePipeline.replace("output.uv", "output.<caret>uv"), "pos")
+
+        assertTrue("expected a conflict with the position output, got: $failure", failure.contains("pos"))
+        assertFalse("the rename must not go through silently", failure == "no failure")
     }
 
     fun testNamesValidatorAcceptsPlainIdentifiers() {

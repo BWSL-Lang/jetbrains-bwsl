@@ -9,6 +9,24 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  */
 abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
 
+    private lateinit var originalCompilerPath: String
+
+    /** Points the plugin at the real bwslc, for the features that run it themselves (the project index, rename's conflict check). */
+    override fun setUp() {
+        super.setUp()
+        originalCompilerPath = BwslSettings.getInstance().compilerPath
+        BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
+            ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
+    }
+
+    override fun tearDown() {
+        try {
+            BwslSettings.getInstance().compilerPath = originalCompilerPath
+        } finally {
+            super.tearDown()
+        }
+    }
+
     /**
      * Configures the fixture file with [textWithCaret] (which may contain `<caret>`), compiles its
      * caret-free text with real bwslc and caches the AST. [modules] maps module names to sources and

@@ -118,9 +118,11 @@ is wrapped at 80 characters.
   a module file outside the project would otherwise only be searched in itself. `collectPayloadFiles`
   is the indexed files that have an AST. `BwslFindUsagesHandlerFactory` brings the index up to date
   (modal progress, only when stale) before a real Find Usages, then returns no handler so the default
-  one runs; it skips highlight-usages requests. Limits: a file that does not compile has no known
-  usages; a stage-interface value (`output.uv`) has no declaration so it
-  is not a target.
+  one runs; it skips highlight-usages requests. A stage-interface value (`output.uv`) has no
+  declaration node, so `findSymbolDeclaredBy` treats the target of the first assignment in the
+  symbol's `definitions` as its declaration (the place the resolver already sends a reference to):
+  that makes it a target, and every `output`/`input` edge to the symbol a usage. Limit: a file that
+  does not compile has no known usages.
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.
@@ -134,6 +136,23 @@ is wrapped at 80 characters.
   `checkCompilerViewOf` finds any *indexed* file whose view is not current (unsaved changes; changed
   since its AST was built; produces no AST; never compiled), or when the text at an occurrence is
   not the old name. An AST cached without its inputs counts as stale.
+- Rename conflict detection (`BwslRenameConflicts.kt`, `findExistingNameConflicts`) asks the
+  compiler instead of re-implementing scoping, so it is not another set of scope rules. The rename is
+  applied to a *copy* of the sources (`SourceMirror`: a temp directory per source directory and
+  module path, with the renamed text and, for a module in a same-named file, the new file name) and
+  compared with an unrenamed copy, both compiled with bwslc, in parallel. It reports (1) errors the
+  rename introduces (`-errors-json -no-validate -check`, matched by message so a moved line is not a
+  new error; a file that stops producing an AST counts), (2) any change in the reference index's
+  edges, and (3) for a stage value, a change in the number of stage-interface symbols (a merge).
+  This works because of facts probed against bwslc, not assumed: node and symbol ids follow source
+  order, so a rename changes no id and the edge sets are *identical* unless some name now resolves to
+  a different declaration; the one id that carries a name, `PASS:n/interface:<name>`, is mapped
+  old to new before comparing. Shadowing is legal in BWSL (a local may reuse a parameter's, a
+  const's or a function's name), so capture is silent in the compiler and only the edge diff finds it;
+  a duplicate in one block, an identical overload, a duplicate struct, field, parameter or module
+  are hard errors, and `-ast-json` prints nothing for them. The conflicts reach the platform's
+  conflicts dialog (a `ConflictsInTestsException` in tests). Skipped when the compiler's view is
+  stale (the rename then refuses with the reason) or bwslc cannot be run.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line

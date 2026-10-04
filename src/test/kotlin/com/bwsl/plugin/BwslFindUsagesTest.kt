@@ -226,6 +226,39 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         assertEquals(collectOffsetsOf("result").filter { it != declaration }, usages)
     }
 
+    fun testStageValueUsagesAreEveryAssignmentAndReadOfIt() {
+        val usages = collectUsageOffsetsAtCaret(
+            """
+            pipeline P {
+                attributes {
+                    position: float4
+                }
+                pass "Main" {
+                    use attributes { position }
+                    outputs {
+                        result: float4
+                    }
+                    vertex {
+                        output.pos = attributes.position;
+                        output.<caret>uv = float2(0.0);
+                        output.other = float2(1.0);
+                    }
+                    fragment {
+                        float2 t = input.uv;
+                        output.result = float4(t.x, input.uv.y, input.other.x, 1.0);
+                    }
+                }
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            "the vertex assignment and both fragment reads, and not the other stage value",
+            collectOffsetsOf("uv"),
+            usages
+        )
+    }
+
     fun testUsagesOfAnImportedFunctionAreFoundFromACallIntoItsFile() {
         // The target is in Common.bwsl, which has no AST of its own cached: it is identified through
         // this file's AST, where it is an imported declaration.

@@ -1,6 +1,5 @@
 package com.bwsl.plugin
 
-import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
@@ -10,7 +9,6 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import java.nio.file.Files
-import java.util.concurrent.TimeUnit
 
 data class Diagnostic(
     val severity: String = "error",
@@ -42,20 +40,10 @@ class BwslExternalAnnotator : ExternalAnnotator<DiagnosticsRequest, List<Diagnos
         val tempFile = Files.createTempFile("bwsl_", ".bwsl").toFile()
         try {
             tempFile.writeText(request.fileContent)
-            val moduleArgs = request.modulePaths.flatMap { listOf("-modules", it) }
-            // -check: diagnostics only. Without it bwslc also writes <stem>.<stage>.spv for every pass
-            // into the working directory, and nothing here would ever delete them.
-            val process = ProcessBuilder(
-                listOf(compilerPath, tempFile.absolutePath, "-errors-json", "-no-validate", "-check") + moduleArgs
-            )
-                .redirectErrorStream(true)
-                .start()
-            val output = process.inputStream.bufferedReader().readText()
-            if (!process.waitFor(15, TimeUnit.SECONDS)) {
-                process.destroy()
-                return emptyList()
-            }
-            return Gson().fromJson(output, CompilerOutput::class.java)?.diagnostics ?: emptyList()
+            // collectDiagnostics passes -check: diagnostics only. Without it bwslc also writes
+            // <stem>.<stage>.spv for every pass into the working directory, and nothing here would
+            // ever delete them.
+            return collectDiagnostics(compilerPath, tempFile.absolutePath, request.modulePaths)
         } catch (_: Exception) {
             return emptyList()
         } finally {

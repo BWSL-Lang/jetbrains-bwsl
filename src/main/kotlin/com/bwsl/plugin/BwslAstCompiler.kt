@@ -2,6 +2,7 @@ package com.bwsl.plugin
 
 import com.google.gson.Gson
 import com.google.gson.JsonElement
+import com.google.gson.JsonSyntaxException
 import com.google.gson.JsonObject
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
@@ -55,6 +56,27 @@ internal fun compileAst(compilerPath: String, filePath: String, modulePaths: Lis
     val rawJson = Gson().fromJson(json, JsonObject::class.java)
     log.warn("bwslc -ast-json parsed for $filePath: modules=${root.modules.size} pipelines=${root.pipelines.size}")
     return CompiledAst(root, rawJson)
+}
+
+/**
+ * Runs `bwslc <filePath> -errors-json -no-validate -check` and returns its diagnostics. `-check`
+ * keeps bwslc from writing output files. Throws [IOException] when bwslc could not be run or timed out.
+ */
+internal fun collectDiagnostics(compilerPath: String, filePath: String, modulePaths: List<String>): List<Diagnostic> {
+    val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
+    val process = ProcessBuilder(listOf(compilerPath, filePath, "-errors-json", "-no-validate", "-check") + moduleArgs)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().readText()
+    if (!process.waitFor(15, TimeUnit.SECONDS)) {
+        process.destroy()
+        throw IOException("bwslc -errors-json timed out for $filePath")
+    }
+    return try {
+        Gson().fromJson(output, CompilerOutput::class.java)?.diagnostics ?: emptyList()
+    } catch (_: JsonSyntaxException) {
+        emptyList()
+    }
 }
 
 /**

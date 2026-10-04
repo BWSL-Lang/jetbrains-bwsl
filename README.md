@@ -52,7 +52,9 @@ is exactly the compiler's:
 ### Find Usages
 
 - On any declaration: functions, methods, structs, fields, parameters, locals,
-  constants, attributes, fragment outputs and modules
+  constants, attributes, fragment outputs, modules and stage values
+  (`output.uv` / `input.uv`, which have no declaration of their own: the
+  vertex stage's first assignment stands in for it)
 - Works from the declaration's name or from any use of it
 - Finds usages across every BWSL file in the project and in the module paths,
   including files you have never opened. It waits for any file that is not up to
@@ -88,8 +90,9 @@ is exactly the compiler's:
 ### Rename (Shift+F6)
 
 - Renames a declaration and every usage in one step: functions, methods,
-  structs, fields, parameters, locals, constants, attributes, fragment outputs
-  and modules
+  structs, fields, parameters, locals, constants, attributes, fragment outputs,
+  modules and stage values (renaming `output.uv` renames the vertex stage's
+  assignments and the fragment stage's `input.uv` reads together)
 - Works from the declaration's name or from any use of it, and respects scope: a
   parameter renamed in one function is untouched in another, and so are
   same-named functions in other modules
@@ -99,6 +102,20 @@ is exactly the compiler's:
 - Brings the project index up to date first (behind a progress dialog, only when
   something is stale), so usages in files you never opened are renamed too,
   including module files outside the project
+- **Checks the new name with the compiler** before changing anything, and
+  lists what it finds in the platform's conflicts dialog, where you can still
+  go ahead. It applies the rename to a temporary copy of the sources and
+  compares that with an unrenamed copy, so it reports:
+  - errors the rename would introduce: a duplicate declaration in one scope, an
+    overload that already exists, a stage value whose type conflicts with the
+    one it would be merged into, or any other rule the compiler enforces (the
+    first attribute has to be called `position`, for one)
+  - names that would silently mean something else: a local renamed to the name
+    of a parameter, which would then capture the parameter's uses
+  - stage values that would be merged, when the new name is already one in the
+    same pass
+
+  The check needs the compiler, and is skipped when it can't be run
 - Refuses, with an explanation, when the compiler's view of any project file is
   not current: it has unsaved changes, has changed since the compiler last
   checked it, has never been compiled, or doesn't compile. A rename from a stale
@@ -170,10 +187,6 @@ is exactly the compiler's:
 Not implemented yet:
 
 **Refactoring and editing**
-- [ ] Rename conflict detection: warn before renaming to a name already used in
-      the same scope
-- [ ] Rename for stage values (`output.uv` / `input.uv`), which have no
-      declaration to start from
 - [ ] Code formatter, auto-indent and **Reformat Code**
 - [ ] Comment / uncomment with the comment shortcut
 - [ ] Brace and quote matching and auto-closing
@@ -201,7 +214,6 @@ Not implemented yet:
 - [ ] Argument-aware ranking and smart completion by expected type
 
 **Navigation and search**
-- [ ] Find Usages on stage values (`output.uv` / `input.uv`)
 - [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs,
       modules and passes
 - [ ] File Structure view and breadcrumbs
