@@ -49,7 +49,16 @@ is wrapped at 80 characters.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
   parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from.
+  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. Its
+  `apply` also shows the shadowing warnings (`BwslShadowing.kt`): bwslc allows a parameter, local,
+  const or loop variable to reuse a visible name and says nothing (probed), so
+  `collectShadowingDeclarations` collects each such declaration from the raw AST and asks
+  `collectVisibleLocalsAt` (the completion walker, so the two share one notion of scope) what is in
+  scope *just before* it: at its own start for a local, one column before the function for a
+  parameter, one column before a loop variable. The result carries the hash of the text bwslc
+  compiled, and `apply` shows nothing unless the editor text still hashes to it (the compile reads
+  the saved file, so positions are wrong while there are unsaved edits). Module-, pipeline- and
+  pass-level consts are visible throughout their container and are not checked.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),

@@ -27,6 +27,10 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - Checks the text in the editor, so **unsaved edits are validated** too
 - Honours the configured **module paths**, so imports resolve as they do when
   you compile
+- **Weak warning when a declaration shadows another**: a parameter, local,
+  constant or loop variable that reuses the name of one already in scope (a
+  parameter or an enclosing local, a loop variable, or a module-, pipeline- or
+  pass-level constant). bwslc allows shadowing without comment for now [See #103](https://github.com/BWSL-Lang/BWSL/issues/103)
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
