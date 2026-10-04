@@ -21,6 +21,12 @@ looks like a stale-cache/stale-daemon problem but is just tasks not re-executing
 `build`/`.gradle` does **not** fix this - `--rerun-tasks` does. Always pass it when a test result
 needs to be trusted, e.g. after any code change.
 
+## Conventions
+
+Follow `docs/conventions/coding-conventions.md` when naming or writing code. In particular, every
+function is named as a verb phrase (`find…`, `collect…`, `build…`, `is…`/`has…`/`can…` for
+predicates, …); that file says which verb to use for which kind of function.
+
 ## Architecture overview
 
 - `BwslLexerAdapter.kt` — flex-generated lexer adapter. Tracks `prevSignificantType` to detect a
