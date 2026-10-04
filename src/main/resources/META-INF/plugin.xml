@@ -97,6 +97,9 @@
             level="WARNING"
             implementationClass="com.bwsl.plugin.BwslMissingImportInspection"/>
 
+        <gotoClassContributor implementation="com.bwsl.plugin.BwslGotoClassContributor"/>
+        <gotoSymbolContributor implementation="com.bwsl.plugin.BwslGotoSymbolContributor"/>
+
         <codeInsight.declarativeInlayProvider
             language="BWSL"
             group="PARAMETERS_GROUP"

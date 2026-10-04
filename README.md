@@ -132,6 +132,15 @@ unsaved edits.
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
 
+### Go to Class / Go to Symbol / Search Everywhere
+
+- **Go to Class** (Ctrl+N) lists modules, pipelines and structs; **Go to
+  Symbol** (Ctrl+Alt+Shift+N) lists passes, functions, methods and module-level
+  constants. Both feed **Search Everywhere** (Shift twice). Each row shows the
+  module or struct that holds it and its file
+- Built from the compiler's AST of each project file, so a file that has not
+  compiled, or has been edited since, is not listed
+
 ### Semantic highlighting
 
 Parameters, locals (and loop variables), constants and struct fields each get
@@ -394,8 +403,6 @@ Not implemented yet:
 - [ ] Completion that sees code typed since the last save
 
 **Navigation and search**
-- [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs,
-      modules and passes
 - [ ] File Structure view and breadcrumbs
 - [ ] Go to Type Declaration
 - [ ] Call hierarchy

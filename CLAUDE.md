@@ -240,6 +240,11 @@ is wrapped at 80 characters.
   target module is the owner (through `owner` links) of no edge's target other than other
   import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
+- Go to Class / Symbol (`BwslGotoContributors.kt`, `gotoClassContributor`/`gotoSymbolContributor`
+  over `ChooseByNameContributor`): `collectProjectSymbols` walks the project's BWSL files
+  (`FileTypeIndex`) that have a cached AST of their current text, lists the symbols of kind
+  module/pipeline/struct/pass/function/method/constant whose declaration is an own node, and the rows
+  are lightweight `NavigationItem`s opening an `OpenFileDescriptor` (the PSI has no named elements).
 - Semantic highlighting (`BwslSemanticHighlighting.kt`, an `Annotator` that runs once on the file):
   `collectSemanticHighlights` colours the name range of every own node whose own symbol, or the
   target of its edge, is a parameter, variable, loop-iterator, constant or struct-field.
