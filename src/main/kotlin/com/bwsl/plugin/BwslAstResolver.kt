@@ -112,7 +112,7 @@ private fun resolveInSourceFile(file: PsiFile, index: BwslAstIndex, node: AstNod
 }
 
 /** Resolves a declaration id (real, synthetic, or builtin) from [AstSymbol.declaration] to a PSI element. */
-private fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declId: String): PsiElement? {
+internal fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declId: String): PsiElement? {
     if (declId.startsWith("builtin:")) return null
 
     index.nodesById[declId]?.let { node ->

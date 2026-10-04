@@ -240,6 +240,9 @@ is wrapped at 80 characters.
   target module is the owner (through `owner` links) of no edge's target other than other
   import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
+- Go to Type Declaration (`BwslTypeDeclarations.kt`, `typeDeclarationProvider`; the platform hands
+  over the declaration's name element, so the provider works from its offset): the symbol's
+  `type`/`return-type` edge to a `struct` symbol, resolved with `resolveDeclarationPosition`.
 - Go to Class / Symbol (`BwslGotoContributors.kt`, `gotoClassContributor`/`gotoSymbolContributor`
   over `ChooseByNameContributor`): `collectProjectSymbols` walks the project's BWSL files
   (`FileTypeIndex`) that have a cached AST of their current text, lists the symbols of kind

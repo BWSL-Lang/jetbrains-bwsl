@@ -132,6 +132,13 @@ unsaved edits.
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
 
+### Go to Type Declaration (Ctrl+Shift+B)
+
+From a variable, parameter, struct field or function (on its declaration or any
+use) to the struct its type names, including a `Module::Type` in another
+module's file. Built-in types such as `float4` have no source and give
+nothing.
+
 ### Go to Class / Go to Symbol / Search Everywhere
 
 - **Go to Class** (Ctrl+N) lists modules, pipelines and structs; **Go to
@@ -404,7 +411,6 @@ Not implemented yet:
 
 **Navigation and search**
 - [ ] File Structure view and breadcrumbs
-- [ ] Go to Type Declaration
 - [ ] Call hierarchy
 - [ ] Ctrl+click on intrinsics, with their documentation
 
