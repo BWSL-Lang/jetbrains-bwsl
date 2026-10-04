@@ -232,6 +232,26 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Member completion (`BwslReceiverTypes.kt`). After a `.` the receiver is **read from the tokens**
+  (`parseReceiver` walks back from the token before the dot: `)` to its `(` and the name before it,
+  `]` to its `[`, `.`/`::` to the previous element) into steps (Name, Call, Field, Method, Index),
+  then typed left to right: the base from the visible locals (`collectVisibleLocalsAt`), the
+  enclosing struct's fields (inside a method), constants, or a call's return type (an overloaded
+  name whose return types differ has none); a field from the struct's `fields[].dataType`, a vector
+  swizzle by `^(float|int|uint|double)[234]$` (families `xyzw` and `rgba`, never mixed, limited to
+  the component count), a method from `methods[].returnType`, `[i]` as element/column/component.
+  Probed facts that shaped it: an array **local's** `declaredType` is just `"array"` (its element
+  type is read from the source at `typeLine`/`typeColumn`, `VisibleLocal.typePosition`), an array
+  **parameter** records no array at all (so no `length` on one), a field has `arraySize`, and
+  `stpq` is not a swizzle family. Nothing is guessed: an untypable receiver gives no members. A
+  swizzle in progress is extended from `result.prefixMatcher.prefix`. After a dot keywords and type
+  names are skipped; the intrinsics stay (method-style calls like `v.normalize()`), so the generic
+  `length` intrinsic is always there and the array member is told apart by its `int` type text.
+  Fields and methods of the enclosing struct are also added to `collectNamesVisibleAt` (a struct's
+  range holds its methods' bodies).
+- Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
+  compile of a file that uses a standard module starts a background download, which would otherwise
+  reach GitHub and could land in another test's cache directory).
 - Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
   the AST: from the name's token it goes back to the first token of that line (the declaration's
   start, so `const float PI` and `struct Point` work), then collects the comments directly above

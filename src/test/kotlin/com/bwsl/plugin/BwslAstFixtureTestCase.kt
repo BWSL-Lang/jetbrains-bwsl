@@ -10,12 +10,17 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
 
     private lateinit var originalCompilerPath: String
+    private lateinit var originalFetchText: (String) -> String?
 
     /** Points the plugin at the real bwslc, for the features that run it themselves (the project index, rename's conflict check). */
     override fun setUp() {
         super.setUp()
         // The cache is global: what an earlier test cached must not be seen by this one.
         BwslAstCache.clear()
+        // Compiling a file that uses a standard module starts a download of its sources in the background:
+        // a test never reaches the network (and a stray download must not land in another test's cache).
+        originalFetchText = BwslStdlibSources.fetchText
+        BwslStdlibSources.fetchText = { null }
         originalCompilerPath = BwslSettings.getInstance().compilerPath
         BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
             ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
@@ -23,6 +28,7 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
 
     override fun tearDown() {
         try {
+            BwslStdlibSources.fetchText = originalFetchText
             BwslSettings.getInstance().compilerPath = originalCompilerPath
         } finally {
             super.tearDown()

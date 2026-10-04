@@ -136,6 +136,7 @@ private fun buildLookupElementFor(name: DeclaredName): LookupElement {
         DeclaredName.Kind.MODULE -> base.withTypeText("module").withInsertHandler(QUALIFIER_INSERT_HANDLER)
         DeclaredName.Kind.CONSTANT -> base.withTypeText(name.type.orEmpty()).withTailText(" constant", true)
         DeclaredName.Kind.ENUM_VALUE -> base.withTypeText(name.type.orEmpty()).withTailText(" enum value", true)
+        DeclaredName.Kind.FIELD -> base.withTypeText(name.type.orEmpty()).withTailText(" field", true)
         DeclaredName.Kind.STRUCT, DeclaredName.Kind.ENUM -> base.withTypeText(name.kind.label)
     }
     return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY)
@@ -278,6 +279,19 @@ class BwslCompletionContributor : CompletionContributor() {
                         return
                     }
 
+                    // After a `.`: what the value before it has - a struct's fields and methods, a vector's
+                    // swizzles, an array's length - when its type can be worked out.
+                    val isAfterDot = previousLeaf?.elementType == BwslTokenTypes.DOT
+                    if (isAfterDot && previousLeaf != null) {
+                        findCompletionAst(parameters)?.let { ast ->
+                            val aliases = collectImportDeclarationsOf(parameters.originalFile)
+                                .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
+                            val context = ReceiverContext(ast.root, ast.raw, ast.line, ast.column, aliases, parameters.originalFile.text)
+                            val members = collectReceiverMembers(parameters.originalFile, previousLeaf.textRange.startOffset, context, result.prefixMatcher.prefix)
+                            for (member in members) result.addElement(buildLookupElementFor(member))
+                        }
+                    }
+
                     val blockContext = classifyCurrentBlockContext(parameters)
 
                     if (blockContext == BwslBlockContext.TOP_LEVEL) {
@@ -346,10 +360,14 @@ class BwslCompletionContributor : CompletionContributor() {
                         }
                     }
 
-                    for (kw in keywords) {
-                        result.addElement(LookupElementBuilder.create(kw).bold())
+                    // Keywords and type names are never what follows a `.`; the intrinsics below are (`v.normalize()`).
+                    if (!isAfterDot) {
+                        for (kw in keywords) {
+                            result.addElement(LookupElementBuilder.create(kw).bold())
+                        }
                     }
-                    if (blockContext != BwslBlockContext.PIPELINE_BODY &&
+                    if (!isAfterDot &&
+                        blockContext != BwslBlockContext.PIPELINE_BODY &&
                         blockContext != BwslBlockContext.PASS_BODY
                     ) {
                         for (type in TYPE_KEYWORDS) {

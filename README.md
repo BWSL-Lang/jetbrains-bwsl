@@ -244,9 +244,24 @@ is exactly the compiler's:
   (once they have been fetched, see below), the module files in the project and
   the module paths, and the other modules of the file. After `using`, the
   modules and aliases the file imports
+- **After a `.`** — what the value before it has: a struct's **fields and
+  methods**, a vector's **swizzles**, an array's `length`. A swizzle is offered
+  for each component (`x y z w`, `r g b a`) and as the prefixes `xy`, `xyz`,
+  `rgb`, ...; once you have typed `xy` it is extended with each component that
+  can follow (the two families are not mixed, and a `float3` has no `w`). The
+  value can be a name, `self`, a call, a constructor, a field, a method call
+  or an index, in any chain: `lights[1].color.`, `makeLight().`, `m[1].` (a
+  matrix column). Keywords and type names are no longer offered after a dot
+- **Inside a struct's methods** its own fields and methods are suggested
+  without a qualifier
 - **`attributes.` members** — the attributes the pass uses
 - **`input.` members** in a fragment stage — the vertex stage's outputs
 - **`extends`** after a submodule's name
+
+Which type a value has comes from the last compile, and the expression before
+the dot is read from the text. A value that is a parenthesised or arithmetic
+expression has no type here, and nothing is guessed. The compiler records no
+array size for a function parameter, so `length` is not offered on one.
 
 These names come from the last compile of the saved file, like the locals: a
 function typed since then is offered once the file has been saved and compiled.
@@ -308,7 +323,6 @@ Not implemented yet:
       constants differently
 
 **Completion**
-- [ ] Struct fields and swizzles after `.`, and fields inside methods
 - [ ] Completion that sees code typed since the last save
 - [ ] Argument-aware ranking and smart completion by expected type
 

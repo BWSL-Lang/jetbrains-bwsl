@@ -17,10 +17,15 @@ abstract class BwslCompletionScopeTestCase : BasePlatformTestCase() {
 
     private var fileCounter = 0
 
-    protected fun assertCompletions(sourceWithCaret: String, present: Set<String> = emptySet(), absent: Set<String> = emptySet()) {
+    protected fun assertCompletions(
+        sourceWithCaret: String,
+        present: Set<String> = emptySet(),
+        absent: Set<String> = emptySet(),
+        modules: Map<String, String> = emptyMap()
+    ) {
         val cleanSource = sourceWithCaret.replace("<caret>", "")
         myFixture.configureByText("scope_test_${fileCounter++}.bwsl", sourceWithCaret)
-        BwslcAstHelper.parseAndCache(cleanSource, myFixture.file.virtualFile.path)
+        BwslcAstHelper.parseAndCache(cleanSource, myFixture.file.virtualFile.path, modules)
 
         val strings = myFixture.completeBasic().map { it.lookupString }
 

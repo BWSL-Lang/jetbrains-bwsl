@@ -18,7 +18,8 @@ data class DeclaredName(
         ENUM("enum"),
         CONSTANT("constant"),
         MODULE("module"),
-        ENUM_VALUE("enum value")
+        ENUM_VALUE("enum value"),
+        FIELD("field")
     }
 }
 
@@ -65,6 +66,9 @@ fun collectNamesVisibleAt(root: AstRoot, rawJson: JsonObject, line: Int, column:
         names += describeFunctionsOf(pass)
     }
 
+    // Inside a struct (its methods): the struct's own fields and methods need no qualifier.
+    findEnclosingStruct(entry, line, column)?.let { struct -> names += describeFieldsOf(struct) + describeMethodsOf(struct) }
+
     for (using in entry.getObjectsOrEmpty("usingImports")) {
         val module = findModuleNamed(rawJson, using.getStringOrNull("name")) ?: continue
         names += describeFunctionsOf(module) + describeConstantsOf(module)
@@ -106,15 +110,33 @@ internal fun findEnclosingEntry(root: AstRoot, rawJson: JsonObject, line: Int, c
         .firstOrNull { it.getStringOrNull("id") in own && it.doesRangeContain(line, column) }
 }
 
-private fun findModuleNamed(rawJson: JsonObject, name: String?): JsonObject? =
+/** The struct of [entry] whose range holds the position, which is where a method body is. */
+internal fun findEnclosingStruct(entry: JsonObject, line: Int, column: Int): JsonObject? =
+    entry.getObjectsOrEmpty("structs").firstOrNull { it.doesRangeContain(line, column) }
+
+internal fun findModuleNamed(rawJson: JsonObject, name: String?): JsonObject? =
     if (name == null) null else rawJson.getObjectsOrEmpty("modules").firstOrNull { it.getStringOrNull("name") == name }
 
 /** The functions, structs, enums and constants a module declares. */
 internal fun describeMembersOfModule(module: JsonObject): List<DeclaredName> =
     describeFunctionsOf(module) + describeTypesOf(module) + describeConstantsOf(module)
 
-private fun describeFunctionsOf(container: JsonObject): List<DeclaredName> =
-    container.getObjectsOrEmpty("functions").mapNotNull { function ->
+/** A struct's fields, with their types as written (an array's elements' type, as `float[4]`). */
+internal fun describeFieldsOf(struct: JsonObject): List<DeclaredName> =
+    struct.getObjectsOrEmpty("fields").mapNotNull { field ->
+        val name = field.getStringOrNull("name") ?: return@mapNotNull null
+        val type = field.getStringOrNull("dataType")
+        val arraySize = field.getIntOrNull("arraySize") ?: 0
+        DeclaredName(name, DeclaredName.Kind.FIELD, if (type != null && arraySize > 0) "$type[$arraySize]" else type)
+    }
+
+/** A struct's methods, as functions. */
+internal fun describeMethodsOf(struct: JsonObject): List<DeclaredName> = describeFunctionsIn(struct.getObjectsOrEmpty("methods"))
+
+private fun describeFunctionsOf(container: JsonObject): List<DeclaredName> = describeFunctionsIn(container.getObjectsOrEmpty("functions"))
+
+private fun describeFunctionsIn(functions: List<JsonObject>): List<DeclaredName> =
+    functions.mapNotNull { function ->
         val name = function.getStringOrNull("name") ?: return@mapNotNull null
         val parameters = function.getObjectsOrEmpty("parameters").map { "${it.getStringOrNull("dataType").orEmpty()} ${it.getStringOrNull("name").orEmpty()}".trim() }
         DeclaredName(name, DeclaredName.Kind.FUNCTION, function.getStringOrNull("returnType"), parameters)
