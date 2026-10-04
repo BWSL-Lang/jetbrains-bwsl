@@ -16,6 +16,7 @@ import com.intellij.psi.codeStyle.CodeStyleSettings
 import com.intellij.psi.codeStyle.CodeStyleSettingsCustomizable
 import com.intellij.psi.codeStyle.CodeStyleSettingsProvider
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
+import com.intellij.psi.codeStyle.CustomCodeStyleSettings
 import com.intellij.psi.codeStyle.LanguageCodeStyleSettingsProvider
 import com.intellij.application.options.CodeStyleAbstractConfigurable
 import com.intellij.application.options.CodeStyleAbstractPanel
@@ -40,6 +41,42 @@ private val SAMPLE = """
     }
 """.trimIndent()
 
+/** How BWSL's formatter places a multi-line block's `{`. */
+object BraceStyle {
+    /** Leave each `{` where it is written. */
+    const val KEEP_AS_WRITTEN = 0
+
+    /** `{` ends the line of its header, and `} else {` stays on one line. */
+    const val END_OF_LINE = 1
+
+    /** `{` is on a line of its own, and `else` starts a line. */
+    const val NEXT_LINE = 2
+}
+
+/**
+ * What the BWSL formatter offers beyond indentation and spacing. All of it is off by default, so
+ * formatting does not move a token to another line unless asked to. Wrapping long lines uses the
+ * standard right margin and **Wrap on typing**-style option of the code style.
+ */
+class BwslCodeStyleSettings(container: CodeStyleSettings) : CustomCodeStyleSettings("BwslCodeStyleSettings", container) {
+
+    /** One of [BraceStyle]. Only blocks that span lines are moved; `{ x }` stays as it is. */
+    @JvmField
+    var BRACE_STYLE: Int = BraceStyle.KEEP_AS_WRITTEN
+
+    /**
+     * Arguments and parameters that run past the right margin go one per line. This is not the common
+     * "wrap long lines" flag: that one also makes the platform cut a line wherever it passes the margin,
+     * through a token if that is where it falls.
+     */
+    @JvmField
+    var WRAP_CALL_ARGUMENTS: Boolean = false
+
+    /** A line that continues an expression lines up with where the expression began, instead of being indented. */
+    @JvmField
+    var ALIGN_CONTINUED_EXPRESSIONS: Boolean = false
+}
+
 /** Indentation defaults for BWSL (four spaces, and four for a continued line), and what the code style page offers. */
 class BwslLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider() {
 
@@ -58,6 +95,18 @@ class BwslLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
             SettingsType.INDENT_SETTINGS ->
                 consumer.showStandardOptions("INDENT_SIZE", "CONTINUATION_INDENT_SIZE", "TAB_SIZE", "USE_TAB_CHARACTER")
             SettingsType.BLANK_LINES_SETTINGS -> consumer.showStandardOptions("KEEP_BLANK_LINES_IN_CODE")
+            SettingsType.WRAPPING_AND_BRACES_SETTINGS -> {
+                consumer.showStandardOptions("RIGHT_MARGIN")
+                consumer.showCustomOption(BwslCodeStyleSettings::class.java, "WRAP_CALL_ARGUMENTS", "Wrap call arguments that pass the right margin", "Wrapping")
+                consumer.showCustomOption(
+                    BwslCodeStyleSettings::class.java, "BRACE_STYLE", "Brace placement", "Braces",
+                    arrayOf("Keep as written", "End of line", "Next line"),
+                    intArrayOf(BraceStyle.KEEP_AS_WRITTEN, BraceStyle.END_OF_LINE, BraceStyle.NEXT_LINE)
+                )
+                consumer.showCustomOption(
+                    BwslCodeStyleSettings::class.java, "ALIGN_CONTINUED_EXPRESSIONS", "Align continued expressions", "Wrapping"
+                )
+            }
             else -> Unit
         }
     }
@@ -69,6 +118,8 @@ class BwslLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider(
 class BwslCodeStyleSettingsProvider : CodeStyleSettingsProvider() {
 
     override fun getConfigurableDisplayName(): String = "BWSL"
+
+    override fun createCustomSettings(settings: CodeStyleSettings): CustomCodeStyleSettings = BwslCodeStyleSettings(settings)
 
     override fun createConfigurable(settings: CodeStyleSettings, modelSettings: CodeStyleSettings): CodeStyleConfigurable =
         object : CodeStyleAbstractConfigurable(settings, modelSettings, "BWSL") {

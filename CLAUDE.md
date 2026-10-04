@@ -232,6 +232,25 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Formatter options (`BwslCodeStyleSettings` in `BwslCodeStyle.kt`, used in `BwslFormatting.kt`):
+  `BRACE_STYLE` (`BraceStyle`: keep/end of line/next line), `WRAP_CALL_ARGUMENTS`,
+  `ALIGN_CONTINUED_EXPRESSIONS`, all off by default so the "no token moves" guarantee holds. Facts
+  that shaped them: (1) **do not use the common `WRAP_LONG_LINES` flag**: it is what makes the
+  platform execute wraps *and* a hard wrapper that cuts a line wherever it passes the margin, through
+  `1.055` as `1` `.` `055`; and `Wrap` objects on flat blocks never fired without it. So
+  `collectWrappedCallArguments` simulates the layout itself (indent per token, spacing from
+  `spacingBetween`, one line at a time) and returns the tokens that must start a line, chopping the
+  commas of the shallowest call on an over-long line, then the next, until it fits; it depends only
+  on the tokens, so a second pass changes nothing; they become `SpacingRule(minLineFeeds = 1)`.
+  (2) Braces: `SpacingRule` carries min/max spaces, `minLineFeeds` and `keepLineBreaks`; only a `{`
+  that follows a brace owner (`)`, a name, a string, any `KW_`) and whose block spans lines is moved,
+  so `case 1: {` and `{ x }` stay. A block counts as multi-line also when the formatter adds a break
+  inside it (a wrapped argument, an `else` moved to its own line, a nested multi-line block) -
+  `collectMultiLineBraces(leaves, text, wrapped, movesElse)` - otherwise its brace moved only on the
+  second pass. (3) Alignment uses platform `Alignment` objects (one per expression after `=`/`return`,
+  one per paren group), which do work on flat blocks. `BwslFormattingOptionsTest` runs the compiler's
+  `tests`/`modules` with every option on and requires unchanged tokens and a stable second pass
+  (verified over all 1,045 files; the committed sample is every seventh).
 - Member completion (`BwslReceiverTypes.kt`). After a `.` the receiver is **read from the tokens**
   (`parseReceiver` walks back from the token before the dot: `)` to its `(` and the name before it,
   `]` to its `[`, `.`/`::` to the previous element) into steps (Name, Call, Field, Method, Index),

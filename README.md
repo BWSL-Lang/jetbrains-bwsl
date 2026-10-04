@@ -70,6 +70,19 @@ That means the compiler has to be configured (see [Setup](#setup)).
   lines and trailing comments. Line breaks are kept as written
 - **Settings → Editor → Code Style → BWSL**: indent size (4 by default),
   continuation indent (4), tabs or spaces, and how many blank lines to keep
+- **Options that move tokens**, all off by default (so by default no token
+  moves to another line), under **Wrapping and Braces**:
+  - **Brace placement**: *Keep as written*, *End of line* (`{` ends the header's
+    line and `} else {` stays together) or *Next line* (`{` on a line of its own
+    and `else` starting a line). Only a block that spans lines is moved: a
+    single-line `{ x }` stays, and so does the `{` after a `case 1:` label
+  - **Wrap call arguments that pass the right margin**: the arguments or
+    parameters of the shallowest call on an over-long line go one per line,
+    then those of the next call in, until the line fits. It uses the right
+    margin of the code style
+  - **Align continued expressions**: a line that continues an expression lines
+    up with where the expression began (after the `=` or `return`) or with the
+    first argument after `(`, instead of being indented
 
 ### Compiler diagnostics
 
@@ -318,8 +331,6 @@ Aliases and imports are read from the text, so they are current.
 Not implemented yet:
 
 **Refactoring and editing**
-- [ ] Formatter options beyond indentation and spacing: brace placement,
-      wrapping long lines and aligning continued expressions
 - [ ] Live templates and snippets for common shapes (`pipeline`, `pass`,
       functions, loops)
 - [ ] Extend selection and smart Enter

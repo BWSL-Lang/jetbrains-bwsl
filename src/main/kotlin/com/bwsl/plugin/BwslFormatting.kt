@@ -97,26 +97,56 @@ private class BwslRootBlock(
 
     private val textRange: TextRange = file.textRange
     private val indentOptions = settings.getIndentOptionsByFile(file)
-    private val keepBlankLines = settings.getCommonSettings(BwslLanguage).KEEP_BLANK_LINES_IN_CODE
+    private val commonSettings = settings.getCommonSettings(BwslLanguage)
+    private val bwslSettings = settings.getCustomSettings(BwslCodeStyleSettings::class.java)
+    private val keepBlankLines = commonSettings.KEEP_BLANK_LINES_IN_CODE
     private val indentSize = indentOptions.INDENT_SIZE.coerceAtLeast(0)
     private val continuationSize = indentOptions.CONTINUATION_INDENT_SIZE.coerceAtLeast(0)
+
+    /**
+     * The `{` of every block that spans lines, after formatting: only those are moved by the brace style.
+     * Set in `init`, once it is known which breaks the formatter adds itself.
+     */
+    private val multiLineBraces: Set<Leaf>
 
     private val leafBlocks: List<Block>
 
     /** The indent a new line would get after token `i`, which is what Enter after it should produce. */
     private val indentAfter: List<Int>
 
+    /** The tokens that start a line only because a call's arguments were too long for one. */
+    private val wrappedLeaves: Set<Leaf>
+
     init {
         val tracker = IndentTracker(indentSize, continuationSize)
-        val blocks = ArrayList<Block>()
+        val indents = ArrayList<Int>()
+        val continuations = ArrayList<Boolean>()
         val after = ArrayList<Int>()
         for (leaf in leaves) {
-            val spaces = tracker.indentFor(leaf)
-            blocks += BwslLeafBlock(leaf, spaces)
+            indents += tracker.indentFor(leaf)
+            continuations += tracker.isContinuationLine(leaf)
             tracker.consume(leaf)
             after += tracker.indentForNewLine()
         }
-        leafBlocks = blocks
+        val text = file.text
+        val bracesAsWritten = collectMultiLineBraces(leaves, text, emptySet(), movesElse = false)
+        wrappedLeaves = if (bwslSettings.WRAP_CALL_ARGUMENTS) {
+            collectWrappedCallArguments(leaves, indents, settings.getRightMargin(BwslLanguage)) { index ->
+                val rule = spacingBetween(leaves[index - 1], leaves[index], bwslSettings.BRACE_STYLE, leaves[index] in bracesAsWritten)
+                rule?.min ?: (leaves[index].range.startOffset - leaves[index - 1].range.endOffset).coerceAtLeast(1)
+            }
+        } else {
+            emptySet()
+        }
+        // A block that holds a break the formatter adds (a wrapped argument, an `else` on its own line) spans
+        // lines too, or formatting would move its brace only the second time.
+        multiLineBraces = collectMultiLineBraces(leaves, text, wrappedLeaves, movesElse = bwslSettings.BRACE_STYLE == BraceStyle.NEXT_LINE)
+
+        val alignments = if (bwslSettings.ALIGN_CONTINUED_EXPRESSIONS) ContinuationAlignments() else null
+        leafBlocks = leaves.mapIndexed { index, leaf ->
+            val startsLine = leaf.isFirstOnLine || leaf in wrappedLeaves
+            BwslLeafBlock(leaf, indents[index], alignments?.alignmentFor(leaf, startsLine, continuations[index]))
+        }
         indentAfter = after
     }
 
@@ -131,8 +161,12 @@ private class BwslRootBlock(
     override fun getSpacing(child1: Block?, child2: Block): Spacing? {
         val second = (child2 as? BwslLeafBlock)?.leaf ?: return null
         val first = (child1 as? BwslLeafBlock)?.leaf ?: return null
-        return spacingBetween(first, second)?.let { (min, max) -> Spacing.createSpacing(min, max, 0, true, keepBlankLines) }
-            ?: Spacing.createSpacing(0, Int.MAX_VALUE, 0, true, keepBlankLines)
+        val rule = if (second in wrappedLeaves) {
+            SpacingRule(0, 0, minLineFeeds = 1)
+        } else {
+            spacingBetween(first, second, bwslSettings.BRACE_STYLE, second in multiLineBraces) ?: SpacingRule(0, Int.MAX_VALUE)
+        }
+        return Spacing.createSpacing(rule.min, rule.max, rule.minLineFeeds, rule.keepLineBreaks, keepBlankLines)
     }
 
     override fun getChildAttributes(newChildIndex: Int): ChildAttributes {
@@ -141,16 +175,150 @@ private class BwslRootBlock(
     }
 }
 
-private class BwslLeafBlock(val leaf: Leaf, private val spaces: Int) : Block {
+private class BwslLeafBlock(val leaf: Leaf, private val spaces: Int, private val alignment: Alignment?) : Block {
     override fun getTextRange(): TextRange = leaf.range
     override fun getSubBlocks(): List<Block> = emptyList()
     override fun getWrap(): Wrap? = null
     override fun getIndent(): Indent = toIndent(spaces)
-    override fun getAlignment(): Alignment? = null
+    override fun getAlignment(): Alignment? = alignment
     override fun getSpacing(child1: Block?, child2: Block): Spacing? = null
     override fun getChildAttributes(newChildIndex: Int): ChildAttributes = ChildAttributes(null, null)
     override fun isIncomplete(): Boolean = false
     override fun isLeaf(): Boolean = true
+}
+
+/**
+ * The tokens that must start a line so that no line passes [rightMargin]: the arguments (or
+ * parameters) of a call, one per line, chosen by simulating the layout. A line that is too long has the
+ * arguments of the shallowest call on it chopped first, then the next call in, and so on until it fits or
+ * has no comma left to break at. The result depends only on the tokens, never on where lines were
+ * broken by an earlier wrap, so formatting the result again changes nothing.
+ *
+ * The platform's own wrapping is not used: it only runs together with a hard wrap that cuts a line
+ * wherever it falls, through a number if need be.
+ *
+ * [indents] is the indent of the line each token would start, and [gapBefore] the spaces between a
+ * token (by index) and the one before it.
+ */
+private fun collectWrappedCallArguments(leaves: List<Leaf>, indents: List<Int>, rightMargin: Int, gapBefore: (Int) -> Int): Set<Leaf> {
+    if (rightMargin <= 0 || leaves.isEmpty()) return emptySet()
+
+    // How many parentheses (not brackets) a token is directly inside, or -1 if the innermost opener is a bracket.
+    val callDepth = IntArray(leaves.size)
+    val openers = ArrayList<IElementType>()
+    var parentheses = 0
+    for ((index, leaf) in leaves.withIndex()) {
+        when (leaf.type) {
+            BwslTokenTypes.LPAREN, BwslTokenTypes.LBRACKET -> {
+                openers += leaf.type
+                if (leaf.type == BwslTokenTypes.LPAREN) parentheses++
+            }
+            BwslTokenTypes.RPAREN, BwslTokenTypes.RBRACKET -> {
+                if (openers.removeLastOrNull() == BwslTokenTypes.LPAREN) parentheses--
+            }
+        }
+        callDepth[index] = if (openers.lastOrNull() == BwslTokenTypes.LPAREN) parentheses else -1
+    }
+
+    val widths = IntArray(leaves.size) { leaves[it].range.length }
+    val startsLine = BooleanArray(leaves.size) { leaves[it].isFirstOnLine }
+    val wrapped = HashSet<Leaf>()
+
+    repeat(MAX_WRAP_PASSES) {
+        var changed = false
+        var lineStart = 0
+        var column = 0
+        for (index in leaves.indices) {
+            if (startsLine[index]) {
+                lineStart = index
+                column = indents[index] + widths[index]
+            } else {
+                column += gapBefore(index) + widths[index]
+            }
+            if (column <= rightMargin) continue
+
+            // Too long here: break the commas of the shallowest call on this line that is not broken yet.
+            var lineEnd = index
+            while (lineEnd + 1 < leaves.size && !startsLine[lineEnd + 1]) lineEnd++
+            val breakable = (lineStart..lineEnd).filter { it > 0 && leaves[it - 1].type == BwslTokenTypes.COMMA && !startsLine[it] && callDepth[it] > 0 }
+            val depth = breakable.minOfOrNull { callDepth[it] } ?: continue
+            for (candidate in breakable.filter { callDepth[it] == depth }) {
+                startsLine[candidate] = true
+                wrapped += leaves[candidate]
+            }
+            changed = true
+            break
+        }
+        if (!changed) return wrapped
+    }
+    return wrapped
+}
+
+private const val MAX_WRAP_PASSES = 200
+
+/**
+ * What a line that carries an expression on lines up with: the token after an `=`, a compound
+ * assignment or `return` for a line that starts with, or follows, an operator; the token after an open
+ * `(` for a line inside the parentheses.
+ */
+private class ContinuationAlignments {
+    private var expression: Alignment? = null
+    private val parentheses = ArrayList<Alignment>()
+    private var startsExpression = false
+
+    fun alignmentFor(leaf: Leaf, startsLine: Boolean, continuesExpression: Boolean): Alignment? {
+        var alignment: Alignment? = null
+        if (leaf.previous?.type == BwslTokenTypes.LPAREN) {
+            alignment = Alignment.createAlignment().also { parentheses += it }
+        } else if (startsLine && parentheses.isNotEmpty() && leaf.type != BwslTokenTypes.RPAREN) {
+            alignment = parentheses.last()
+        } else if (startsExpression) {
+            alignment = Alignment.createAlignment().also { expression = it }
+        } else if (continuesExpression && parentheses.isEmpty()) {
+            alignment = expression
+        }
+        startsExpression = leaf.type in EXPRESSION_STARTERS && parentheses.isEmpty()
+        when (leaf.type) {
+            BwslTokenTypes.RPAREN -> parentheses.removeLastOrNull()
+            BwslTokenTypes.SEMI, BwslTokenTypes.LBRACE, BwslTokenTypes.RBRACE -> if (parentheses.isEmpty()) expression = null
+        }
+        return alignment
+    }
+
+    private companion object {
+        val EXPRESSION_STARTERS = setOf(
+            BwslTokenTypes.EQ, BwslTokenTypes.PLUSEQ, BwslTokenTypes.MINUSEQ, BwslTokenTypes.STAREQ, BwslTokenTypes.SLASHEQ,
+            BwslTokenTypes.PERCENTEQ, BwslTokenTypes.AMPEQ, BwslTokenTypes.PIPEEQ, BwslTokenTypes.CARETEQ,
+            BwslTokenTypes.LSHIFTEQ, BwslTokenTypes.RSHIFTEQ, BwslTokenTypes.KW_RETURN
+        )
+    }
+}
+
+/**
+ * The `{` of every block whose `}` is on a later line, or that holds a line break the formatter adds:
+ * a token in [wrapped] starts a line, an `else` after a `}` goes to its own line when [movesElse], or a
+ * block inside it spans lines.
+ */
+private fun collectMultiLineBraces(leaves: List<Leaf>, text: String, wrapped: Set<Leaf>, movesElse: Boolean): Set<Leaf> {
+    class Frame(val open: Leaf, var hasBreak: Boolean = false)
+
+    val multiLine = HashSet<Leaf>()
+    val frames = ArrayList<Frame>()
+    for (leaf in leaves) {
+        if (leaf in wrapped) frames.lastOrNull()?.hasBreak = true
+        when (leaf.type) {
+            BwslTokenTypes.LBRACE -> frames += Frame(leaf)
+            BwslTokenTypes.RBRACE -> frames.removeLastOrNull()?.let { frame ->
+                val spansLines = frame.hasBreak || text.substring(frame.open.range.startOffset, leaf.range.startOffset).contains("\n")
+                if (spansLines) {
+                    multiLine += frame.open
+                    frames.lastOrNull()?.hasBreak = true
+                }
+                if (movesElse && leaf.nextSignificant?.type == BwslTokenTypes.KW_ELSE) frames.lastOrNull()?.hasBreak = true
+            }
+        }
+    }
+    return multiLine
 }
 
 private fun toIndent(spaces: Int): Indent = if (spaces <= 0) Indent.getNoneIndent() else Indent.getSpaceIndent(spaces, false)
@@ -190,14 +358,33 @@ private val STATEMENT_BOUNDARIES = setOf(
 )
 
 /**
+ * How two tokens that follow each other are separated: [min] to [max] spaces when they share a line,
+ * at least [minLineFeeds] line breaks between them, and whether a line break that is there is kept.
+ */
+internal class SpacingRule(val min: Int, val max: Int, val minLineFeeds: Int = 0, val keepLineBreaks: Boolean = true)
+
+/** What a block's `{` can follow: a header's `)`, a name, a string (`pass "Main"`), a keyword (`else`, `vertex`) or a type. */
+private fun isBraceOwner(type: IElementType): Boolean = type in BRACE_OWNERS || type.toString().startsWith("KW_")
+
+private val BRACE_OWNERS = setOf(
+    BwslTokenTypes.RPAREN, BwslTokenTypes.RBRACKET, BwslTokenTypes.IDENTIFIER, BwslTokenTypes.MODULE_NAME,
+    BwslTokenTypes.FUNCTION_DECLARATION, BwslTokenTypes.STRING_LIT
+)
+
+/**
  * The number of spaces to put between [first] and [second] when they are on one line, as a
  * (minimum, maximum) pair, or null to leave what is there. Only unambiguous places have a rule: `<`
  * and `>` (a comparison or a generic's brackets), `:` and `?` (a label, an entry, a ternary), `^` (an
  * operator or a pointer), `..` and a sign are left alone.
  */
-internal fun spacingBetween(first: Leaf, second: Leaf): Pair<Int, Int>? {
-    val one = 1 to 1
-    val none = 0 to 0
+internal fun spacingBetween(
+    first: Leaf,
+    second: Leaf,
+    braceStyle: Int = BraceStyle.KEEP_AS_WRITTEN,
+    isMultiLineBrace: Boolean = false
+): SpacingRule? {
+    val one = SpacingRule(1, 1)
+    val none = SpacingRule(0, 0)
     val a = first.type
     val b = second.type
 
@@ -208,10 +395,28 @@ internal fun spacingBetween(first: Leaf, second: Leaf): Pair<Int, Int>? {
     if (b == BwslTokenTypes.RPAREN || b == BwslTokenTypes.RBRACKET) return none
     if (b == BwslTokenTypes.LPAREN && a in CONTROL_KEYWORDS) return one
 
-    if (b == BwslTokenTypes.LBRACE) return if (a == BwslTokenTypes.LBRACE) null else one
+    if (b == BwslTokenTypes.LBRACE) {
+        if (a == BwslTokenTypes.LBRACE) return null
+        // The brace style moves only the `{` of a block that spans lines, and only after what owns the block.
+        if (isMultiLineBrace && isBraceOwner(a)) {
+            when (braceStyle) {
+                BraceStyle.END_OF_LINE -> return SpacingRule(1, 1, keepLineBreaks = false)
+                BraceStyle.NEXT_LINE -> return SpacingRule(0, 0, minLineFeeds = 1)
+            }
+        }
+        return one
+    }
     if (a == BwslTokenTypes.LBRACE) return if (b == BwslTokenTypes.RBRACE) null else one
     if (b == BwslTokenTypes.RBRACE) return one
-    if (a == BwslTokenTypes.RBRACE) return one
+    if (a == BwslTokenTypes.RBRACE) {
+        if (b == BwslTokenTypes.KW_ELSE) {
+            when (braceStyle) {
+                BraceStyle.END_OF_LINE -> return SpacingRule(1, 1, keepLineBreaks = false)
+                BraceStyle.NEXT_LINE -> return SpacingRule(0, 0, minLineFeeds = 1)
+            }
+        }
+        return one
+    }
 
     if (a in SPACED_OPERATORS || b in SPACED_OPERATORS) return one
     if (first.isBinaryArithmetic || second.isBinaryArithmetic) return one
@@ -387,7 +592,8 @@ internal class IndentTracker(private val indentSize: Int, private val continuati
         }
     }
 
-    private fun isContinuationLine(leaf: Leaf): Boolean {
+    /** Whether [leaf] starts a line that carries on an expression: it follows, or starts with, an operator. */
+    fun isContinuationLine(leaf: Leaf): Boolean {
         if (!leaf.isFirstOnLine || leaf.isComment) return false
         val previous = leaf.previousSignificant ?: return false
         if (previous.type in CONTINUING_OPERATORS) return true
