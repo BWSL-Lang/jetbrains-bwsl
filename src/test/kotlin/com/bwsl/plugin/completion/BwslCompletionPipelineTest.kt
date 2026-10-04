@@ -4,13 +4,13 @@ package com.bwsl.plugin.completion
  * Completion tests for positions directly inside a `pipeline { ... }` block (not inside any of
  * its subblocks) — i.e. the gaps before/between/after `attributes`/`resources`/`variants`/`pass`.
  * Each test provides a realistic pipeline with `<caret>` placed at the position under test;
- * [checkCompletions] compiles the caret-free source with the real bwslc compiler and asserts the
+ * [assertCompletions] compiles the caret-free source with the real bwslc compiler and asserts the
  * suggestions at that position.
  */
 class BwslCompletionPipelineTest : BwslCompletionScopeTestCase() {
 
     fun testPipelineBodyBeforeAttributes() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    <caret>\n" +
                 "    attributes {\n" +
@@ -34,7 +34,7 @@ class BwslCompletionPipelineTest : BwslCompletionScopeTestCase() {
     }
 
     fun testBetweenAttributesAndResources() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    attributes {\n" +
                 "        position: float3\n" +
@@ -58,7 +58,7 @@ class BwslCompletionPipelineTest : BwslCompletionScopeTestCase() {
     }
 
     fun testPipelineBodyBeforePass() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    attributes {\n" +
                 "        position: float3\n" +
@@ -82,7 +82,7 @@ class BwslCompletionPipelineTest : BwslCompletionScopeTestCase() {
     }
 
     fun testPipelineBodyAfterPass() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    attributes {\n" +
                 "        position: float3\n" +

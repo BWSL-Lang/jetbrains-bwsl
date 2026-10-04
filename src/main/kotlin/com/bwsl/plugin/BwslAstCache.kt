@@ -181,14 +181,14 @@ data class AstRoot(
     /**
      * [modules] also contains every imported module (bwslc is given `-modules` paths), whose
      * line/column are relative to *their own* file. Anything measured against the compiled file's
-     * text must go through this (or [ownPipelines]) instead of [modules] directly.
+     * text must go through this (or [collectOwnPipelines]) instead of [modules] directly.
      */
-    fun ownModules(): List<AstModule> {
+    fun collectOwnModules(): List<AstModule> {
         val ids = roots.toSet()
         return modules.filter { it.id in ids }
     }
 
-    fun ownPipelines(): List<AstPipeline> {
+    fun collectOwnPipelines(): List<AstPipeline> {
         val ids = roots.toSet()
         return pipelines.filter { it.id in ids }
     }
@@ -208,7 +208,7 @@ object BwslAstCache {
         if (rawJson != null) rawRoots[filePath] = rawJson else rawRoots.remove(filePath)
     }
 
-    fun getRoot(filePath: String): AstRoot? = roots[filePath]
+    fun findRoot(filePath: String): AstRoot? = roots[filePath]
 
-    fun getRawRoot(filePath: String): com.google.gson.JsonObject? = rawRoots[filePath]
+    fun findRawRoot(filePath: String): com.google.gson.JsonObject? = rawRoots[filePath]
 }

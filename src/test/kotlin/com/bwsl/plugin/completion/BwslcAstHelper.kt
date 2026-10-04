@@ -27,6 +27,17 @@ object BwslcAstHelper {
             ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
     }
 
+    /** Builds the [BwslAstIndex] for [source] from real bwslc output; positions are measured against [source]. */
+    fun buildIndex(source: String, modules: Map<String, String> = emptyMap()): BwslAstIndex =
+        buildIndexAndRoot(source, modules).first
+
+    /** Like [buildIndex], also returning the typed [AstRoot] the index was built from. */
+    fun buildIndexAndRoot(source: String, modules: Map<String, String> = emptyMap()): Pair<BwslAstIndex, AstRoot> {
+        val root = parse(source, modules)
+        val raw = parseRaw(source, modules)
+        return BwslAstIndex(root, raw, source) to root
+    }
+
     /** The same bwslc -ast-json output as [parse], parsed generically instead of into the typed model. */
     fun parseRaw(source: String, modules: Map<String, String> = emptyMap()): JsonObject {
         val json = runBwslc(source, modules)

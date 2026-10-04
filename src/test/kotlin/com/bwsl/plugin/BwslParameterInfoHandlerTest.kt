@@ -1,26 +1,17 @@
 package com.bwsl.plugin
 
-import com.bwsl.plugin.completion.BwslcAstHelper
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
-
-class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
+class BwslParameterInfoHandlerTest : BwslAstFixtureTestCase() {
 
     private val handler = BwslParameterInfoHandler()
 
     fun testIntrinsicCallShowsBuiltinSignature() {
         myFixture.configureByText("test.bwsl", "module M { f1 :: () -> float { return sin(<caret>1.0); } }")
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertEquals(1, signatures.size)
         assertEquals("sin", signatures[0].name)
         assertEquals(BwslIntrinsics.ALL.first { it.name == "sin" }.params.size, signatures[0].params.size)
-    }
-
-    /** Configures [textWithCaret] and caches the real bwslc AST for it (modules written to `-modules` paths). */
-    private fun configureAndCache(textWithCaret: String, modules: Map<String, String> = emptyMap()) {
-        myFixture.configureByText("test.bwsl", textWithCaret)
-        BwslcAstHelper.parseAndCache(myFixture.file.text, myFixture.file.virtualFile.path, modules)
     }
 
     fun testCustomFunctionCallShowsAstSignature() {
@@ -33,7 +24,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertEquals(1, signatures.size)
         assertEquals("rotate", signatures[0].name)
@@ -57,7 +48,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertEquals(1, signatures.size)
         assertEquals(listOf("float2 v", "float k"), signatures[0].params)
@@ -85,7 +76,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertEquals(1, signatures.size)
         assertEquals(listOf("float3 color", "float exposure"), signatures[0].params)
@@ -103,7 +94,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
             mapOf("Common" to "module Common {\n    helper :: (float a, float b) -> float { return a + b; }\n}\n")
         )
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertEquals(1, signatures.size)
         assertEquals("helper", signatures[0].name)
@@ -113,7 +104,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
     fun testNoCallExpressionAtCursorYieldsNoSignatures() {
         myFixture.configureByText("test.bwsl", "module M { f1 :: () -> float { float x = <caret>1.0; return x; } }")
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertTrue(signatures.isEmpty())
     }
@@ -124,7 +115,7 @@ class BwslParameterInfoHandlerTest : BasePlatformTestCase() {
             "module M { f1 :: () -> float2 { return doesNotExist(<caret>1.0); } }"
         )
 
-        val signatures = handler.signaturesAt(myFixture.file, myFixture.caretOffset)
+        val signatures = handler.collectSignaturesAt(myFixture.file, myFixture.caretOffset)
 
         assertTrue(signatures.isEmpty())
     }

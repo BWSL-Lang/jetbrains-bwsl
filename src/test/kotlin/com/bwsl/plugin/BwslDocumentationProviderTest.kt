@@ -1,13 +1,12 @@
 package com.bwsl.plugin
 
 import com.bwsl.plugin.completion.BwslcAstHelper
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
-class BwslDocumentationProviderTest : BasePlatformTestCase() {
+class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
 
     private val provider = BwslDocumentationProvider()
 
-    private fun docAt(caretOffset: Int): String? {
+    private fun generateDocAt(caretOffset: Int): String? {
         val file = myFixture.file
         val original = file.findElementAt(caretOffset)!!
         var element = original
@@ -30,7 +29,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
                 "}"
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'saturate'", doc)
         assertTrue(doc!!.contains("saturate"))
         assertTrue("Expected return type in signature", doc.contains("floatN"))
@@ -47,7 +46,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
                 "}"
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'values.length()'", doc)
         assertTrue("Expected 'int length()' signature, got: $doc", doc!!.contains("int length()"))
         assertTrue("Expected array-length description", doc.contains("Number of elements"))
@@ -63,16 +62,10 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
                 "}"
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'values.cos()'", doc)
         assertTrue("Expected 'cos' signature, got: $doc", doc!!.contains("cos"))
         assertTrue("Expected cosine description, got: $doc", doc.contains("Cosine"))
-    }
-
-    /** Configures [textWithCaret] and caches the real bwslc AST for it. */
-    private fun configureAndCache(textWithCaret: String) {
-        myFixture.configureByText("test.bwsl", textWithCaret)
-        BwslcAstHelper.parseAndCache(myFixture.file.text, myFixture.file.virtualFile.path)
     }
 
     fun testLocalVariableUsageShowsDeclaredType() {
@@ -87,7 +80,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'normalized'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 normalized"))
         assertTrue("Expected 'local variable' label, got: $doc", doc.contains("local variable"))
@@ -104,7 +97,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'pos'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 pos"))
         assertTrue("Expected 'parameter' label, got: $doc", doc.contains("parameter"))
@@ -127,8 +120,8 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         """.trimIndent()
         configureAndCache(source)
 
-        val inFirst = docAt(source.indexOf("return v;") + "return ".length)
-        val inSecond = docAt(source.lastIndexOf("return v;") + "return ".length)
+        val inFirst = generateDocAt(source.indexOf("return v;") + "return ".length)
+        val inSecond = generateDocAt(source.lastIndexOf("return v;") + "return ".length)
 
         assertTrue("Expected 'float v' in the first function, got: $inFirst", inFirst!!.contains("float v"))
         assertFalse("First function's v is not a float2, got: $inFirst", inFirst.contains("float2"))
@@ -147,7 +140,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'K'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float K"))
         assertTrue("Expected 'constant' label, got: $doc", doc.contains("constant"))
@@ -165,7 +158,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the declaration of 'normalized'", doc)
         assertTrue("Expected declared type, got: $doc", doc!!.contains("float2 normalized"))
     }
@@ -187,7 +180,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
 
         configureAndCache(source)
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'attributes'", doc)
         assertTrue("Expected position in list, got: $doc", doc!!.contains("position"))
         assertTrue("Expected color in list, got: $doc", doc.contains("color"))
@@ -211,7 +204,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
 
         configureAndCache(source)
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'attributes.position'", doc)
         assertTrue("Expected type float4, got: $doc", doc!!.contains("float4"))
         assertTrue("Expected member name, got: $doc", doc.contains("position"))
@@ -231,7 +224,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
 
         val caretOffset = source.indexOf("rotate(pos)")
-        val doc = docAt(caretOffset)
+        val doc = generateDocAt(caretOffset)
         assertNotNull("Expected documentation for 'rotate' call", doc)
         assertTrue("Expected qualified name, got: $doc", doc!!.contains("M::rotate()"))
         assertTrue("Expected signature with parameter, got: $doc", doc.contains("float2 rotate(float2 pos)"))
@@ -266,7 +259,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         // The type shown is the one on the compiler's stage-interface symbol.
         configureAndCache(stageIoSource.replace("input.n,", "input.<caret>n,"))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'input.n'", doc)
         assertTrue("Expected the inferred type float2, got: $doc", doc!!.contains("float2 n"))
         assertTrue("Expected the input.n name, got: $doc", doc.contains("input.n"))
@@ -276,7 +269,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
         // `normalize(float2)` returns float2; the compiler infers that from the intrinsic's signature.
         configureAndCache(stageIoSource.replace("input.unit", "input.un<caret>it"))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'input.unit'", doc)
         assertTrue("Expected the inferred type float2, got: $doc", doc!!.contains("float2 unit"))
         assertFalse("Must not claim the function name as the type, got: $doc", doc.contains("normalize"))
@@ -285,7 +278,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     fun testOutputMemberShowsItsInterpolationQualifier() {
         configureAndCache(stageIoSource.replace("output.index", "output.ind<caret>ex"))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for 'output.index'", doc)
         assertTrue("Expected the int type, got: $doc", doc!!.contains("int index"))
         assertTrue("Expected the @flat qualifier, got: $doc", doc.contains("@flat"))
@@ -294,7 +287,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     fun testFragmentOutputMemberIsDocumentedAsAFragmentOutput() {
         configureAndCache(stageIoSource.replace("output.result", "output.res<caret>ult"))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the fragment output 'result'", doc)
         assertTrue("Expected the declared type, got: $doc", doc!!.contains("float4 result"))
         assertTrue("Expected a fragment-output description, got: $doc", doc.contains("Fragment output"))
@@ -303,7 +296,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     fun testInputQualifierInTheFragmentStageListsTheVertexOutputsWithTheirTypes() {
         configureAndCache(stageIoSource.replace("float4(input.n", "float4(inp<caret>ut.n"))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the 'input' qualifier", doc)
         assertTrue("Expected float2 n listed, got: $doc", doc!!.contains("<b>float2</b> n"))
         assertTrue("Expected int index listed, got: $doc", doc.contains("<b>int</b> index"))
@@ -313,7 +306,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
     fun testOutputQualifierInTheVertexStageListsTheVertexOutputs() {
         configureAndCache(stageIoSource.replace("output.n =", "outp<caret>ut.n ="))
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the 'output' qualifier", doc)
         assertTrue("Expected the vertex stage description, got: $doc", doc!!.contains("Built-in vertex stage qualifier"))
         assertTrue("Expected float2 n listed, got: $doc", doc.contains("<b>float2</b> n"))
@@ -332,7 +325,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the method declaration", doc)
         assertTrue("Expected the qualified name, got: $doc", doc!!.contains("M::S::scale()"))
         assertTrue("Expected the signature, got: $doc", doc.contains("float scale(float k)"))
@@ -356,7 +349,7 @@ class BwslDocumentationProviderTest : BasePlatformTestCase() {
             mapOf("Common" to "module Common {\n    helper :: (float a, float b) -> float { return a + b; }\n}\n")
         )
 
-        val doc = docAt(myFixture.caretOffset)
+        val doc = generateDocAt(myFixture.caretOffset)
         assertNotNull("Expected documentation for the imported 'helper'", doc)
         assertTrue("Expected the qualified name, got: $doc", doc!!.contains("Common::helper()"))
         assertTrue("Expected the signature, got: $doc", doc.contains("float helper(float a, float b)"))

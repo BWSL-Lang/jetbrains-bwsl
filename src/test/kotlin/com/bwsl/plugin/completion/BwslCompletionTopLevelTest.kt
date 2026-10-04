@@ -4,7 +4,7 @@ package com.bwsl.plugin.completion
 class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
 
     fun testTopLevelSuggestsOnlyModuleAndPipeline() {
-        checkCompletions(
+        assertCompletions(
             "module M {\n" +
                 "}\n" +
                 "<caret>\n",
@@ -14,7 +14,7 @@ class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
     }
 
     fun testTopLevelBeforeModule() {
-        checkCompletions(
+        assertCompletions(
             "<caret>\n" +
                 "module M {\n" +
                 "}\n",
@@ -24,7 +24,7 @@ class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
     }
 
     fun testTopLevelSuggestsSubmodule() {
-        checkCompletions(
+        assertCompletions(
             "module Base {\n" +
                 "}\n" +
                 "<caret>\n",
@@ -36,7 +36,7 @@ class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
     fun testExtendsIsSuggestedAfterSubmoduleName() {
         // Caret sits between the submodule name and `extends`, so the cleaned source is still
         // valid bwslc input while the PSI at the caret position has MODULE_NAME ← KW_SUBMODULE.
-        checkCompletions(
+        assertCompletions(
             "module Base {\n}\nsubmodule Child <caret>extends Base {\n}\n",
             present = setOf("extends"),
             absent = setOf("module", "pipeline", "if", "float", "normalize")
@@ -44,7 +44,7 @@ class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
     }
 
     fun testExtendsIsNotSuggestedInFunctionBody() {
-        checkCompletions(
+        assertCompletions(
             "module Base {\n" +
                 "    f :: () -> void { <caret> }\n" +
                 "}\n",
@@ -53,7 +53,7 @@ class BwslCompletionTopLevelTest : BwslCompletionScopeTestCase() {
     }
 
     fun testExtendsIsNotSuggestedAtTopLevel() {
-        checkCompletions(
+        assertCompletions(
             "module Base {\n" +
                 "}\n" +
                 "<caret>\n",

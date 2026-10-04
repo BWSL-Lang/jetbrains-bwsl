@@ -27,15 +27,15 @@ class BwslFindUsagesProvider : FindUsagesProvider {
         TokenSet.create(BwslTokenTypes.STRING_LIT)
     )
 
-    override fun canFindUsagesFor(psiElement: PsiElement): Boolean = declarationIdentityOf(psiElement) != null
+    override fun canFindUsagesFor(psiElement: PsiElement): Boolean = findDeclarationIdentityOf(psiElement) != null
 
     override fun getHelpId(psiElement: PsiElement): String? = null
 
     override fun getType(element: PsiElement): String =
-        declarationIdentityOf(element)?.symbol?.kind?.replace('-', ' ') ?: ""
+        findDeclarationIdentityOf(element)?.symbol?.kind?.replace('-', ' ') ?: ""
 
     override fun getDescriptiveName(element: PsiElement): String =
-        declarationIdentityOf(element)?.symbol?.name ?: element.text
+        findDeclarationIdentityOf(element)?.symbol?.name ?: element.text
 
     override fun getNodeText(element: PsiElement, useFullName: Boolean): String = getDescriptiveName(element)
 }
@@ -49,9 +49,9 @@ class BwslTargetElementEvaluator : TargetElementEvaluatorEx2() {
     override fun getNamedElement(element: PsiElement): PsiElement? {
         val file = element.containingFile ?: return null
         val index = buildAstIndex(file) ?: return null
-        val declaration = index.nodeAtOffset(element.textOffset)
+        val declaration = index.findNodeAtOffset(element.textOffset)
             ?.takeIf { index.symbolsById.containsKey(it.id) } ?: return null
-        return index.nameRangeOf(declaration)?.let { elementAtOffset(file, it.first) }
+        return index.findNameRangeOf(declaration)?.let { findElementAtOffset(file, it.first) }
     }
 }
 

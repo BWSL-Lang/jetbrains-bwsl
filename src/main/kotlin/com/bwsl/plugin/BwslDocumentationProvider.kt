@@ -1,5 +1,5 @@
 package com.bwsl.plugin
-import com.bwsl.plugin.references.previousNonWhitespace
+import com.bwsl.plugin.references.findPreviousNonWhitespace
 
 import com.intellij.lang.documentation.AbstractDocumentationProvider
 import com.intellij.lang.documentation.DocumentationMarkup
@@ -8,7 +8,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.elementType
 
-private fun signatureHtml(returnType: String, name: String, params: List<String>): String =
+private fun renderSignatureHtml(returnType: String, name: String, params: List<String>): String =
     "${returnType.ifBlank { "void" }} ${name}(${params.joinToString(", ")})"
 
 private fun renderDoc(qualifiedName: String?, signature: String, description: String?): String = buildString {
@@ -24,19 +24,19 @@ private fun renderDoc(qualifiedName: String?, signature: String, description: St
     }
 }
 
-private fun intrinsicDoc(name: String, hasReceiver: Boolean): String? {
+private fun renderIntrinsicDoc(name: String, hasReceiver: Boolean): String? {
     if (hasReceiver && name == "length") {
-        return renderDoc(null, signatureHtml("int", "length", emptyList()), "Number of elements in the array")
+        return renderDoc(null, renderSignatureHtml("int", "length", emptyList()), "Number of elements in the array")
     }
     val fn = BwslIntrinsics.ALL.firstOrNull { it.name == name } ?: return null
-    val signature = signatureHtml(fn.returnType, fn.name, fn.params.map { "${it.type} ${it.name}" })
+    val signature = renderSignatureHtml(fn.returnType, fn.name, fn.params.map { "${it.type} ${it.name}" })
     return renderDoc(null, signature, fn.description.takeIf { it.isNotBlank() })
 }
 
 /**
  * Formats an interpolation qualifier for display ("DEFAULT" → null, "FLAT" → "@flat", etc.).
  */
-private fun interpolationLabel(interp: String): String? = when (interp) {
+private fun formatInterpolationLabel(interp: String): String? = when (interp) {
     "FLAT"           -> "@flat"
     "NO_PERSPECTIVE" -> "@noperspective"
     else             -> null
@@ -50,7 +50,7 @@ private data class StageValue(val name: String, val type: String, val interpolat
  * symbols, in the compiler's order. The type is the compiler's own; the interpolation qualifier is
  * on the first assignment that defines the value.
  */
-private fun stageValues(index: BwslAstIndex, pass: AstNodePos): List<StageValue> =
+private fun collectStageValues(index: BwslAstIndex, pass: AstNodePos): List<StageValue> =
     index.symbolsById.values
         .filter { it.kind == "stage-interface" && it.owner == pass.id }
         .map { symbol ->
@@ -59,7 +59,7 @@ private fun stageValues(index: BwslAstIndex, pass: AstNodePos): List<StageValue>
         }
 
 /** The attributes [pass] lists in its `use attributes { ... }`, in that order, as the compiler resolved them. */
-private fun usedAttributes(index: BwslAstIndex, pass: AstNodePos): List<AstSymbol> =
+private fun collectUsedAttributes(index: BwslAstIndex, pass: AstNodePos): List<AstSymbol> =
     index.nodesById.values
         .filter { it.id.startsWith("${pass.id}/used-attribute:") }
         .sortedBy { it.id.substringAfterLast(':').toIntOrNull() ?: Int.MAX_VALUE }
@@ -68,20 +68,20 @@ private fun usedAttributes(index: BwslAstIndex, pass: AstNodePos): List<AstSymbo
                 ?.let { index.symbolsById[it.to] }
         }
 
-private fun outputListHtml(outputs: List<StageValue>): String {
+private fun renderOutputListHtml(outputs: List<StageValue>): String {
     if (outputs.isEmpty()) return "(none)"
     return outputs.joinToString("<br/>") { vo ->
-        val interp = interpolationLabel(vo.interpolation)?.let { " &nbsp;<i>$it</i>" } ?: ""
+        val interp = formatInterpolationLabel(vo.interpolation)?.let { " &nbsp;<i>$it</i>" } ?: ""
         "<code><b>${vo.type}</b> ${vo.name}</code>$interp"
     }
 }
 
 /** Tooltip for the `attributes` qualifier, listing the attributes available in the current pass. */
-private fun attributesQualifierDoc(element: PsiElement): String? {
+private fun renderAttributesQualifierDoc(element: PsiElement): String? {
     if (element.text != "attributes") return null
     val index = buildAstIndex(element.containingFile) ?: return null
-    val pass = index.enclosingNodeOfType("PASS", element.textOffset) ?: return null
-    val used = usedAttributes(index, pass)
+    val pass = index.findEnclosingNodeOfType("PASS", element.textOffset) ?: return null
+    val used = collectUsedAttributes(index, pass)
     val listHtml = if (used.isEmpty()) "(none)" else
         used.joinToString("<br/>") { "<code><b>${it.type}</b> ${it.name}</code>" }
     return renderDoc("attributes", "Pipeline attribute inputs",
@@ -89,21 +89,21 @@ private fun attributesQualifierDoc(element: PsiElement): String? {
 }
 
 /** Tooltip for the `input` or `output` qualifier identifier, explaining its role in the shader pipeline. */
-private fun shaderQualifierDoc(element: PsiElement): String? {
+private fun renderShaderQualifierDoc(element: PsiElement): String? {
     val name = element.text
     if (name != "input" && name != "output") return null
     val index = buildAstIndex(element.containingFile) ?: return null
     val offset = element.textOffset
-    val pass = index.enclosingNodeOfType("PASS", offset) ?: return null
-    val inFragmentStage = index.enclosingNodeOfType("FRAGMENT_STAGE", offset) != null
-    val inVertexStage = index.enclosingNodeOfType("VERTEX_STAGE", offset) != null
+    val pass = index.findEnclosingNodeOfType("PASS", offset) ?: return null
+    val inFragmentStage = index.findEnclosingNodeOfType("FRAGMENT_STAGE", offset) != null
+    val inVertexStage = index.findEnclosingNodeOfType("VERTEX_STAGE", offset) != null
 
     return when (name) {
         "input" if inFragmentStage -> {
             renderDoc("input", "Built-in fragment stage qualifier",
                 "Provides access to values written to <code>output.*</code> in the vertex stage, " +
                         "interpolated across the triangle.<br/><br/>" +
-                        "Vertex outputs available here:<br/>${outputListHtml(stageValues(index, pass))}")
+                        "Vertex outputs available here:<br/>${renderOutputListHtml(collectStageValues(index, pass))}")
         }
         "input" -> renderDoc("input", "Built-in stage qualifier",
             "In a vertex stage: provides per-vertex built-in values such as <code>vertex_id</code>, <code>instance_id</code>.<br/>" +
@@ -111,7 +111,7 @@ private fun shaderQualifierDoc(element: PsiElement): String? {
         "output" if inVertexStage -> {
             renderDoc("output", "Built-in vertex stage qualifier",
                 "Writes per-vertex output attributes passed to the fragment stage as <code>input.*</code>.<br/><br/>" +
-                        "Outputs declared in this vertex block:<br/>${outputListHtml(stageValues(index, pass))}")
+                        "Outputs declared in this vertex block:<br/>${renderOutputListHtml(collectStageValues(index, pass))}")
         }
         else -> renderDoc("output", "Built-in stage qualifier",
             "Writes values to render targets or depth. " +
@@ -123,9 +123,9 @@ private fun shaderQualifierDoc(element: PsiElement): String? {
  * Tooltip for the member in `attributes.<member>`, `input.<member>` or `output.<member>`: whichever
  * declaration the compiler's reference edge for that member points at.
  */
-private fun shaderMemberDoc(element: PsiElement): String? {
+private fun renderShaderMemberDoc(element: PsiElement): String? {
     val index = buildAstIndex(element.containingFile) ?: return null
-    val edge = referenceEdgesAt(index, element.textOffset)
+    val edge = collectReferenceEdgesAt(index, element.textOffset)
         .firstOrNull { it.role == "attribute" || it.role == "input" || it.role == "output" } ?: return null
     val symbol = index.symbolsById[edge.to] ?: return null
     val member = symbol.name
@@ -135,7 +135,7 @@ private fun shaderMemberDoc(element: PsiElement): String? {
         "attribute" -> renderDoc("attributes.$member", "$type $member", "Pipeline vertex attribute")
         "stage-interface" -> {
             val interpolation = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it]?.interpolation }
-                ?.let { interpolationLabel(it) }
+                ?.let { formatInterpolationLabel(it) }
             val details = buildString {
                 append("Vertex output attribute")
                 if (interpolation != null) append(", interpolated as <code>$interpolation</code>")
@@ -152,9 +152,9 @@ private fun shaderMemberDoc(element: PsiElement): String? {
  * refers to - at a declaration's own name or at a use of it. The compiler's reference index says
  * which declaration a use belongs to, so same-named variables in different scopes can't be mixed up.
  */
-private fun variableTypeDoc(element: PsiElement): String? {
+private fun renderVariableTypeDoc(element: PsiElement): String? {
     val index = buildAstIndex(element.containingFile) ?: return null
-    val symbol = symbolAt(index, element.textOffset) ?: return null
+    val symbol = findSymbolAt(index, element.textOffset) ?: return null
     val description = when (symbol.kind) {
         "parameter" -> "parameter"
         "variable" -> "local variable"
@@ -167,7 +167,7 @@ private fun variableTypeDoc(element: PsiElement): String? {
 }
 
 /** The names of the module/struct/pass that enclose [symbol], outermost first (a pipeline is not part of a function's path). */
-private fun qualifiedPathOf(index: BwslAstIndex, symbol: AstSymbol): List<String> {
+private fun collectQualifiedPathOf(index: BwslAstIndex, symbol: AstSymbol): List<String> {
     val path = ArrayList<String>()
     var owner = symbol.owner
     var depth = 0
@@ -186,12 +186,12 @@ private fun qualifiedPathOf(index: BwslAstIndex, symbol: AstSymbol): List<String
  * signature, from the symbol. [at] is the element in the file that has the cached AST - a call, or
  * the declaration itself - not a declaration the call resolved into another file.
  */
-private fun functionDoc(at: PsiElement): String? {
+private fun renderFunctionDoc(at: PsiElement): String? {
     val index = buildAstIndex(at.containingFile) ?: return null
-    val symbol = symbolAt(index, at.textOffset) ?: return null
-    val signature = functionSignatureOf(index, symbol) ?: return null
-    val qualifiedName = (qualifiedPathOf(index, symbol) + symbol.name).joinToString("::") + "()"
-    return renderDoc(qualifiedName, signatureHtml(signature.returnType, signature.name, signature.params), null)
+    val symbol = findSymbolAt(index, at.textOffset) ?: return null
+    val signature = buildFunctionSignature(index, symbol) ?: return null
+    val qualifiedName = (collectQualifiedPathOf(index, symbol) + symbol.name).joinToString("::") + "()"
+    return renderDoc(qualifiedName, renderSignatureHtml(signature.returnType, signature.name, signature.params), null)
 }
 
 class BwslDocumentationProvider : AbstractDocumentationProvider() {
@@ -219,24 +219,24 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
                 val callElement = if (element.elementType == BwslTokenTypes.INTRINSIC_CALL) element else element.firstChild!!
                 val refElement = if (element.elementType == BwslTokenTypes.REFERENCE) element else (element.parent ?: element)
                 val outer = if (refElement.parent?.elementType == BwslTokenTypes.CALL_EXPRESSION) refElement.parent!! else refElement
-                val hasReceiver = previousNonWhitespace(outer)?.elementType == BwslTokenTypes.DOT
-                intrinsicDoc(callElement.text, hasReceiver)
+                val hasReceiver = findPreviousNonWhitespace(outer)?.elementType == BwslTokenTypes.DOT
+                renderIntrinsicDoc(callElement.text, hasReceiver)
             }
             // The target of a hover is the declaration a call resolved to, which may be in another
             // file with no cached AST of its own: document it from the hovered element instead.
-            BwslTokenTypes.FUNCTION_DECLARATION -> functionDoc(originalElement ?: element)
+            BwslTokenTypes.FUNCTION_DECLARATION -> renderFunctionDoc(originalElement ?: element)
             // A method-style call (e.g. "values.cos()") is lexed as FUNCTION_CALL rather than
             // INTRINSIC_CALL because it has a receiver, but it may still name an intrinsic.
-            BwslTokenTypes.FUNCTION_CALL -> functionDoc(element) ?: intrinsicDoc(element.text, hasReceiver = false)
-            BwslTokenTypes.KW_ATTRIBUTES -> attributesQualifierDoc(element)
+            BwslTokenTypes.FUNCTION_CALL -> renderFunctionDoc(element) ?: renderIntrinsicDoc(element.text, hasReceiver = false)
+            BwslTokenTypes.KW_ATTRIBUTES -> renderAttributesQualifierDoc(element)
             BwslTokenTypes.IDENTIFIER -> {
                 // Highest priority: input/output qualifier keywords and their member identifiers.
-                val prev = previousNonWhitespace(element.parent ?: element)
+                val prev = findPreviousNonWhitespace(element.parent ?: element)
                 if (prev?.elementType == BwslTokenTypes.DOT)
-                    shaderMemberDoc(element)?.let { return it }
+                    renderShaderMemberDoc(element)?.let { return it }
                 if (element.text == "input" || element.text == "output")
-                    shaderQualifierDoc(element)?.let { return it }
-                variableTypeDoc(element)
+                    renderShaderQualifierDoc(element)?.let { return it }
+                renderVariableTypeDoc(element)
             }
             else -> null
         }

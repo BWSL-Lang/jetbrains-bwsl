@@ -9,7 +9,7 @@ import com.intellij.codeInsight.lookup.LookupElementPresentation
 class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
 
     fun testParametersAndEarlierLocalsAreSuggestedButNotLaterOnesOrOtherFunctions() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 helper :: (float alpha, float2 beta) -> float {
@@ -27,7 +27,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testLocalsOfAnEnclosingBlockAreVisibleInsideANestedBlock() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: (float x) -> float {
@@ -47,7 +47,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testLocalsOfAClosedBlockAreNotSuggestedAfterIt() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: (float x) -> float {
@@ -80,8 +80,8 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
                 }
             }
         """.trimIndent()
-        checkCompletions(source, present = setOf("i", "inLoop", "outer"), absent = setOf("after"))
-        checkCompletions(
+        assertCompletions(source, present = setOf("i", "inLoop", "outer"), absent = setOf("after"))
+        assertCompletions(
             source.replace("<caret>outer = inLoop", "outer = inLoop").replace("float after", "<caret>float after"),
             present = setOf("outer"),
             absent = setOf("i", "inLoop")
@@ -101,8 +101,8 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
                 }
             }
         """.trimIndent()
-        checkCompletions(source, present = setOf("n", "outer"), absent = setOf("after"))
-        checkCompletions(
+        assertCompletions(source, present = setOf("n", "outer"), absent = setOf("after"))
+        assertCompletions(
             source.replace("<caret>outer = outer", "outer = outer").replace("float after", "<caret>float after"),
             present = setOf("outer"),
             absent = setOf("n")
@@ -110,7 +110,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testCollectionLoopVariableIsVisibleInTheLoop() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: (float[4] values) -> float {
@@ -127,7 +127,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testEveryVariableOfAMultiRangeForeachIsVisibleInItsBody() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: () -> float {
@@ -144,7 +144,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testShaderStageSeesItsOwnLocalsAndTheConstsAroundItButNotOtherStagesOrFunctions() {
-        checkCompletions(
+        assertCompletions(
             """
             pipeline P {
                 attributes {
@@ -176,7 +176,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testModuleLevelConstIsSuggestedEvenWhenDeclaredAfterTheFunction() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: () -> float { return <caret>LIMIT; }
@@ -188,7 +188,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testStructMethodSeesItsParametersAndLocals() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 struct S {
@@ -206,7 +206,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testNothingIsSuggestedAsALocalAfterADot() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 f :: (float2 v) -> float {
@@ -220,7 +220,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testNothingIsSuggestedAsALocalAfterAModuleQualifier() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 g :: () -> float { return 1.0; }
@@ -232,7 +232,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
     }
 
     fun testNoLocalsAreSuggestedOutsideAFunctionBody() {
-        checkCompletions(
+        assertCompletions(
             """
             module M {
                 <caret>
@@ -254,7 +254,7 @@ class BwslCompletionLocalsTest : BwslCompletionScopeTestCase() {
             }
         """.trimIndent()
         myFixture.configureByText("locals_presentation.bwsl", source)
-        com.bwsl.plugin.completion.BwslcAstHelper.parseAndCache(source.replace("<caret>", ""), myFixture.file.virtualFile.path)
+        BwslcAstHelper.parseAndCache(source.replace("<caret>", ""), myFixture.file.virtualFile.path)
 
         val items = myFixture.completeBasic().associateBy { it.lookupString }
 

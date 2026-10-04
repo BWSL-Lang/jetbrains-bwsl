@@ -39,7 +39,7 @@ class BwslReferenceContributor : PsiReferenceContributor() {
     }
 }
 
-fun previousNonWhitespace(element: PsiElement): PsiElement? {
+fun findPreviousNonWhitespace(element: PsiElement): PsiElement? {
     var sibling = element.prevSibling
     while (sibling != null && (sibling.node.elementType == TokenType.WHITE_SPACE ||
             sibling.node.elementType == BwslTokenTypes.LINE_COMMENT ||

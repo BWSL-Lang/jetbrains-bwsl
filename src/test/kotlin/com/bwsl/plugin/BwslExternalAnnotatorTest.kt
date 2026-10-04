@@ -27,7 +27,7 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
         }
     }
 
-    private fun pipeline(vertexBody: String) = """
+    private fun buildPipelineSource(vertexBody: String) = """
         pipeline P {
             attributes {
                 position: float4
@@ -49,17 +49,17 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
     """.trimIndent()
 
     /** The SPIR-V files in the directories bwslc could write to when run by the annotator. */
-    private fun spirvFiles(): Set<String> =
+    private fun collectSpirvFiles(): Set<String> =
         listOf(File(System.getProperty("user.dir")), File(System.getProperty("java.io.tmpdir")))
             .flatMap { dir -> dir.listFiles { f -> f.extension == "spv" }?.map { it.absolutePath }.orEmpty() }
             .toSet()
 
     fun testAValidPipelineLeavesNoSpirvFilesBehind() {
-        val before = spirvFiles()
+        val before = collectSpirvFiles()
 
-        val diagnostics = BwslExternalAnnotator().doAnnotate(pipeline("output.uv = float2(0.0);"))
+        val diagnostics = BwslExternalAnnotator().doAnnotate(buildPipelineSource("output.uv = float2(0.0);"))
 
-        val created = spirvFiles() - before
+        val created = collectSpirvFiles() - before
         try {
             assertTrue("Expected no diagnostics, got: $diagnostics", diagnostics.isEmpty())
             assertTrue("The annotator left SPIR-V files behind: $created", created.isEmpty())
@@ -69,13 +69,13 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
     }
 
     fun testDiagnosticsAreStillReportedAndNoSpirvFilesAreLeftBehind() {
-        val before = spirvFiles()
+        val before = collectSpirvFiles()
 
         val diagnostics = BwslExternalAnnotator().doAnnotate(
-            pipeline("output.uv = float2(0.0); output.uv = float3(0.0);")
+            buildPipelineSource("output.uv = float2(0.0); output.uv = float3(0.0);")
         )
 
-        val created = spirvFiles() - before
+        val created = collectSpirvFiles() - before
         try {
             assertTrue(
                 "Expected the conflicting-types error, got: $diagnostics",

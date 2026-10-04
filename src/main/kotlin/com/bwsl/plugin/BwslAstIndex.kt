@@ -59,7 +59,7 @@ class SourcePositions(private val text: String) {
     }
 
     /** Converts a 1-based (line, column) AST position to a 0-based character offset in [text]. */
-    fun offsetOf(line: Int, column: Int): Int? {
+    fun toOffset(line: Int, column: Int): Int? {
         if (line < 1 || line > lineStarts.size) return null
         return lineStarts[line - 1] + (column - 1)
     }
@@ -70,21 +70,21 @@ class SourcePositions(private val text: String) {
      * type, a MODULE at its keyword, a MEMBER_ACCESS at the dot), so this fails closed - null -
      * when the node has no name position, rather than falling back to the wrong one.
      */
-    fun nameRangeOf(node: AstNodePos): IntRange? {
+    fun findNameRangeOf(node: AstNodePos): IntRange? {
         val line = node.nameLine?.takeIf { it != 0 } ?: return null
         val column = node.nameColumn?.takeIf { it != 0 } ?: return null
         val name = (node.member ?: node.writtenName ?: node.name)?.takeIf { it.isNotEmpty() } ?: return null
-        val start = offsetOf(line, column) ?: return null
+        val start = toOffset(line, column) ?: return null
         return start until (start + name.length)
     }
 
     /**
      * The character range (0-based, end-exclusive) of the *type* text a declaration carries -
-     * distinct from [nameRangeOf], which returns its name: a VARIABLE_DECL's declared type, a
+     * distinct from [findNameRangeOf], which returns its name: a VARIABLE_DECL's declared type, a
      * FUNCTION's return type, or a parameter's or struct field's type. Null for a node with no type
      * text, or missing its position.
      */
-    fun typeRangeOf(node: AstNodePos): IntRange? {
+    fun findTypeRangeOf(node: AstNodePos): IntRange? {
         val (line, column, text) = when {
             node.type == "FUNCTION" -> Triple(node.returnTypeLine, node.returnTypeColumn, node.returnType)
             node.declaredType != null -> Triple(node.typeLine, node.typeColumn, node.declaredType)
@@ -94,7 +94,7 @@ class SourcePositions(private val text: String) {
         val tl = line?.takeIf { it != 0 } ?: return null
         val tc = column?.takeIf { it != 0 } ?: return null
         val typeText = text?.takeIf { it.isNotEmpty() } ?: return null
-        val start = offsetOf(tl, tc) ?: return null
+        val start = toOffset(tl, tc) ?: return null
         return start until (start + typeText.length)
     }
 
@@ -102,11 +102,11 @@ class SourcePositions(private val text: String) {
      * The character range (0-based, inclusive end) spanned by [node]'s full body, per its
      * line/column..endLine/endColumn.
      */
-    fun ownerRangeOf(node: AstNodePos): IntRange? {
-        val start = offsetOf(node.line, node.column) ?: return null
+    fun findBodyRangeOf(node: AstNodePos): IntRange? {
+        val start = toOffset(node.line, node.column) ?: return null
         val endLine = node.endLine?.takeIf { it != 0 } ?: return null
         val endColumn = node.endColumn?.takeIf { it != 0 } ?: return null
-        val end = offsetOf(endLine, endColumn) ?: return null
+        val end = toOffset(endLine, endColumn) ?: return null
         return start..end
     }
 }
@@ -191,36 +191,36 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
     }
 
     /** The node id of the target expression of [assignmentId] (e.g. the `output.x` of `output.x = ...`). */
-    fun assignmentTargetOf(assignmentId: String): String? = assignmentTargets[assignmentId]
+    fun findAssignmentTargetOf(assignmentId: String): String? = assignmentTargets[assignmentId]
 
     /** Measures positions against [text] - for a node from a file other than the compiled one. */
-    fun positionsFor(text: String): SourcePositions = SourcePositions(text)
+    fun createPositionsFor(text: String): SourcePositions = SourcePositions(text)
 
-    fun nameRangeOf(node: AstNodePos): IntRange? = own.nameRangeOf(node)
-    fun typeRangeOf(node: AstNodePos): IntRange? = own.typeRangeOf(node)
-    fun ownerRangeOf(node: AstNodePos): IntRange? = own.ownerRangeOf(node)
+    fun findNameRangeOf(node: AstNodePos): IntRange? = own.findNameRangeOf(node)
+    fun findTypeRangeOf(node: AstNodePos): IntRange? = own.findTypeRangeOf(node)
+    fun findBodyRangeOf(node: AstNodePos): IntRange? = own.findBodyRangeOf(node)
 
     /** The innermost indexed node (by smallest name-range span) whose name range contains [offset]. */
-    fun nodeAtOffset(offset: Int): AstNodePos? =
+    fun findNodeAtOffset(offset: Int): AstNodePos? =
         nodesById.values
-            .mapNotNull { node -> nameRangeOf(node)?.let { it to node } }
+            .mapNotNull { node -> findNameRangeOf(node)?.let { it to node } }
             .filter { (range, _) -> offset in range }
             .minByOrNull { (range, _) -> range.last - range.first }
             ?.second
 
     /** The innermost node of kind [type] (`PASS`, `FRAGMENT_STAGE`, ...) whose body range contains [offset]. */
-    fun enclosingNodeOfType(type: String, offset: Int): AstNodePos? =
+    fun findEnclosingNodeOfType(type: String, offset: Int): AstNodePos? =
         nodesById.values
             .filter { it.type == type }
-            .mapNotNull { node -> ownerRangeOf(node)?.let { it to node } }
+            .mapNotNull { node -> findBodyRangeOf(node)?.let { it to node } }
             .filter { (range, _) -> offset in range }
             .minByOrNull { (range, _) -> range.last - range.first }
             ?.second
 
-    /** The declaration (variable, function, parameter or field) whose type text ([typeRangeOf]) contains [offset]. */
-    fun declaredTypeAtOffset(offset: Int): AstNodePos? =
+    /** The declaration (variable, function, parameter or field) whose type text ([findTypeRangeOf]) contains [offset]. */
+    fun findTypedDeclarationAtOffset(offset: Int): AstNodePos? =
         nodesById.values
-            .firstOrNull { node -> typeRangeOf(node)?.let { offset in it } == true }
+            .firstOrNull { node -> findTypeRangeOf(node)?.let { offset in it } == true }
 
     private fun collectNodes(
         element: JsonElement,
@@ -271,9 +271,3 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
         }
     }
 }
-
-private fun JsonElement.asStringOrNull(): String? =
-    if (isJsonPrimitive && asJsonPrimitive.isString) asString else null
-
-private fun JsonElement.asIntOrNull(): Int? =
-    if (isJsonPrimitive && asJsonPrimitive.isNumber) asInt else null

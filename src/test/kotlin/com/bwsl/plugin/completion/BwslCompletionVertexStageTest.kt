@@ -4,7 +4,7 @@ package com.bwsl.plugin.completion
 class BwslCompletionVertexStageTest : BwslCompletionScopeTestCase() {
 
     fun testInsideVertexStageBody() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    attributes {\n" +
                 "        position: float3\n" +

@@ -32,13 +32,13 @@ class BwslCompletionFragmentStageTest : BwslCompletionScopeTestCase() {
         assertFalse("expected 'color' NOT to be suggested", items.containsKey("color"))
 
         // Type text should reflect the deduced type from the RHS constructor.
-        fun typeTextOf(key: String): String? {
+        fun readTypeTextOf(key: String): String? {
             val pres = LookupElementPresentation()
             items[key]?.renderElement(pres)
             return pres.typeText
         }
-        assertEquals("float4", typeTextOf("position"))
-        assertEquals("float2", typeTextOf("uv"))
+        assertEquals("float4", readTypeTextOf("position"))
+        assertEquals("float2", readTypeTextOf("uv"))
     }
 
     fun testInputMemberAccessTypeFromAttributesBlock() {

@@ -4,7 +4,7 @@ package com.bwsl.plugin.completion
 class BwslCompletionVariantsTest : BwslCompletionScopeTestCase() {
 
     fun testInsideVariantsBlock() {
-        checkCompletions(
+        assertCompletions(
             "pipeline Base {\n" +
                 "    attributes {\n" +
                 "        position: float3\n" +

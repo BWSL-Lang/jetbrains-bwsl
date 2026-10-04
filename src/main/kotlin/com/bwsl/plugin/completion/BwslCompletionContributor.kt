@@ -1,7 +1,7 @@
 package com.bwsl.plugin.completion
 
 import com.bwsl.plugin.*
-import com.bwsl.plugin.references.previousNonWhitespace
+import com.bwsl.plugin.references.findPreviousNonWhitespace
 
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
@@ -64,26 +64,26 @@ private val INTRINSIC_NAMES = listOf(
  * Falls back to [BwslBlockContext.STATEMENT_BODY] (i.e. no restrictions) when no AST is cached,
  * since the lexical fallback has no notion of block structure.
  */
-private fun currentBlockContext(parameters: CompletionParameters): BwslBlockContext {
+private fun classifyCurrentBlockContext(parameters: CompletionParameters): BwslBlockContext {
     val file = parameters.originalFile
     val path = file.virtualFile?.path ?: return BwslBlockContext.STATEMENT_BODY
-    val root = BwslAstCache.getRoot(path) ?: return BwslBlockContext.STATEMENT_BODY
+    val root = BwslAstCache.findRoot(path) ?: return BwslBlockContext.STATEMENT_BODY
     // Use the position just before the inserted dummy identifier, which is where the real token starts.
-    val (line, column) = lineColumnAt(file, parameters.offset) ?: return BwslBlockContext.STATEMENT_BODY
-    return blockContextAt(root, line, column, file.text)
+    val (line, column) = toLineColumn(file, parameters.offset) ?: return BwslBlockContext.STATEMENT_BODY
+    return classifyBlockContextAt(root, line, column, file.text)
 }
 
 /**
  * The parameters, locals and constants in scope at the completion position, from the cached AST.
  * Empty when no AST is cached (there is no lexical fallback).
  */
-private fun visibleLocals(parameters: CompletionParameters): List<VisibleLocal> {
+private fun collectVisibleLocals(parameters: CompletionParameters): List<VisibleLocal> {
     val file = parameters.originalFile
     val path = file.virtualFile?.path ?: return emptyList()
-    val root = BwslAstCache.getRoot(path) ?: return emptyList()
-    val raw = BwslAstCache.getRawRoot(path) ?: return emptyList()
-    val (line, column) = lineColumnAt(file, parameters.offset) ?: return emptyList()
-    return visibleLocalsAt(root, raw, line, column)
+    val root = BwslAstCache.findRoot(path) ?: return emptyList()
+    val raw = BwslAstCache.findRawRoot(path) ?: return emptyList()
+    val (line, column) = toLineColumn(file, parameters.offset) ?: return emptyList()
+    return collectVisibleLocalsAt(root, raw, line, column)
 }
 
 class BwslCompletionContributor : CompletionContributor() {
@@ -97,20 +97,20 @@ class BwslCompletionContributor : CompletionContributor() {
                     context: ProcessingContext,
                     result: CompletionResultSet
                 ) {
-                    val prevSibling = parameters.position.parent?.let { previousNonWhitespace(it) }
-                    val beforeDot = if (prevSibling?.elementType == BwslTokenTypes.DOT) previousNonWhitespace(prevSibling) else null
+                    val prevSibling = parameters.position.parent?.let { findPreviousNonWhitespace(it) }
+                    val beforeDot = if (prevSibling?.elementType == BwslTokenTypes.DOT) findPreviousNonWhitespace(prevSibling) else null
                     if (prevSibling?.elementType == BwslTokenTypes.DOT &&
                         (beforeDot?.text == "attributes" || beforeDot?.text == "input")
                     ) {
                         val file = parameters.originalFile
-                        val root = file.virtualFile?.path?.let { BwslAstCache.getRoot(it) }
-                        val (line, column) = lineColumnAt(file, parameters.offset) ?: (0 to 0)
+                        val root = file.virtualFile?.path?.let { BwslAstCache.findRoot(it) }
+                        val (line, column) = toLineColumn(file, parameters.offset) ?: (0 to 0)
                         val scope = root?.let { findScope(it, line, column) }
                         val pass = scope?.pass
                         val pipeline = scope?.pipeline
                         if (pass != null) {
                             if (beforeDot.text == "attributes" && pipeline != null) {
-                                for (attr in passUsedAttributes(pass, pipeline)) {
+                                for (attr in collectPassUsedAttributes(pass, pipeline)) {
                                     result.addElement(
                                         LookupElementBuilder.create(attr.name)
                                             .withTypeText(attr.dataType)
@@ -118,7 +118,7 @@ class BwslCompletionContributor : CompletionContributor() {
                                 }
                             } else if (beforeDot.text == "input") {
                                 val allAttrs = pipeline?.attributes ?: emptyList()
-                                for ((_, vo) in vertexOutputAssignments(pass, allAttrs)) {
+                                for ((_, vo) in collectVertexOutputAssignments(pass, allAttrs)) {
                                     result.addElement(
                                         LookupElementBuilder.create(vo.member)
                                             .withTypeText(vo.type ?: "output")
@@ -133,15 +133,15 @@ class BwslCompletionContributor : CompletionContributor() {
                     // `submodule <MODULE_NAME> <caret>` → offer only "extends".
                     // MODULE_NAME is wrapped in a REFERENCE composite by the parser, so check firstChild.
                     val posParent = parameters.position.parent
-                    val prevRef = posParent?.let { previousNonWhitespace(it) }
+                    val prevRef = posParent?.let { findPreviousNonWhitespace(it) }
                     if (prevRef?.firstChild?.elementType == BwslTokenTypes.MODULE_NAME &&
-                        previousNonWhitespace(prevRef)?.elementType == BwslTokenTypes.KW_SUBMODULE
+                        findPreviousNonWhitespace(prevRef)?.elementType == BwslTokenTypes.KW_SUBMODULE
                     ) {
                         result.addElement(LookupElementBuilder.create("extends").bold())
                         return
                     }
 
-                    val blockContext = currentBlockContext(parameters)
+                    val blockContext = classifyCurrentBlockContext(parameters)
 
                     if (blockContext == BwslBlockContext.TOP_LEVEL) {
                         for (kw in TOP_LEVEL_KEYWORDS) {
@@ -174,7 +174,7 @@ class BwslCompletionContributor : CompletionContributor() {
                     val afterMemberOrQualifier =
                         prevSibling?.elementType == BwslTokenTypes.DOT || prevSibling?.elementType == BwslTokenTypes.COLONCOLON
                     if (blockContext == BwslBlockContext.STATEMENT_BODY && !afterMemberOrQualifier) {
-                        for (local in visibleLocals(parameters)) {
+                        for (local in collectVisibleLocals(parameters)) {
                             result.addElement(
                                 PrioritizedLookupElement.withPriority(
                                     LookupElementBuilder.create(local.name)

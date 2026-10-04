@@ -11,12 +11,6 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  */
 class BwslAstResolverTest : BasePlatformTestCase() {
 
-    private fun buildIndex(source: String, modules: Map<String, String> = emptyMap()): BwslAstIndex {
-        val root = BwslcAstHelper.parse(source, modules)
-        val raw = BwslcAstHelper.parseRaw(source, modules)
-        return BwslAstIndex(root, raw, source)
-    }
-
     private val commonModule =
         "module Common {\n" +
             "    struct Box {\n" +
@@ -43,7 +37,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}\n"
         )
-        return buildIndex(myFixture.file.text, mapOf("Common" to commonModule))
+        return BwslcAstHelper.buildIndex(myFixture.file.text, mapOf("Common" to commonModule))
     }
 
     fun testVariableUsageResolvesToDeclarationName() {
@@ -56,7 +50,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -75,7 +69,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         assertTrue(
             "A caret on a VARIABLE_DECL's own name must not resolve anywhere",
@@ -95,7 +89,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -113,7 +107,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -140,7 +134,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -163,7 +157,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -197,7 +191,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
 
     fun testFragmentOutputResolvesToItsEntryInTheOutputsBlock() {
         myFixture.configureByText("test.bwsl", fragmentOutputSource.replace("output.result", "output.res<caret>ult"))
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -208,7 +202,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
 
     fun testFragmentOutputSharingAnAttributesNameStillResolvesToTheOutputsEntry() {
         myFixture.configureByText("test.bwsl", fragmentOutputSource.replace("output.color", "output.co<caret>lor"))
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -224,7 +218,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    f1 :: (float angle) -> float { return co<caret>s(angle); }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         assertTrue(
             "A call to a builtin intrinsic has no source declaration to navigate to",
@@ -249,7 +243,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -272,7 +266,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -298,7 +292,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "    }\n" +
                 "}"
         )
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -323,7 +317,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
         // A declared type "Mod::Type" has a positioned type-qualifier node with its own [qualifier]
         // edge to the module, the same as the qualifier of a call.
         myFixture.configureByText("test.bwsl", declaredTypeSource.replace("LengthMethodTest::testStruct", "Length<caret>MethodTest::testStruct"))
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -334,7 +328,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
 
     fun testTypeNameOfAQualifiedVariableDeclTypeResolvesToTheStruct() {
         myFixture.configureByText("test.bwsl", declaredTypeSource.replace("LengthMethodTest::testStruct", "LengthMethodTest::test<caret>Struct"))
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -360,7 +354,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
             """.trimIndent()
         )
         val source = myFixture.file.text
-        val index = buildIndex(source)
+        val index = BwslcAstHelper.buildIndex(source)
 
         val nameOffsets = mapOf(
             "param" to source.indexOf("param)") + 2,
@@ -391,7 +385,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "}"
         )
         val source = myFixture.file.text
-        val index = buildIndex(source)
+        val index = BwslcAstHelper.buildIndex(source)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -429,7 +423,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "}"
         )
         val source = myFixture.file.text
-        val index = buildIndex(source)
+        val index = BwslcAstHelper.buildIndex(source)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -453,7 +447,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "}"
         )
         val source = myFixture.file.text
-        val index = buildIndex(source)
+        val index = BwslcAstHelper.buildIndex(source)
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 
@@ -519,7 +513,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "        r<caret>eturn Common::helper();\n"
         )
 
-        assertNull(index.nodeAtOffset(myFixture.caretOffset))
+        assertNull(index.findNodeAtOffset(myFixture.caretOffset))
     }
 
     // --- Constants, `using`, and members merged in from a submodule ---
@@ -562,7 +556,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
     /** Configures [textWithCaret] as the compiled file (with both module files available) and resolves its caret. */
     private fun resolveInConstsAndSubmoduleMain(textWithCaret: String): List<com.intellij.psi.PsiElement> {
         myFixture.configureByText("test.bwsl", textWithCaret)
-        val index = buildIndex(
+        val index = BwslcAstHelper.buildIndex(
             myFixture.file.text,
             mapOf("SubmoduleParent" to submoduleParent, "SubmoduleParentExtra" to submoduleExtra)
         )
@@ -641,7 +635,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
 
     private fun resolveConstUse(textWithCaret: String): List<com.intellij.psi.PsiElement> {
         myFixture.configureByText("test.bwsl", textWithCaret)
-        val index = buildIndex(myFixture.file.text)
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text)
         return resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
     }
 
@@ -767,7 +761,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
             "input read" to repeatedAssignmentsSource.replace("input.uv", "input.u<caret>v")
         )) {
             myFixture.configureByText("test.bwsl", text)
-            val resolved = resolveSymbolAt(myFixture.file, buildIndex(myFixture.file.text), myFixture.caretOffset)
+            val resolved = resolveSymbolAt(myFixture.file, BwslcAstHelper.buildIndex(myFixture.file.text), myFixture.caretOffset)
 
             assertEquals("$label: expected one result", 1, resolved.size)
             assertEquals("$label: should resolve to the first assignment, not the second", first, resolved[0].textOffset)
@@ -781,7 +775,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
                 "test.bwsl",
                 repeatedAssignmentsSource.replace(marker, marker.replace("output.res", "output.re<caret>s"))
             )
-            val resolved = resolveSymbolAt(myFixture.file, buildIndex(myFixture.file.text), myFixture.caretOffset)
+            val resolved = resolveSymbolAt(myFixture.file, BwslcAstHelper.buildIndex(myFixture.file.text), myFixture.caretOffset)
 
             assertEquals(1, resolved.size)
             assertEquals(myFixture.file.text.indexOf("result: float4"), resolved[0].textOffset)
@@ -819,7 +813,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
 
     private fun resolveReturnTypeCaret(textWithCaret: String): List<com.intellij.psi.PsiElement> {
         myFixture.configureByText("test.bwsl", textWithCaret)
-        return resolveSymbolAt(myFixture.file, buildIndex(myFixture.file.text), myFixture.caretOffset)
+        return resolveSymbolAt(myFixture.file, BwslcAstHelper.buildIndex(myFixture.file.text), myFixture.caretOffset)
     }
 
     fun testReturnTypeResolvesToItsStruct() {
@@ -874,7 +868,7 @@ class BwslAstResolverTest : BasePlatformTestCase() {
             """.trimIndent()
         )
         val common = "module Common {\n    struct Box {\n        float size;\n    }\n}\n"
-        val index = buildIndex(myFixture.file.text, mapOf("Common" to common))
+        val index = BwslcAstHelper.buildIndex(myFixture.file.text, mapOf("Common" to common))
 
         val resolved = resolveSymbolAt(myFixture.file, index, myFixture.caretOffset)
 

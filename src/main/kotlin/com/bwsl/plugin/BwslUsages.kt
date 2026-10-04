@@ -23,14 +23,14 @@ data class DeclarationIdentity(val symbol: AstSymbol, val payloadPath: String) {
 }
 
 /** The project's BWSL files that have a cached AST - the compiles whose edges can name a usage. */
-private fun payloadFiles(project: Project): List<PsiFile> {
+private fun collectPayloadFiles(project: Project): List<PsiFile> {
     val manager = PsiManager.getInstance(project)
     return FileTypeIndex.getFiles(BwslFileType, GlobalSearchScope.allScope(project))
-        .filter { BwslAstCache.getRoot(it.path) != null && BwslAstCache.getRawRoot(it.path) != null }
+        .filter { BwslAstCache.findRoot(it.path) != null && BwslAstCache.findRawRoot(it.path) != null }
         .mapNotNull { manager.findFile(it) }
 }
 
-private fun samePath(a: String, b: String): Boolean {
+private fun doesPathMatch(a: String, b: String): Boolean {
     val x = a.replace('\\', '/')
     val y = b.replace('\\', '/')
     return if (SystemInfo.isFileSystemCaseSensitive) x == y else x.equals(y, ignoreCase = true)
@@ -41,26 +41,26 @@ private fun samePath(a: String, b: String): Boolean {
  * in the element's own file's AST first, then in the AST of any other file that imports it (its
  * declarations appear there as nodes written in this file).
  */
-fun declarationIdentityOf(element: PsiElement): DeclarationIdentity? {
+fun findDeclarationIdentityOf(element: PsiElement): DeclarationIdentity? {
     val file = element.containingFile ?: return null
     if (file.language != BwslLanguage) return null
     val path = file.virtualFile?.path ?: return null
     val offset = element.textOffset
 
     buildAstIndex(file)?.let { index ->
-        val symbol = index.nodeAtOffset(offset)?.let { index.symbolsById[it.id] }
+        val symbol = index.findNodeAtOffset(offset)?.let { index.symbolsById[it.id] }
         if (symbol != null) return DeclarationIdentity(symbol, path)
     }
 
     val positions = SourcePositions(file.text)
-    for (other in payloadFiles(file.project)) {
+    for (other in collectPayloadFiles(file.project)) {
         val otherPath = other.virtualFile?.path ?: continue
         if (otherPath == path) continue
         val index = buildAstIndex(other) ?: continue
         val declared = index.externalNodesById.values.firstOrNull { node ->
-            node.sourceFile != null && samePath(node.sourceFile, path) &&
+            node.sourceFile != null && doesPathMatch(node.sourceFile, path) &&
                 index.symbolsById.containsKey(node.id) &&
-                positions.nameRangeOf(node)?.let { offset in it } == true
+                positions.findNameRangeOf(node)?.let { offset in it } == true
         } ?: continue
         return DeclarationIdentity(index.symbolsById.getValue(declared.id), otherPath)
     }
@@ -74,12 +74,12 @@ fun declarationIdentityOf(element: PsiElement): DeclarationIdentity? {
  * has no known references.
  */
 fun findUsagesOf(target: PsiElement, scope: SearchScope): List<PsiReference> {
-    val identity = declarationIdentityOf(target) ?: return emptyList()
+    val identity = findDeclarationIdentityOf(target) ?: return emptyList()
     val targetFile = target.containingFile
     val targetOffset = target.textOffset
 
     val references = LinkedHashMap<Pair<String, Int>, PsiReference>()
-    for (file in payloadFiles(target.project)) {
+    for (file in collectPayloadFiles(target.project)) {
         val path = file.virtualFile?.path ?: continue
         val index = buildAstIndex(file) ?: continue
         val declarationId = when {
@@ -91,10 +91,10 @@ fun findUsagesOf(target: PsiElement, scope: SearchScope): List<PsiReference> {
 
         for (edge in index.refsByTo[declarationId].orEmpty()) {
             val from = index.nodesById[edge.from] ?: continue
-            val offset = usageOffset(index, from, edge) ?: continue
+            val offset = findUsageOffset(index, from, edge) ?: continue
             val reference = file.findReferenceAt(offset) ?: continue
             if (!PsiSearchScopeUtil.isInScope(scope, reference.element)) continue
-            if (!resolvesTo(reference, targetFile, targetOffset)) continue
+            if (!doesReferenceResolveTo(reference, targetFile, targetOffset)) continue
             references[path to reference.element.textOffset + reference.rangeInElement.startOffset] = reference
         }
     }
@@ -106,11 +106,11 @@ fun findUsagesOf(target: PsiElement, scope: SearchScope): List<PsiReference> {
  * end of the declared-type text (the type's own name, after any `Mod::`), since the node's name is
  * the declaration's, not the usage's; otherwise it is the node's name.
  */
-private fun usageOffset(index: BwslAstIndex, from: AstNodePos, edge: AstReference): Int? =
-    if (edge.role == "type" || edge.role == "return-type") index.typeRangeOf(from)?.last
-    else index.nameRangeOf(from)?.first
+private fun findUsageOffset(index: BwslAstIndex, from: AstNodePos, edge: AstReference): Int? =
+    if (edge.role == "type" || edge.role == "return-type") index.findTypeRangeOf(from)?.last
+    else index.findNameRangeOf(from)?.first
 
-private fun resolvesTo(reference: PsiReference, targetFile: PsiFile, targetOffset: Int): Boolean {
+private fun doesReferenceResolveTo(reference: PsiReference, targetFile: PsiFile, targetOffset: Int): Boolean {
     val resolved = if (reference is PsiPolyVariantReference)
         reference.multiResolve(false).mapNotNull { it.element }
     else listOfNotNull(reference.resolve())

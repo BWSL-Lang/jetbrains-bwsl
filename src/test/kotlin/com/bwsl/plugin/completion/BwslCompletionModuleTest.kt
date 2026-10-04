@@ -4,7 +4,7 @@ package com.bwsl.plugin.completion
 class BwslCompletionModuleTest : BwslCompletionScopeTestCase() {
 
     fun testModuleBodyDoesNotSuggestModuleOrPipeline() {
-        checkCompletions(
+        assertCompletions(
             "module M {\n" +
                 "    <caret>\n" +
                 "}\n",
@@ -14,7 +14,7 @@ class BwslCompletionModuleTest : BwslCompletionScopeTestCase() {
     }
 
     fun testInsideFunctionBodySuggestsStatementsAndIntrinsics() {
-        checkCompletions(
+        assertCompletions(
             "module M {\n" +
                 "    f1 :: () -> float {\n" +
                 "        <caret>\n" +

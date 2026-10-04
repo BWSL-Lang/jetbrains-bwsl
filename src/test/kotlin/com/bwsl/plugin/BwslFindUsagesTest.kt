@@ -11,7 +11,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 class BwslFindUsagesTest : BasePlatformTestCase() {
 
     /** Configures [sourceWithCaret], caches its real AST, and returns the offsets of all usages of the target at the caret. */
-    private fun usagesAtCaret(sourceWithCaret: String, modules: Map<String, String> = emptyMap()): List<Int> {
+    private fun collectUsageOffsetsAtCaret(sourceWithCaret: String, modules: Map<String, String> = emptyMap()): List<Int> {
         myFixture.configureByText("usages.bwsl", sourceWithCaret)
         BwslcAstHelper.parseAndCache(myFixture.file.text, myFixture.file.virtualFile.path, modules)
         val target = myFixture.elementAtCaret
@@ -19,7 +19,7 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
     }
 
     /** The offsets of every occurrence of [needle] in the configured file, optionally the [nth] only. */
-    private fun offsetsOf(needle: String, startingAt: Int = 0): List<Int> {
+    private fun collectOffsetsOf(needle: String, startingAt: Int = 0): List<Int> {
         val text = myFixture.file.text
         val result = ArrayList<Int>()
         var i = text.indexOf(needle, startingAt)
@@ -28,7 +28,7 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
     }
 
     fun testFunctionUsagesFromItsDeclarationName() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 hel<caret>per :: (float x) -> float { return x; }
@@ -38,11 +38,11 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        assertEquals("the declaration is not a usage; the three calls are", offsetsOf("helper("), usages)
+        assertEquals("the declaration is not a usage; the three calls are", collectOffsetsOf("helper("), usages)
     }
 
     fun testFunctionUsagesFromACall() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 helper :: (float x) -> float { return x; }
@@ -52,11 +52,11 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
             """.trimIndent()
         )
 
-        assertEquals("both calls; the declaration is not a usage", offsetsOf("helper("), usages)
+        assertEquals("both calls; the declaration is not a usage", collectOffsetsOf("helper("), usages)
     }
 
     fun testSameNamedFunctionsInDifferentModulesHaveSeparateUsages() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module A {
                 sc<caret>ale :: (float x) -> float { return x; }
@@ -70,11 +70,11 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         )
 
         // Only the call inside module A.
-        assertEquals(listOf(offsetsOf("scale(").first { it > myFixture.file.text.indexOf("run") }), usages)
+        assertEquals(listOf(collectOffsetsOf("scale(").first { it > myFixture.file.text.indexOf("run") }), usages)
     }
 
     fun testParameterUsagesStayInsideTheirFunction() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 first :: (float <caret>v) -> float {
@@ -91,13 +91,13 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         )
 
         val firstFunctionEnd = myFixture.file.text.indexOf("second")
-        val uses = offsetsOf("v").filter { it < firstFunctionEnd }
+        val uses = collectOffsetsOf("v").filter { it < firstFunctionEnd }
             .filter { myFixture.file.text[it + 1].let { c -> !c.isLetterOrDigit() } && myFixture.file.text[it - 1].let { c -> !c.isLetterOrDigit() } }
         assertEquals("every use of v in the first function, not its declaration", uses.drop(1), usages)
     }
 
     fun testLocalVariableUsagesIncludeReadsAndWrites() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 first :: (float v) -> float {
@@ -117,7 +117,7 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
     }
 
     fun testStructUsagesAreItsTypeUses() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 struct B<caret>ox {
@@ -134,13 +134,13 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
 
         val text = myFixture.file.text
         val declaration = text.indexOf("struct Box") + "struct ".length
-        val expected = offsetsOf("Box").filter { it != declaration }
+        val expected = collectOffsetsOf("Box").filter { it != declaration }
         assertEquals("parameter type, return type and the local's declared type", 3, expected.size)
         assertEquals(expected, usages)
     }
 
     fun testStructFieldUsagesAreItsMemberAccesses() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 struct Box {
@@ -157,13 +157,13 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
 
         val text = myFixture.file.text
         val declaration = text.indexOf("float size") + "float ".length
-        val expected = offsetsOf("size").filter { it != declaration }
+        val expected = collectOffsetsOf("size").filter { it != declaration }
         assertEquals("b.size and seed.size", 2, expected.size)
         assertEquals(expected, usages)
     }
 
     fun testConstUsagesIncludeUsesTheParserFoldedIntoLiterals() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 const float <caret>K = 2.0;
@@ -173,13 +173,13 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         )
 
         val declaration = myFixture.file.text.indexOf("float K") + "float ".length
-        val expected = offsetsOf("K").filter { it != declaration }
+        val expected = collectOffsetsOf("K").filter { it != declaration }
         assertEquals("both uses, which the parser folded into literals", 2, expected.size)
         assertEquals(expected, usages)
     }
 
     fun testAttributeUsagesAreItsUseListNameAndMemberAccesses() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             pipeline P {
                 attributes {
@@ -196,11 +196,11 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         )
 
         val declaration = myFixture.file.text.indexOf("position: float4")
-        assertEquals(offsetsOf("position").filter { it != declaration }, usages)
+        assertEquals(collectOffsetsOf("position").filter { it != declaration }, usages)
     }
 
     fun testFragmentOutputUsagesAreItsAssignments() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             pipeline P {
                 attributes {
@@ -223,13 +223,13 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
         )
 
         val declaration = myFixture.file.text.indexOf("result: float4")
-        assertEquals(offsetsOf("result").filter { it != declaration }, usages)
+        assertEquals(collectOffsetsOf("result").filter { it != declaration }, usages)
     }
 
     fun testUsagesOfAnImportedFunctionAreFoundFromACallIntoItsFile() {
         // The target is in Common.bwsl, which has no AST of its own cached: it is identified through
         // this file's AST, where it is an imported declaration.
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 import Common
@@ -240,11 +240,11 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
             mapOf("Common" to "module Common {\n    helper :: (float a) -> float { return a; }\n}\n")
         )
 
-        assertEquals(offsetsOf("helper("), usages)
+        assertEquals(collectOffsetsOf("helper("), usages)
     }
 
     fun testUsagesOfAnImportedModuleAreItsImportAndQualifiers() {
-        val usages = usagesAtCaret(
+        val usages = collectUsageOffsetsAtCaret(
             """
             module M {
                 import Common
@@ -255,7 +255,7 @@ class BwslFindUsagesTest : BasePlatformTestCase() {
             mapOf("Common" to "module Common {\n    helper :: (float a) -> float { return a; }\n}\n")
         )
 
-        assertEquals("the import and both qualifiers", offsetsOf("Common"), usages)
+        assertEquals("the import and both qualifiers", collectOffsetsOf("Common"), usages)
     }
 
     fun testOnlyDeclarationNamesCanBeFoundUsagesFor() {

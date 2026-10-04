@@ -40,23 +40,19 @@ class BwslImportedModulesTest {
             "\n" +
             "\n"
 
-    private fun buildIndex(): Pair<BwslAstIndex, AstRoot> {
-        val modules = mapOf("Common" to common)
-        val root = BwslcAstHelper.parse(main, modules)
-        val raw = BwslcAstHelper.parseRaw(main, modules)
-        return BwslAstIndex(root, raw, main) to root
-    }
+    private fun buildIndexForMainModule(): Pair<BwslAstIndex, AstRoot> =
+        BwslcAstHelper.buildIndexAndRoot(main, mapOf("Common" to common))
 
     @Test
-    fun importedModulesAppearInTheAstButNotInRoots() {
-        val (_, root) = buildIndex()
+    fun testImportedModulesAppearInTheAstButNotInRoots() {
+        val (_, root) = buildIndexForMainModule()
         assertEquals(listOf("M", "Common"), root.modules.map { it.name })
-        assertEquals(listOf("M"), root.ownModules().map { it.name })
+        assertEquals(listOf("M"), root.collectOwnModules().map { it.name })
     }
 
     @Test
-    fun importedNodesAreKeptOutOfTheCompiledFilesPositions() {
-        val (index, _) = buildIndex()
+    fun testImportedNodesAreKeptOutOfTheCompiledFilesPositions() {
+        val (index, _) = buildIndexForMainModule()
 
         // `helper` is declared at line 6 of Common.bwsl; indexing it as if it were in main.bwsl
         // would put it on an unrelated line of main (there, line 6 is `return Common::helper();`).
@@ -72,39 +68,39 @@ class BwslImportedModulesTest {
     }
 
     @Test
-    fun membersOfAnImportedStructAreExternalAndPositionedInTheirOwnFile() {
-        val (index, _) = buildIndex()
+    fun testMembersOfAnImportedStructAreExternalAndPositionedInTheirOwnFile() {
+        val (index, _) = buildIndexForMainModule()
         val field = index.externalNodesById.values.firstOrNull { it.id.contains("/field:") && it.name == "size" }
         assertNotNull(field) { "Expected Common's Box.size field in externalNodesById" }
         assertTrue(field!!.sourceFile!!.endsWith("Common.bwsl"))
 
-        val range = index.positionsFor(common).nameRangeOf(field)
+        val range = index.createPositionsFor(common).findNameRangeOf(field)
         assertNotNull(range) { "A struct field has a name position" }
         assertEquals(common.indexOf("size"), range!!.first)
     }
 
     @Test
-    fun importedNodesArePositionedAgainstTheirOwnFilesText() {
-        val (index, _) = buildIndex()
+    fun testImportedNodesArePositionedAgainstTheirOwnFilesText() {
+        val (index, _) = buildIndexForMainModule()
         val helper = index.externalNodesById.values.first { it.type == "FUNCTION" && it.name == "helper" }
 
-        val range = index.positionsFor(common).nameRangeOf(helper)
+        val range = index.createPositionsFor(common).findNameRangeOf(helper)
         assertNotNull(range)
         assertEquals("helper", common.substring(range!!.first, range.last + 1))
         assertEquals(common.indexOf("helper ::"), range.first)
     }
 
     @Test
-    fun blockContextIgnoresImportedModulesLineRanges() {
-        val (_, root) = buildIndex()
+    fun testBlockContextIgnoresImportedModulesLineRanges() {
+        val (_, root) = buildIndexForMainModule()
         // Line 9 of main.bwsl is past the end of module M (lines 1-8) but inside Common's own
         // 1-9 range - it must be top level, not "inside a module".
-        assertEquals(BwslBlockContext.TOP_LEVEL, blockContextAt(root, 9, 1, main))
+        assertEquals(BwslBlockContext.TOP_LEVEL, classifyBlockContextAt(root, 9, 1, main))
     }
 
     @Test
-    fun findScopeIgnoresImportedModulesLineRanges() {
-        val (_, root) = buildIndex()
+    fun testFindScopeIgnoresImportedModulesLineRanges() {
+        val (_, root) = buildIndexForMainModule()
         val scope = findScope(root, 9, 1)
         assertNull(scope.module)
     }

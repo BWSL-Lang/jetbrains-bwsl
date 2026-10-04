@@ -16,7 +16,7 @@ import com.intellij.psi.util.elementType
  * reference found)" means "no reference", full stop.
  */
 fun resolveSymbolAt(file: PsiFile, index: BwslAstIndex, offset: Int): List<PsiElement> =
-    declarationIdsAt(index, offset).mapNotNull { declId -> resolveDeclarationPosition(file, index, declId) }
+    collectDeclarationIdsAt(index, offset).mapNotNull { declId -> resolveDeclarationPosition(file, index, declId) }
 
 /**
  * Builds the [BwslAstIndex] for [file] from what [BwslAstCache] has cached for it, or null when no
@@ -24,18 +24,18 @@ fun resolveSymbolAt(file: PsiFile, index: BwslAstIndex, offset: Int): List<PsiEl
  */
 fun buildAstIndex(file: PsiFile): BwslAstIndex? {
     val path = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.getRoot(path) ?: return null
-    val rawRoot = BwslAstCache.getRawRoot(path) ?: return null
+    val root = BwslAstCache.findRoot(path) ?: return null
+    val rawRoot = BwslAstCache.findRawRoot(path) ?: return null
     return BwslAstIndex(root, rawRoot, file.text)
 }
 
 /**
  * The declaration ids ([AstSymbol.declaration]) the caret at [offset] refers to, following the
  * reference edges out of the node there. Empty when nothing is referenced - a caret on a
- * declaration's own name refers to nothing, it *is* the declaration (see [symbolAt]).
+ * declaration's own name refers to nothing, it *is* the declaration (see [findSymbolAt]).
  */
-fun declarationIdsAt(index: BwslAstIndex, offset: Int): List<String> =
-    referenceEdgesAt(index, offset).mapNotNull { index.symbolsById[it.to]?.declaration }.distinct()
+fun collectDeclarationIdsAt(index: BwslAstIndex, offset: Int): List<String> =
+    collectReferenceEdgesAt(index, offset).mapNotNull { index.symbolsById[it.to]?.declaration }.distinct()
 
 /**
  * The reference edges out of the node at [offset]: the edges of the node whose name is there, minus
@@ -43,11 +43,11 @@ fun declarationIdsAt(index: BwslAstIndex, offset: Int): List<String> =
  * declaration's own name would navigate a field to its type). A caret on a variable's declared-type
  * text, or a function's return-type text, is the one place those are the answer.
  */
-fun referenceEdgesAt(index: BwslAstIndex, offset: Int): List<AstReference> {
-    index.nodeAtOffset(offset)?.let { hit ->
+fun collectReferenceEdgesAt(index: BwslAstIndex, offset: Int): List<AstReference> {
+    index.findNodeAtOffset(offset)?.let { hit ->
         return index.refsByFrom[hit.id].orEmpty().filter { it.role !in DECLARATION_ROLES }
     }
-    val declared = index.declaredTypeAtOffset(offset) ?: return emptyList()
+    val declared = index.findTypedDeclarationAtOffset(offset) ?: return emptyList()
     return index.refsByFrom[declared.id].orEmpty()
 }
 
@@ -55,9 +55,9 @@ fun referenceEdgesAt(index: BwslAstIndex, offset: Int): List<AstReference> {
  * The symbol the caret at [offset] is on or refers to: the declaration's own symbol when the caret
  * is on a declaration's name, otherwise the symbol its reference edge points at.
  */
-fun symbolAt(index: BwslAstIndex, offset: Int): AstSymbol? {
-    index.nodeAtOffset(offset)?.let { hit -> index.symbolsById[hit.id]?.let { return it } }
-    return declarationIdsAt(index, offset).firstNotNullOfOrNull { index.symbolsById[it] }
+fun findSymbolAt(index: BwslAstIndex, offset: Int): AstSymbol? {
+    index.findNodeAtOffset(offset)?.let { hit -> index.symbolsById[hit.id]?.let { return it } }
+    return collectDeclarationIdsAt(index, offset).firstNotNullOfOrNull { index.symbolsById[it] }
 }
 
 /**
@@ -65,7 +65,7 @@ fun symbolAt(index: BwslAstIndex, offset: Int): AstSymbol? {
  * symbol's type, and its parameters are the parameter symbols it owns, in order. Null for any other
  * kind of symbol.
  */
-fun functionSignatureOf(index: BwslAstIndex, symbol: AstSymbol): BwslFunctionSignature? {
+fun buildFunctionSignature(index: BwslAstIndex, symbol: AstSymbol): BwslFunctionSignature? {
     if (symbol.kind != "function" && symbol.kind != "method") return null
     val params = index.symbolsById.values
         .filter { it.kind == "parameter" && it.owner == symbol.declaration }
@@ -83,7 +83,7 @@ private val DECLARATION_ROLES = setOf("type", "return-type")
  * ambiguous with usages - in a REFERENCE node; declaration-site tokens for functions/modules/
  * structs are not).
  */
-fun elementAtOffset(file: PsiFile, offset: Int): PsiElement? {
+fun findElementAtOffset(file: PsiFile, offset: Int): PsiElement? {
     val leaf = file.findElementAt(offset) ?: return null
     val parent = leaf.parent
     return if (parent?.elementType == BwslTokenTypes.REFERENCE) parent else leaf
@@ -99,8 +99,8 @@ private fun resolveInSourceFile(file: PsiFile, index: BwslAstIndex, node: AstNod
     val path = node.sourceFile ?: return null
     val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.replace('\\', '/')) ?: return null
     val target = PsiManager.getInstance(file.project).findFile(virtualFile) ?: return null
-    val range = index.positionsFor(target.text).nameRangeOf(node) ?: return null
-    return elementAtOffset(target, range.first)
+    val range = index.createPositionsFor(target.text).findNameRangeOf(node) ?: return null
+    return findElementAtOffset(target, range.first)
 }
 
 /** Resolves a declaration id (real, synthetic, or builtin) from [AstSymbol.declaration] to a PSI element. */
@@ -108,7 +108,7 @@ private fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declI
     if (declId.startsWith("builtin:")) return null
 
     index.nodesById[declId]?.let { node ->
-        return index.nameRangeOf(node)?.let { range -> elementAtOffset(file, range.first) }
+        return index.findNameRangeOf(node)?.let { range -> findElementAtOffset(file, range.first) }
     }
     index.externalNodesById[declId]?.let { node ->
         return resolveInSourceFile(file, index, node)
@@ -119,7 +119,7 @@ private fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declI
     // definition - so go to the first assignment the symbol lists, at that assignment's target.
     val symbol = index.symbolsById[declId] ?: return null
     if (declId.substringAfter('/', "").substringBefore(':') != "interface") return null
-    val targetId = symbol.definitions.firstNotNullOfOrNull { index.assignmentTargetOf(it) } ?: return null
+    val targetId = symbol.definitions.firstNotNullOfOrNull { index.findAssignmentTargetOf(it) } ?: return null
     val targetNode = index.nodesById[targetId] ?: return null
-    return index.nameRangeOf(targetNode)?.let { range -> elementAtOffset(file, range.first) }
+    return index.findNameRangeOf(targetNode)?.let { range -> findElementAtOffset(file, range.first) }
 }

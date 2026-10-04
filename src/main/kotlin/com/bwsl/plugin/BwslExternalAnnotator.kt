@@ -80,7 +80,7 @@ class BwslExternalAnnotator : ExternalAnnotator<String, List<Diagnostic>>() {
     private fun resolveCompilerPath(): String? {
         val configured = BwslSettings.getInstance().compilerPath
         if (configured.isNotBlank()) return configured
-        val downloaded = BwslCompilerDownloader.installPath()
+        val downloaded = BwslCompilerDownloader.getInstallPath()
         return if (downloaded.toFile().exists()) downloaded.toString() else null
     }
 }

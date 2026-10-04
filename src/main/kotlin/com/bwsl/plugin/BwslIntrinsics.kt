@@ -14,6 +14,8 @@ data class IntrinsicFunction(
     val description: String = ""
 )
 
+// Terse table builders, kept short on purpose: they are used once per row of a long declarative table.
+// `p` builds a parameter, `fn` builds an intrinsic function.
 private fun p(type: String, name: String) = IntrinsicParam(type, name)
 private fun fn(
     name: String, ret: String, vararg params: IntrinsicParam,

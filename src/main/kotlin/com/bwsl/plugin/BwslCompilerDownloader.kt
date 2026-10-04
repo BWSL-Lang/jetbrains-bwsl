@@ -18,17 +18,17 @@ object BwslCompilerDownloader {
     private const val LATEST_RELEASE_URL = "https://api.github.com/repos/BWSL-Lang/BWSL/releases/latest"
 
     /** Where a downloaded compiler is stored, so it can be reused across IDE sessions. */
-    fun installPath(): Path {
+    fun getInstallPath(): Path {
         val osName = System.getProperty("os.name").lowercase()
         val extension = if (osName.contains("win")) ".exe" else ""
         return Path.of(PathManager.getSystemPath(), "bwsl", "bwslc$extension")
     }
 
     /**
-     * Downloads the latest bwslc release matching the current OS/architecture to [installPath],
+     * Downloads the latest bwslc release matching the current OS/architecture to [getInstallPath],
      * overwriting any existing file there. Returns the installed path.
      */
-    fun downloadLatest(target: Path = installPath()): Path {
+    fun downloadLatest(target: Path = getInstallPath()): Path {
         val osName = System.getProperty("os.name").lowercase()
         val archName = System.getProperty("os.arch").lowercase()
         val arch = if (archName == "aarch64" || archName == "arm64") "arm64" else "x64"

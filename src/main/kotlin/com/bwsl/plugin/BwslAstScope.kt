@@ -5,7 +5,7 @@ import com.intellij.psi.PsiFile
 data class AstScope(val module: AstModule?, val struct: AstStruct?, val pass: AstPass?, val pipeline: AstPipeline? = null)
 
 /** Converts a zero-based document offset to a 1-based (line, column) pair, matching bwslc's AST positions. */
-fun lineColumnAt(file: PsiFile, offset: Int): Pair<Int, Int>? {
+fun toLineColumn(file: PsiFile, offset: Int): Pair<Int, Int>? {
     val doc = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return null
     if (offset < 0 || offset > doc.textLength) return null
     val line = doc.getLineNumber(offset)
@@ -13,10 +13,8 @@ fun lineColumnAt(file: PsiFile, offset: Int): Pair<Int, Int>? {
     return (line + 1) to (column + 1)
 }
 
-fun astContains(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean =
-    contains(line, column, startLine, startColumn, endLine, endColumn)
-
-private fun contains(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean {
+/** Whether the 1-based ([line], [column]) lies inside the range from the start position to the end position, inclusive. */
+fun doesRangeContain(line: Int, column: Int, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int): Boolean {
     if (line < startLine || line > endLine) return false
     if (line == startLine && column < startColumn) return false
     if (line == endLine && column > endColumn) return false
@@ -34,17 +32,17 @@ fun findScope(root: AstRoot, line: Int, column: Int): AstScope {
         when {
             rootId.startsWith("MODULE:") -> {
                 val module = root.modules.firstOrNull { it.id == rootId } ?: continue
-                if (contains(line, column, module.line, module.column, module.endLine, module.endColumn)) {
-                    val struct = module.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                if (doesRangeContain(line, column, module.line, module.column, module.endLine, module.endColumn)) {
+                    val struct = module.structs.firstOrNull { doesRangeContain(line, column, it.line, it.column, it.endLine, it.endColumn) }
                     return AstScope(module, struct, null)
                 }
             }
             rootId.startsWith("PIPELINE:") -> {
                 val pipeline = root.pipelines.firstOrNull { it.id == rootId } ?: continue
-                if (contains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
-                    val pass = pipeline.passes.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                if (doesRangeContain(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) {
+                    val pass = pipeline.passes.firstOrNull { doesRangeContain(line, column, it.line, it.column, it.endLine, it.endColumn) }
                     if (pass != null) return AstScope(null, null, pass, pipeline)
-                    val struct = pipeline.structs.firstOrNull { contains(line, column, it.line, it.column, it.endLine, it.endColumn) }
+                    val struct = pipeline.structs.firstOrNull { doesRangeContain(line, column, it.line, it.column, it.endLine, it.endColumn) }
                     if (struct != null) return AstScope(null, struct, null, pipeline)
                 }
             }
@@ -85,21 +83,21 @@ enum class BwslBlockContext {
     STATEMENT_BODY
 }
 
-private fun astContainsRange(line: Int, column: Int, r: AstStage) =
-    astContains(line, column, r.line, r.column, r.endLine, r.endColumn)
+private fun doesNodeContain(line: Int, column: Int, r: AstStage) =
+    doesRangeContain(line, column, r.line, r.column, r.endLine, r.endColumn)
 
-private fun astContainsRange(line: Int, column: Int, fn: AstFunction) =
-    astContains(line, column, fn.line, fn.column, fn.endLine, fn.endColumn)
+private fun doesNodeContain(line: Int, column: Int, fn: AstFunction) =
+    doesRangeContain(line, column, fn.line, fn.column, fn.endLine, fn.endColumn)
 
-private fun structContext(struct: AstStruct, line: Int, column: Int): BwslBlockContext {
-    val fn = struct.methods.firstOrNull { astContainsRange(line, column, it) }
+private fun classifyStructContext(struct: AstStruct, line: Int, column: Int): BwslBlockContext {
+    val fn = struct.methods.firstOrNull { doesNodeContain(line, column, it) }
     return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.STRUCT_BODY
 }
 
-private fun passContext(pass: AstPass, line: Int, column: Int): BwslBlockContext {
+private fun classifyPassContext(pass: AstPass, line: Int, column: Int): BwslBlockContext {
     val stages = listOfNotNull(pass.vertexShader, pass.fragmentShader, pass.computeShader)
-    if (stages.any { astContainsRange(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
-    if (pass.functions.any { astContainsRange(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
+    if (stages.any { doesNodeContain(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
+    if (pass.functions.any { doesNodeContain(line, column, it) }) return BwslBlockContext.STATEMENT_BODY
     return BwslBlockContext.PASS_BODY
 }
 
@@ -110,7 +108,7 @@ private fun passContext(pass: AstPass, line: Int, column: Int): BwslBlockContext
  * so this brace-matching is needed to correctly classify positions where no declaration exists yet
  * (e.g. an empty line while typing a new declaration, or a still-empty block).
  */
-private fun blockLineRange(text: String, keyword: String): IntRange? {
+private fun findBlockLineRange(text: String, keyword: String): IntRange? {
     val match = Regex("\\b$keyword\\s*\\{").find(text) ?: return null
     val startLine = text.substring(0, match.range.first).count { it == '\n' } + 1
     var depth = 0
@@ -127,26 +125,26 @@ private fun blockLineRange(text: String, keyword: String): IntRange? {
 }
 
 /** Determines which kind of block surrounds the given (1-based) source position, based on AST ranges. */
-fun blockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): BwslBlockContext {
-    for (module in root.ownModules()) {
-        if (!astContains(line, column, module.line, module.column, module.endLine, module.endColumn)) continue
-        val struct = module.structs.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-        if (struct != null) return structContext(struct, line, column)
-        val fn = module.functions.firstOrNull { astContainsRange(line, column, it) }
+fun classifyBlockContextAt(root: AstRoot, line: Int, column: Int, text: String = ""): BwslBlockContext {
+    for (module in root.collectOwnModules()) {
+        if (!doesRangeContain(line, column, module.line, module.column, module.endLine, module.endColumn)) continue
+        val struct = module.structs.firstOrNull { doesRangeContain(line, column, it.line, it.column, it.endLine, it.endColumn) }
+        if (struct != null) return classifyStructContext(struct, line, column)
+        val fn = module.functions.firstOrNull { doesNodeContain(line, column, it) }
         return if (fn != null) BwslBlockContext.STATEMENT_BODY else BwslBlockContext.MODULE_BODY
     }
-    for (pipeline in root.ownPipelines()) {
-        if (!astContains(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) continue
-        val pass = pipeline.passes.firstOrNull { astContains(line, column, it.line, it.column, it.endLine, it.endColumn) }
-        if (pass != null) return passContext(pass, line, column)
+    for (pipeline in root.collectOwnPipelines()) {
+        if (!doesRangeContain(line, column, pipeline.line, pipeline.column, pipeline.endLine, pipeline.endColumn)) continue
+        val pass = pipeline.passes.firstOrNull { doesRangeContain(line, column, it.line, it.column, it.endLine, it.endColumn) }
+        if (pass != null) return classifyPassContext(pass, line, column)
 
         // bwslc's AST gives only point locations for individual attributes/resources/variants
         // declarations, not a range for the enclosing block, so brace-matching on the source text
-        // is used to find each block's extent (see blockLineRange).
+        // is used to find each block's extent (see findBlockLineRange).
         val sections = listOfNotNull(
-            if (pipeline.attributes.isNotEmpty()) blockLineRange(text, "attributes")?.let { it to BwslBlockContext.ATTRIBUTES_BODY } else null,
-            if (pipeline.resources.isNotEmpty()) blockLineRange(text, "resources")?.let { it to BwslBlockContext.RESOURCES_BODY } else null,
-            if (pipeline.variantDecls.isNotEmpty()) blockLineRange(text, "variants")?.let { it to BwslBlockContext.VARIANTS_BODY } else null
+            if (pipeline.attributes.isNotEmpty()) findBlockLineRange(text, "attributes")?.let { it to BwslBlockContext.ATTRIBUTES_BODY } else null,
+            if (pipeline.resources.isNotEmpty()) findBlockLineRange(text, "resources")?.let { it to BwslBlockContext.RESOURCES_BODY } else null,
+            if (pipeline.variantDecls.isNotEmpty()) findBlockLineRange(text, "variants")?.let { it to BwslBlockContext.VARIANTS_BODY } else null
         )
 
         return sections.firstOrNull { line in it.first }?.second ?: BwslBlockContext.PIPELINE_BODY
@@ -203,7 +201,7 @@ fun deduceExprType(expr: AstExpr, block: AstBlock? = null, attributes: List<AstA
  * declaration" node — outputs are plain ASSIGNMENT statements whose target is a MEMBER_ACCESS on
  * the built-in `output` identifier (identifierKind == "OUTPUT").
  */
-fun vertexOutputAssignments(pass: AstPass, attributes: List<AstAttributeDecl> = emptyList()): Map<String, VertexOutput> {
+fun collectVertexOutputAssignments(pass: AstPass, attributes: List<AstAttributeDecl> = emptyList()): Map<String, VertexOutput> {
     val block = pass.vertexShader?.body
     return collectAssignments(block)
         .filter { it.target?.type == "MEMBER_ACCESS" && it.target.objectExpr?.identifierKind == "OUTPUT" }
@@ -223,7 +221,7 @@ fun vertexOutputAssignments(pass: AstPass, attributes: List<AstAttributeDecl> = 
  * Returns the [AstAttributeDecl] entries from [pipeline] that are listed in the pass's
  * `usedAttributes` list, preserving the declaration order from the pipeline's attributes block.
  */
-fun passUsedAttributes(pass: AstPass, pipeline: AstPipeline): List<AstAttributeDecl> {
+fun collectPassUsedAttributes(pass: AstPass, pipeline: AstPipeline): List<AstAttributeDecl> {
     if (pass.usedAttributes.isEmpty()) return emptyList()
     val byName = pipeline.attributes.associateBy { it.name }
     return pass.usedAttributes.mapNotNull { byName[it.name] }

@@ -3,21 +3,13 @@ package com.bwsl.plugin.references
 import com.bwsl.plugin.*
 import com.bwsl.plugin.completion.BwslcAstHelper
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 /**
  * Exercises the real [BwslReferenceContributor] dispatch end-to-end (via `element.parent.references`,
  * exactly as the IDE would), against real bwslc output rather than hand-built AstRoot literals
  * (which have no reference index to resolve against).
  */
-class BwslReferenceTest : BasePlatformTestCase() {
-
-    private fun configureAndCache(text: String): String {
-        myFixture.configureByText("test.bwsl", text)
-        val source = myFixture.file.text
-        BwslcAstHelper.parseAndCache(source, myFixture.file.virtualFile.path)
-        return source
-    }
+class BwslReferenceTest : BwslAstFixtureTestCase() {
 
     fun testReceiverMethodCallResolvesViaVariableType() {
         // s1 and s2 both call test(), but their declared types point to different structs
@@ -199,7 +191,7 @@ class BwslReferenceTest : BasePlatformTestCase() {
         assertEquals(BwslTokenTypes.REFERENCE, resolved!!.node.elementType)
         assertEquals("normalized", resolved.text)
         assertTrue(resolved.textOffset < element.textOffset)
-        val prevType = previousNonWhitespace(resolved)?.node?.elementType
+        val prevType = findPreviousNonWhitespace(resolved)?.node?.elementType
         assertEquals(BwslTokenTypes.KW_FLOAT2, prevType)
     }
 
@@ -220,7 +212,7 @@ class BwslReferenceTest : BasePlatformTestCase() {
 
         assertNotNull("Expected 'pos' usage to resolve to its parameter declaration", resolved)
         assertEquals("pos", resolved!!.text)
-        val prevType = previousNonWhitespace(resolved)?.node?.elementType
+        val prevType = findPreviousNonWhitespace(resolved)?.node?.elementType
         assertEquals(BwslTokenTypes.KW_FLOAT2, prevType)
         assertTrue(resolved.textOffset < element.textOffset)
     }

@@ -9,7 +9,7 @@ import java.io.File
 class BwslLexerFunctionCallTest {
 
     @Test
-    fun rotateOnLine15IsAFunctionCall() {
+    fun testRotateOnLine15IsAFunctionCall() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val token = tokens.firstOrNull { it.line == 15 && it.text == "rotate" }
         assertNotNull(token) { "Expected 'rotate' token on line 15" }
@@ -17,7 +17,7 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
-    fun ifIsNotAFunctionCall() {
+    fun testIfIsNotAFunctionCall() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val token = tokens.firstOrNull { it.line == 12 && it.text == "if" }
         assertNotNull(token) { "Expected 'if' token on line 12" }
@@ -25,7 +25,7 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
-    fun functionDeclarationNamesAreTokenizedCorrectly() {
+    fun testFunctionDeclarationNamesAreTokenizedCorrectly() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         listOf(2 to "rotate", 11 to "rotate90DegreesAroundOrigo").forEach { (line, name) ->
             val token = tokens.firstOrNull { it.line == line && it.text == name }
@@ -37,7 +37,7 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
-    fun cosAndSinAreIntrinsicCalls() {
+    fun testCosAndSinAreIntrinsicCalls() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val intrinsics = tokens.filter { (it.text == "cos" || it.text == "sin") && it.line != 23 }
         assertNotNull(intrinsics.firstOrNull()) { "Expected cos/sin tokens in file" }
@@ -49,7 +49,7 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
-    fun methodCallOnReceiverIsNotAnIntrinsic() {
+    fun testMethodCallOnReceiverIsNotAnIntrinsic() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val cosCall = tokens.firstOrNull { it.line == 23 && it.text == "cos" }
         assertNotNull(cosCall) { "Expected 'cos' token on line 23" }
@@ -59,7 +59,7 @@ class BwslLexerFunctionCallTest {
     }
 
     @Test
-    fun lengthCallOnArrayReceiverIsStillAnIntrinsic() {
+    fun testLengthCallOnArrayReceiverIsStillAnIntrinsic() {
         val tokens = tokenizeResource("lexer_test_files/module.bwsl")
         val lengthCall = tokens.firstOrNull { it.line == 22 && it.text == "length" }
         assertNotNull(lengthCall) { "Expected 'length' token on line 22" }

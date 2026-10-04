@@ -52,7 +52,7 @@ predicates, …); that file says which verb to use for which kind of function.
   raw JSON tree.
 - `BwslAstIndex.kt` — a generic id → position index built by walking the *raw* JSON tree (not the
   typed model, which can't practically mirror every node type), plus lookups over the compiler's
-  own `referenceIndex` (`symbolsById`/`refsByFrom`/`refsByTo`). `nameRangeOf` is just a node's
+  own `referenceIndex` (`symbolsById`/`refsByFrom`/`refsByTo`). `findNameRangeOf` is just a node's
   `nameLine`/`nameColumn` plus its name (`member` for a `MEMBER_ACCESS`), failing closed to null
   when absent — a node's own `line`/`column` is **not** its name (a `VARIABLE_DECL` points at the
   declared type, a `MODULE` at the keyword, a `MEMBER_ACCESS` at the dot). **Other files are in
@@ -60,11 +60,11 @@ predicates, …); that file says which verb to use for which kind of function.
   line/column are relative to the file they were written in, which `sourceFile` names on every
   top-level entry and member (inherited down by `AstNodePos.sourceFile`). `AstRoot.roots` says
   which entries are the compiled file's own. Never measure `AstRoot.modules`/`pipelines` directly
-  against the current file's text: use `ownModules()`/`ownPipelines()`, or `BwslAstIndex.nodesById`
+  against the current file's text: use `collectOwnModules()`/`collectOwnPipelines()`, or `BwslAstIndex.nodesById`
   (written by the compiled file) vs `externalNodesById` (written elsewhere, measured against that
   node's `sourceFile` text via `SourcePositions`).
 - `BwslAstResolver.kt` — `resolveSymbolAt(file, index, offset)`: the single generic resolver.
-  Caret → occurrence node (via `nameRangeOf`) → the reference-index edge from that node → the
+  Caret → occurrence node (via `findNameRangeOf`) → the reference-index edge from that node → the
   target symbol's declaration → that declaration's position (an own node, an external node opened
   through its `sourceFile`, or a stage-interface value, which has no declaration and resolves to
   the target of the first assignment in the symbol's `definitions`) → PSI element. A caret on a
@@ -72,8 +72,8 @@ predicates, …); that file says which verb to use for which kind of function.
   navigate to its type. Returns no results (not a guess) when nothing resolves — see "no
   fallback" below.
 - `BwslPsiReferences.kt` — `BwslAstReference`, the one `PsiReference` (backed by `resolveSymbolAt`).
-- Also index-driven, through `declarationIdsAt`/`referenceEdgesAt`/`symbolAt`/
-  `functionSignatureOf` in `BwslAstResolver.kt` and `BwslAstIndex.enclosingNodeOfType`: every hover
+- Also index-driven, through `collectDeclarationIdsAt`/`collectReferenceEdgesAt`/`findSymbolAt`/
+  `buildFunctionSignature` in `BwslAstResolver.kt` and `BwslAstIndex.findEnclosingNodeOfType`: every hover
   doc (`BwslDocumentationProvider`) and parameter info for non-intrinsic calls
   (`BwslParameterInfoHandler`). A function's signature is its symbol plus the parameter symbols it
   owns; its qualified name is its owners' names. The `input.x`/`output.x`/`attributes.x` docs follow
@@ -97,9 +97,9 @@ predicates, …); that file says which verb to use for which kind of function.
   target; there is no rename.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
-  `blockContextAt`, `vertexOutputAssignments`, `passUsedAttributes`, `deduceExprType`) and line
+  `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line
   ranges. Nothing else may use those helpers. The parameters, locals, consts and loop variables it
-  offers in a function or stage body come from `visibleLocalsAt` (`BwslAstLocals.kt`), which walks
+  offers in a function or stage body come from `collectVisibleLocalsAt` (`BwslAstLocals.kt`), which walks
   the *raw* cached AST down to the position (only into containers whose range holds it) rather than
   asking the reference index: it answers "what could be typed here", not "what does this name
   refer to". A name counts once it is declared and only while its block is open; module-, pipeline-

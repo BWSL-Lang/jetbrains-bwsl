@@ -57,11 +57,11 @@ class BwslLexerAdapter : LexerBase() {
             prevSignificantType == BwslTokenTypes.KW_EXTENDS -> raw.copy(type = BwslTokenTypes.MODULE_QUALIFIER)
             // "name :: (" is a function declaration; "Name::Thing" / "Name::func(...)" is a
             // module qualifier, "Name" should be tagged MODULE_QUALIFIER.
-            nextNonWhitespace(0)?.type == BwslTokenTypes.COLONCOLON ->
-                if (nextNonWhitespace(1)?.type == BwslTokenTypes.LPAREN)
+            findNextNonWhitespace(0)?.type == BwslTokenTypes.COLONCOLON ->
+                if (findNextNonWhitespace(1)?.type == BwslTokenTypes.LPAREN)
                     raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
                 else raw.copy(type = BwslTokenTypes.MODULE_QUALIFIER)
-            nextNonWhitespace(0)?.type == BwslTokenTypes.LPAREN ->
+            findNextNonWhitespace(0)?.type == BwslTokenTypes.LPAREN ->
                 raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
                                     BwslTokenTypes.INTRINSIC_CALL
                                 else BwslTokenTypes.FUNCTION_CALL)
@@ -70,7 +70,7 @@ class BwslLexerAdapter : LexerBase() {
     }
 
     /** Returns the (skip+1)-th non-whitespace token after the current position (0-based). */
-    private fun nextNonWhitespace(skip: Int): Tok? {
+    private fun findNextNonWhitespace(skip: Int): Tok? {
         var i = 0
         var found = 0
         while (true) {

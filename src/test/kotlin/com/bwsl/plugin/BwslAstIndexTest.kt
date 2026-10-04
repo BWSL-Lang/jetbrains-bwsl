@@ -8,36 +8,30 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Verifies against real bwslc output that [BwslAstIndex.nameRangeOf] - which is just a node's
+ * Verifies against real bwslc output that [BwslAstIndex.findNameRangeOf] - which is just a node's
  * nameLine/nameColumn plus its name - lands on the actual identifier text, not just "close to" it.
  * Every resolution in the plugin depends on that.
  */
 class BwslAstIndexTest {
 
-    private fun moduleBwslSource(): String =
+    private fun readModuleBwslSource(): String =
         File(javaClass.classLoader.getResource("lexer_test_files/module.bwsl")!!.toURI()).readText()
-
-    private fun buildIndex(source: String): Pair<BwslAstIndex, AstRoot> {
-        val root = BwslcAstHelper.parse(source)
-        val raw = BwslcAstHelper.parseRaw(source)
-        return BwslAstIndex(root, raw, source) to root
-    }
 
     private fun assertNameRangeIs(index: BwslAstIndex, source: String, nodeId: String, expected: String) {
         val node = index.nodesById[nodeId]
         assertNotNull(node) { "Expected node $nodeId in index" }
-        val range = index.nameRangeOf(node!!)
-        assertNotNull(range) { "Expected nameRangeOf to resolve a range for $nodeId (${node.type})" }
+        val range = index.findNameRangeOf(node!!)
+        assertNotNull(range) { "Expected findNameRangeOf to resolve a range for $nodeId (${node.type})" }
         assertEquals(
             expected, source.substring(range!!.first, range.last + 1),
-            "nameRangeOf mismatch for $nodeId (${node.type}) at ${node.line}:${node.column}"
+            "findNameRangeOf mismatch for $nodeId (${node.type}) at ${node.line}:${node.column}"
         )
     }
 
     @Test
-    fun everyReferenceEdgeFromANamedNodeResolvesToItsIdentifierText() {
-        val source = moduleBwslSource()
-        val (index, root) = buildIndex(source)
+    fun testEveryReferenceEdgeFromANamedNodeResolvesToItsIdentifierText() {
+        val source = readModuleBwslSource()
+        val (index, root) = BwslcAstHelper.buildIndexAndRoot(source)
         val references = root.referenceIndex?.references.orEmpty()
         assertTrue(references.isNotEmpty(), "Expected a non-empty reference index for module.bwsl")
 
@@ -52,55 +46,55 @@ class BwslAstIndexTest {
     }
 
     @Test
-    fun forLoopInitVariableDeclHasBothNameAndTypeRanges() {
+    fun testForLoopInitVariableDeclHasBothNameAndTypeRanges() {
         // A for-loop's `int i = 0` init clause is a VARIABLE_DECL under the loop node rather than in a
         // block's statements; it must have both a name ("i") and a declared-type ("int") range.
-        val source = moduleBwslSource()
-        val (index, _) = buildIndex(source)
+        val source = readModuleBwslSource()
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
         val forInit = index.nodesById["VARIABLE_DECL:3"]
         assertNotNull(forInit) { "Expected VARIABLE_DECL:3 (the for-loop's 'int i') in the index" }
         assertEquals("i", forInit!!.name)
 
         assertNameRangeIs(index, source, "VARIABLE_DECL:3", "i")
 
-        val typeRange = index.typeRangeOf(forInit)
+        val typeRange = index.findTypeRangeOf(forInit)
         assertNotNull(typeRange) { "Expected a resolvable type range for the for-loop's 'int i'" }
         assertEquals("int", source.substring(typeRange!!.first, typeRange.last + 1))
     }
 
     @Test
-    fun moduleNameRangeSkipsTheModuleKeyword() {
-        val source = moduleBwslSource()
-        val (index, _) = buildIndex(source)
+    fun testModuleNameRangeSkipsTheModuleKeyword() {
+        val source = readModuleBwslSource()
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
         assertNameRangeIs(index, source, "MODULE:0", "Test1")
         assertNameRangeIs(index, source, "MODULE:1", "LengthMethodTest")
         assertNameRangeIs(index, source, "MODULE:2", "LengthTest2")
     }
 
     @Test
-    fun structDeclNameRangeSkipsTheStructKeyword() {
-        val source = moduleBwslSource()
-        val (index, _) = buildIndex(source)
+    fun testStructDeclNameRangeSkipsTheStructKeyword() {
+        val source = readModuleBwslSource()
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
         assertNameRangeIs(index, source, "STRUCT_DECL:0", "testStruct")
         assertNameRangeIs(index, source, "STRUCT_DECL:1", "testStruct")
     }
 
     @Test
-    fun receiverAndQualifiedFunctionCallsPointAtTheNameNotTheDotOrColonColon() {
-        val source = moduleBwslSource()
-        val (index, _) = buildIndex(source)
+    fun testReceiverAndQualifiedFunctionCallsPointAtTheNameNotTheDotOrColonColon() {
+        val source = readModuleBwslSource()
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
 
         // line/column of "values.length()" is the dot and of "Mod::test(values)" the "::", but
         // nameLine/nameColumn is the name in both - check the character just before it.
         val calls = index.nodesById.values.filter { it.type == "FUNCTION_CALL" && it.name != null }
         for (call in calls) assertNameRangeIs(index, source, call.id, call.name!!)
-        val before = calls.map { source[index.nameRangeOf(it)!!.first - 1] }
+        val before = calls.map { source[index.findNameRangeOf(it)!!.first - 1] }
         assertTrue('.' in before, "Expected a receiver call (recv.f()) in module.bwsl")
         assertTrue(':' in before, "Expected a module-qualified call (Mod::f()) in module.bwsl")
     }
 
     @Test
-    fun everyNamedNodeIncludingMembersOfADeclarationPointsAtItsNameText() {
+    fun testEveryNamedNodeIncludingMembersOfADeclarationPointsAtItsNameText() {
         // Every named node has nameLine/nameColumn: struct fields, parameters,
         // attributes, used attributes, fragment outputs, consts and import/using entries included.
         val source = """
@@ -126,7 +120,7 @@ class BwslAstIndexTest {
                 }
             }
         """.trimIndent() + "\n"
-        val (index, _) = buildIndex(source)
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
 
         val expectedKinds = listOf("/field:", "/used-attribute:", "/fragment-output:", "ATTRIBUTE_DECL:", "PIPELINE:", "PASS:")
         for (kind in expectedKinds) {
@@ -141,7 +135,7 @@ class BwslAstIndexTest {
     }
 
     @Test
-    fun pipelineAttributeAndMemberAccessNameRangesAreCorrect() {
+    fun testPipelineAttributeAndMemberAccessNameRangesAreCorrect() {
         val source = "pipeline ShaderIoTest {\n" +
             "    attributes {\n" +
             "        position: float4\n" +
@@ -157,7 +151,7 @@ class BwslAstIndexTest {
             "        }\n" +
             "    }\n" +
             "}\n"
-        val (index, root) = buildIndex(source)
+        val (index, root) = BwslcAstHelper.buildIndexAndRoot(source)
 
         // PIPELINE: line/column is the keyword, nameLine/nameColumn the name.
         assertNameRangeIs(index, source, "PIPELINE:0", "ShaderIoTest")
@@ -176,7 +170,7 @@ class BwslAstIndexTest {
     }
 
     @Test
-    fun functionReturnTypeRangeCoversTheTypeTextIncludingItsQualifier() {
+    fun testFunctionReturnTypeRangeCoversTheTypeTextIncludingItsQualifier() {
         val source = """
             module Common {
                 struct Box {
@@ -199,17 +193,17 @@ class BwslAstIndexTest {
                 }
             }
         """.trimIndent() + "\n"
-        val (index, _) = buildIndex(source)
+        val (index, _) = BwslcAstHelper.buildIndexAndRoot(source)
 
-        fun returnTypeText(name: String): String {
+        fun readReturnTypeText(name: String): String {
             val fn = index.nodesById.values.first { it.type == "FUNCTION" && it.name == name }
-            val range = index.typeRangeOf(fn)
+            val range = index.findTypeRangeOf(fn)
             assertNotNull(range) { "Expected a return-type range for $name" }
             return source.substring(range!!.first, range.last + 1)
         }
 
-        assertEquals("Local", returnTypeText("plain"))
-        assertEquals("Common::Box", returnTypeText("qualified"))
+        assertEquals("Local", readReturnTypeText("plain"))
+        assertEquals("Common::Box", readReturnTypeText("qualified"))
         // The qualifier is its own positioned node, named by nameLine/nameColumn.
         assertNameRangeIs(index, source, index.nodesById.keys.first { it.endsWith("/return-type-qualifier") }, "Common")
     }
