@@ -83,7 +83,7 @@ private val DECLARATION_ROLES = setOf("type", "return-type")
  * ambiguous with usages - in a REFERENCE node; declaration-site tokens for functions/modules/
  * structs are not).
  */
-private fun elementAt(file: PsiFile, offset: Int): PsiElement? {
+fun elementAtOffset(file: PsiFile, offset: Int): PsiElement? {
     val leaf = file.findElementAt(offset) ?: return null
     val parent = leaf.parent
     return if (parent?.elementType == BwslTokenTypes.REFERENCE) parent else leaf
@@ -100,7 +100,7 @@ private fun resolveInSourceFile(file: PsiFile, index: BwslAstIndex, node: AstNod
     val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.replace('\\', '/')) ?: return null
     val target = PsiManager.getInstance(file.project).findFile(virtualFile) ?: return null
     val range = index.positionsFor(target.text).nameRangeOf(node) ?: return null
-    return elementAt(target, range.first)
+    return elementAtOffset(target, range.first)
 }
 
 /** Resolves a declaration id (real, synthetic, or builtin) from [AstSymbol.declaration] to a PSI element. */
@@ -108,7 +108,7 @@ private fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declI
     if (declId.startsWith("builtin:")) return null
 
     index.nodesById[declId]?.let { node ->
-        return index.nameRangeOf(node)?.let { range -> elementAt(file, range.first) }
+        return index.nameRangeOf(node)?.let { range -> elementAtOffset(file, range.first) }
     }
     index.externalNodesById[declId]?.let { node ->
         return resolveInSourceFile(file, index, node)
@@ -121,5 +121,5 @@ private fun resolveDeclarationPosition(file: PsiFile, index: BwslAstIndex, declI
     if (declId.substringAfter('/', "").substringBefore(':') != "interface") return null
     val targetId = symbol.definitions.firstNotNullOfOrNull { index.assignmentTargetOf(it) } ?: return null
     val targetNode = index.nodesById[targetId] ?: return null
-    return index.nameRangeOf(targetNode)?.let { range -> elementAt(file, range.first) }
+    return index.nameRangeOf(targetNode)?.let { range -> elementAtOffset(file, range.first) }
 }

@@ -30,6 +30,8 @@ data class AstNodePos(
     val returnTypeLine: Int? = null,
     val returnTypeColumn: Int? = null,
     val returnType: String? = null,
+    /** Present on parameters and struct fields - the declared type's text (qualified, as written). */
+    val dataType: String? = null,
     /** Present on nodes with a body range (FUNCTION, STRUCT_DECL, MODULE, PIPELINE, PASS, ...). */
     val endLine: Int? = null,
     val endColumn: Int? = null,
@@ -78,14 +80,15 @@ class SourcePositions(private val text: String) {
 
     /**
      * The character range (0-based, end-exclusive) of the *type* text a declaration carries -
-     * distinct from [nameRangeOf], which returns its name: a VARIABLE_DECL's declared type, or a
-     * FUNCTION's return type. Null for every other node type, and for a node missing the position
-     * or the type's text.
+     * distinct from [nameRangeOf], which returns its name: a VARIABLE_DECL's declared type, a
+     * FUNCTION's return type, or a parameter's or struct field's type. Null for a node with no type
+     * text, or missing its position.
      */
     fun typeRangeOf(node: AstNodePos): IntRange? {
-        val (line, column, text) = when (node.type) {
-            "VARIABLE_DECL" -> Triple(node.typeLine, node.typeColumn, node.declaredType)
-            "FUNCTION" -> Triple(node.returnTypeLine, node.returnTypeColumn, node.returnType)
+        val (line, column, text) = when {
+            node.type == "FUNCTION" -> Triple(node.returnTypeLine, node.returnTypeColumn, node.returnType)
+            node.declaredType != null -> Triple(node.typeLine, node.typeColumn, node.declaredType)
+            node.dataType != null -> Triple(node.typeLine, node.typeColumn, node.dataType)
             else -> return null
         }
         val tl = line?.takeIf { it != 0 } ?: return null
@@ -214,7 +217,7 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
             .minByOrNull { (range, _) -> range.last - range.first }
             ?.second
 
-    /** The declaration (a VARIABLE_DECL or FUNCTION) whose type text ([typeRangeOf]) contains [offset]. */
+    /** The declaration (variable, function, parameter or field) whose type text ([typeRangeOf]) contains [offset]. */
     fun declaredTypeAtOffset(offset: Int): AstNodePos? =
         nodesById.values
             .firstOrNull { node -> typeRangeOf(node)?.let { offset in it } == true }
@@ -248,6 +251,7 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                         returnTypeLine = obj.get("returnTypeLine")?.asIntOrNull(),
                         returnTypeColumn = obj.get("returnTypeColumn")?.asIntOrNull(),
                         returnType = obj.get("returnType")?.asStringOrNull(),
+                        dataType = obj.get("dataType")?.asStringOrNull(),
                         endLine = obj.get("endLine")?.asIntOrNull(),
                         endColumn = obj.get("endColumn")?.asIntOrNull(),
                         interpolation = obj.get("interpolation")?.asStringOrNull(),

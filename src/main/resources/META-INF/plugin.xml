@@ -74,6 +74,20 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslDocumentationProvider"/>
 
+        <lang.findUsagesProvider
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslFindUsagesProvider"/>
+
+        <targetElementEvaluator
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslTargetElementEvaluator"/>
+
+        <referencesSearch
+            implementation="com.bwsl.plugin.BwslReferencesSearch"/>
+
+        <useScopeEnlarger
+            implementation="com.bwsl.plugin.BwslUseScopeEnlarger"/>
+
         <completion.contributor
             language="BWSL"
             implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>

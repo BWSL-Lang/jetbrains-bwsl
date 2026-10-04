@@ -76,6 +76,19 @@ needs to be trusted, e.g. after any code change.
   into another file is generated from the *hovered* element (`originalElement`), because the
   declaration it resolved to has no cached AST of its own. Intrinsics come from the built-in table
   in `BwslIntrinsics.kt`.
+- Find Usages (`BwslFindUsages.kt`, `BwslUsages.kt`, `BwslUseScopeEnlarger.kt`) is index-driven too.
+  The PSI has no named elements, so the platform's word-index search can't be used: a custom
+  `ReferencesSearch` follows the compiler's incoming edges (`refsByTo`) in every cached AST,
+  `BwslTargetElementEvaluator` makes a caret on a declaration's name a target, and
+  `BwslFindUsagesProvider` says which elements are targets (a declaration name that has a symbol).
+  A declaration is identified across files by its symbol's `stableId`, since node ids differ per
+  compile (a local has no `stableId` and exists only in its own file's AST). A declaration in a
+  file with no AST of its own (an imported module) is found through the importing file's AST, where
+  it is a node written in that file. Each candidate reference must resolve back to the target
+  through the normal resolver. `BwslUseScopeEnlarger` widens the use scope to the project, since a
+  module file outside it would otherwise only be searched in itself. Limits: a file with no cached
+  AST has no known usages; a stage-interface value (`output.uv`) has no declaration so it is not a
+  target; there is no rename.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `blockContextAt`, `vertexOutputAssignments`, `passUsedAttributes`, `deduceExprType`) and line
