@@ -166,7 +166,9 @@ is wrapped at 80 characters.
   flat: one block per token (`collectLeaves`, looking through REFERENCE/CALL_EXPRESSION) directly
   under the file, each carrying the absolute indent of its line, computed up front by
   `IndentTracker` from what precedes it: `{` frames, open `(`/`[` (continuation indent), operator
-  continuation lines, and braceless bodies. A body is a *construct* (`if (...)`, `else`, `for`,
+  continuation lines, braceless bodies, and `case`/`default` labels (the `:` that ends a label, found
+  at the paren depth the label started at, opens a `KW_CASE` construct; a `;` never ends it, the
+  next label or the switch's `}` does, and a `default` only counts as a label when a `:` follows). A body is a *construct* (`if (...)`, `else`, `for`,
   `loop`, ...) opened when its header closes; it indents a level only if its first token starts a
   line, ends at its `;` or closing `}`, and an `else` after it attaches to the `if` just ended
   (walk outwards, stopping there), which is what puts `else` at its `if`'s level. `spacingBetween`

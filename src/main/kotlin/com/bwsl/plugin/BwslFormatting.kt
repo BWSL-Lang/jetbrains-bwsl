@@ -255,19 +255,24 @@ internal class IndentTracker(private val indentSize: Int, private val continuati
     private val frames = ArrayList<Frame>()
     private val parenOpeners = ArrayList<IElementType?>()
 
+    /** The `(` depth at which a `case`/`default` label was started, until its `:` is reached. */
+    private var labelParenDepth: Int? = null
+
     /** The indent of the line [leaf] starts, in spaces; only used when it is the first token of its line. */
     fun indentFor(leaf: Leaf): Int {
         var braces = braceDepth
         var bodies = bodyDepth
         var parens = parenDepth
-        when (leaf.type) {
-            BwslTokenTypes.RBRACE -> {
+        when {
+            leaf.type == BwslTokenTypes.RBRACE -> {
                 braces = (braceDepth - 1).coerceAtLeast(0)
                 frames.lastOrNull()?.let { bodies = it.bodyDepthAtOpen }
                 parens = 0
             }
-            BwslTokenTypes.RPAREN, BwslTokenTypes.RBRACKET -> parens = (parenDepth - 1).coerceAtLeast(0)
-            else -> if (pending != null && leaf.type != BwslTokenTypes.LBRACE) bodies++
+            leaf.type == BwslTokenTypes.RPAREN || leaf.type == BwslTokenTypes.RBRACKET -> parens = (parenDepth - 1).coerceAtLeast(0)
+            // A label sits where the previous label did: the body of that one ends here.
+            isLabelStart(leaf) -> bodies -= countLevelsOfOpenCaseBody()
+            pending != null && leaf.type != BwslTokenTypes.LBRACE -> bodies++
         }
         val continuation = when {
             parens > 0 -> parens * continuationSize
@@ -285,18 +290,28 @@ internal class IndentTracker(private val indentSize: Int, private val continuati
 
     /** Takes [leaf] into account for the lines that follow it. */
     fun consume(leaf: Leaf) {
-        val waiting = pending
+        val startsLabel = isLabelStart(leaf)
+        if (startsLabel) endCaseBody()
+        // A label right after another (`case 1:` `case 2:`) is not the body of the first.
+        val waiting = if (startsLabel) null else pending
         pending = null
         if (waiting != null && leaf.type != BwslTokenTypes.LBRACE && leaf.isFirstOnLine) {
             waiting.isBodyOnItsOwnLine = true
             bodyDepth++
         }
+        if (startsLabel) labelParenDepth = parenDepth
         when (leaf.type) {
+            BwslTokenTypes.COLON -> if (labelParenDepth == parenDepth) {
+                labelParenDepth = null
+                openConstruct(BwslTokenTypes.KW_CASE)
+            }
             BwslTokenTypes.LBRACE -> {
+                labelParenDepth = null
                 frames += Frame(bodyDepth, constructs.size, isConstructBody = waiting != null)
                 braceDepth++
             }
             BwslTokenTypes.RBRACE -> {
+                labelParenDepth = null
                 val frame = frames.removeLastOrNull()
                 braceDepth = (braceDepth - 1).coerceAtLeast(0)
                 if (frame != null) {
@@ -315,7 +330,10 @@ internal class IndentTracker(private val indentSize: Int, private val continuati
                 val keyword = parenOpeners.removeLastOrNull()
                 if (keyword != null && leaf.type == BwslTokenTypes.RPAREN) openConstruct(keyword)
             }
-            BwslTokenTypes.SEMI -> if (parenDepth == 0) endStatement(leaf)
+            BwslTokenTypes.SEMI -> {
+                labelParenDepth = null
+                if (parenDepth == 0) endStatement(leaf)
+            }
             BwslTokenTypes.KW_ELSE -> openConstruct(leaf.type)
             // `loop (n) {` has a header like the others; a bare `loop {` has its body right away.
             BwslTokenTypes.KW_LOOP -> if (leaf.nextSignificant?.type != BwslTokenTypes.LPAREN) openConstruct(leaf.type)
@@ -336,10 +354,36 @@ internal class IndentTracker(private val indentSize: Int, private val continuati
     private fun endStatement(last: Leaf) {
         val floor = frames.lastOrNull()?.constructsAtOpen ?: 0
         val nextIsElse = last.nextSignificant?.type == BwslTokenTypes.KW_ELSE
-        while (constructs.size > floor) {
+        // A `case` body holds many statements: it ends at the next label or the switch's `}`, not at a `;`.
+        while (constructs.size > floor && constructs.last().keyword != BwslTokenTypes.KW_CASE) {
             val ended = constructs.removeLast()
             if (ended.isBodyOnItsOwnLine) bodyDepth--
             if (nextIsElse && ended.keyword == BwslTokenTypes.KW_IF) break
+        }
+    }
+
+    /** Whether [leaf] starts a `case X:` or `default:` label (a `default` is one only when a `:` follows it). */
+    private fun isLabelStart(leaf: Leaf): Boolean =
+        leaf.type == BwslTokenTypes.KW_CASE ||
+            (leaf.type == BwslTokenTypes.KW_DEFAULT && leaf.nextSignificant?.type == BwslTokenTypes.COLON)
+
+    /** The `case` construct of the innermost switch block, with the index it has in [constructs], or null. */
+    private fun findOpenCase(): Int? {
+        val floor = frames.lastOrNull()?.constructsAtOpen ?: 0
+        return constructs.indexOfLast { it.keyword == BwslTokenTypes.KW_CASE }.takeIf { it >= floor }
+    }
+
+    /** How many levels the body of the open `case`, and what is open inside it, add on a line of its own. */
+    private fun countLevelsOfOpenCaseBody(): Int {
+        val index = findOpenCase() ?: return 0
+        return constructs.drop(index).count { it.isBodyOnItsOwnLine }
+    }
+
+    /** A new label ended the body of the open `case`, and whatever was left open inside it. */
+    private fun endCaseBody() {
+        val index = findOpenCase() ?: return
+        while (constructs.size > index) {
+            if (constructs.removeLast().isBodyOnItsOwnLine) bodyDepth--
         }
     }
 

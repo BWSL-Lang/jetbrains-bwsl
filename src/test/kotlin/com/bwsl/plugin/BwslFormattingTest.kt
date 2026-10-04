@@ -238,6 +238,158 @@ class BwslFormattingTest : BasePlatformTestCase() {
         )
     }
 
+    fun testStatementsAfterACaseLabelAreIndentedUntilTheNextLabel() {
+        val result = formatText(
+            """
+            module M {
+            f :: (int x) -> float {
+            float a = 0.0;
+            switch (x) {
+            case 0:
+            a = 1.0;
+            break;
+            case 1:
+            case 2:
+            a = 2.0;
+            break;
+            default:
+            a = 3.0;
+            }
+            return a;
+            }
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            """
+            module M {
+                f :: (int x) -> float {
+                    float a = 0.0;
+                    switch (x) {
+                        case 0:
+                            a = 1.0;
+                            break;
+                        case 1:
+                        case 2:
+                            a = 2.0;
+                            break;
+                        default:
+                            a = 3.0;
+                    }
+                    return a;
+                }
+            }
+            """.trimIndent(),
+            result
+        )
+    }
+
+    fun testBracedCaseBodiesAreIndentedByTheirBracesOnly() {
+        val result = formatText(
+            """
+            module M {
+            f :: (int x) -> float {
+            float a = 0.0;
+            switch (x) {
+            case 0: {
+            a = 1.0;
+            }
+            case 1: { a = 2.0; }
+            default: {
+            if (a > 0.0)
+            a = 3.0;
+            }
+            }
+            return a;
+            }
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            """
+            module M {
+                f :: (int x) -> float {
+                    float a = 0.0;
+                    switch (x) {
+                        case 0: {
+                            a = 1.0;
+                        }
+                        case 1: { a = 2.0; }
+                        default: {
+                            if (a > 0.0)
+                                a = 3.0;
+                        }
+                    }
+                    return a;
+                }
+            }
+            """.trimIndent(),
+            result
+        )
+    }
+
+    fun testAControlStatementInsideACaseBodyEndsWithoutEndingTheCase() {
+        val result = formatText(
+            """
+            module M {
+            f :: (int x, float b) -> float {
+            float a = 0.0;
+            switch (x) {
+            case 0:
+            if (b > 0.0)
+            a = 1.0;
+            else
+            a = 2.0;
+            a = a + 1.0;
+            break;
+            case 1:
+            a = 4.0;
+            }
+            return a;
+            }
+            }
+            """.trimIndent()
+        )
+
+        assertEquals(
+            """
+            module M {
+                f :: (int x, float b) -> float {
+                    float a = 0.0;
+                    switch (x) {
+                        case 0:
+                            if (b > 0.0)
+                                a = 1.0;
+                            else
+                                a = 2.0;
+                            a = a + 1.0;
+                            break;
+                        case 1:
+                            a = 4.0;
+                    }
+                    return a;
+                }
+            }
+            """.trimIndent(),
+            result
+        )
+    }
+
+    fun testEnterAfterACaseLabelIndentsTheBody() {
+        myFixture.configureByText(
+            "enter.bwsl",
+            "module M {\n    f :: (int x) -> float {\n        switch (x) {\n            case 0:<caret>\n        }\n    }\n}"
+        )
+
+        myFixture.type("\n")
+
+        myFixture.checkResult(
+            "module M {\n    f :: (int x) -> float {\n        switch (x) {\n            case 0:\n                <caret>\n        }\n    }\n}"
+        )
+    }
+
     fun testAContinuedExpressionIsIndentedWhetherTheOperatorEndsOrStartsTheLine() {
         val result = formatText(
             """

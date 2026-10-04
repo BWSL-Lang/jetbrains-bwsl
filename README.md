@@ -32,6 +32,9 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - Understands braceless bodies: a statement under `if (...)`, `else`, `for`,
   `loop` and the like is indented one level, and an `else` lines up with the
   `if` it belongs to. A body on the same line as its header stays there
+- `switch`: `case` and `default` labels sit one level inside the `switch`, and
+  the statements after a label are indented one more until the next label or
+  the closing `}`.
 - Continued expressions are indented: a line after an operator, one that
   starts with an operator, and lines inside open `( )` or `[ ]`
 - **Auto-indent**: Enter indents the next line (a level after `{` or a
@@ -215,7 +218,7 @@ Not implemented yet:
 
 **Refactoring and editing**
 - [ ] Formatter options beyond indentation and spacing: brace placement,
-      wrapping long lines, aligning continued expressions and `case` labels
+      wrapping long lines and aligning continued expressions
 - [ ] Comment / uncomment with the comment shortcut
 - [ ] Brace and quote matching and auto-closing
 - [ ] Code folding (blocks, functions, comments)
