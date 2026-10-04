@@ -97,9 +97,17 @@ fun findElementAtOffset(file: PsiFile, offset: Int): PsiElement? {
  */
 private fun resolveInSourceFile(file: PsiFile, index: BwslAstIndex, node: AstNodePos): PsiElement? {
     val path = node.sourceFile ?: return null
-    val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.replace('\\', '/')) ?: return null
+    val isStandardLibrary = BwslStdlibSources.isStdlibKey(path)
+    val virtualFile = if (isStandardLibrary) {
+        // An embedded file has no path of its own: open the local copy of the file the AST says it came from.
+        node.sourceUrl?.let { BwslStdlibSources.findCopyOf(it) }?.let { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
+    } else {
+        LocalFileSystem.getInstance().refreshAndFindFileByPath(path.replace('\\', '/'))
+    } ?: return null
     val target = PsiManager.getInstance(file.project).findFile(virtualFile) ?: return null
     val range = index.createPositionsFor(target.text).findNameRangeOf(node) ?: return null
+    // A copy is of the compiler's source, not necessarily that exact build's: if it has moved on, the position is wrong.
+    if (isStandardLibrary && node.name != null && target.text.substring(range.first, range.last + 1) != node.name) return null
     return findElementAtOffset(target, range.first)
 }
 

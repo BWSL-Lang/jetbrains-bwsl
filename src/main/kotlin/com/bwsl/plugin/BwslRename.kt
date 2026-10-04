@@ -35,7 +35,10 @@ internal data class RenameEdit(val file: PsiFile, val range: TextRange)
  */
 class BwslRenameProcessor : RenamePsiElementProcessor() {
 
-    override fun canProcessElement(element: PsiElement): Boolean = findDeclarationIdentityOf(element) != null
+    /** Not a standard-library declaration: its file is a read-only copy of the compiler's source. */
+    override fun canProcessElement(element: PsiElement): Boolean =
+        element.containingFile?.virtualFile?.path?.let { BwslStdlibSources.isCopy(it) } != true &&
+            findDeclarationIdentityOf(element) != null
 
     /**
      * Before the rename starts, brings the compiler's view of the whole project up to date, so the

@@ -62,12 +62,14 @@ fun findDeclarationIdentityOf(element: PsiElement): DeclarationIdentity? {
     }
 
     val positions = SourcePositions(file.text)
+    // A local copy of an embedded standard-library file is known to the compiler by its `stdlib://` name.
+    val sourceKey = BwslStdlibSources.findSourceKeyOf(path) ?: path
     for (other in collectPayloadFiles(file.project)) {
         val otherPath = other.virtualFile?.path ?: continue
         if (otherPath == path) continue
         val index = buildAstIndex(other) ?: continue
         val declared = index.externalNodesById.values.firstOrNull { node ->
-            node.sourceFile != null && doesPathMatch(node.sourceFile, path) &&
+            node.sourceFile != null && doesPathMatch(node.sourceFile, sourceKey) &&
                 index.symbolsById.containsKey(node.id) &&
                 positions.findNameRangeOf(node)?.let { offset in it } == true
         } ?: continue

@@ -57,7 +57,7 @@ private class LocalsWalker(
 
         // A node with a source range only matters if the position is inside it: a block that has
         // closed, or one that starts later, has nothing in scope here.
-        if (o.hasRange() && !o.doesRangeContainCaret()) return
+        if (o.hasRange() && !o.doesRangeContain(line, column)) return
 
         when (type) {
             "FUNCTION" -> o.get("parameters")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { p ->
@@ -116,14 +116,4 @@ private class LocalsWalker(
         return l to c
     }
 
-    private fun JsonObject.doesRangeContainCaret(): Boolean {
-        val startLine = getIntOrNull("line") ?: return true
-        val startColumn = getIntOrNull("column") ?: return true
-        val endLine = getIntOrNull("endLine") ?: return true
-        val endColumn = getIntOrNull("endColumn") ?: return true
-        if (line < startLine || (line == startLine && column < startColumn)) return false
-        return line < endLine || (line == endLine && column <= endColumn)
-    }
-
-    private fun JsonObject.hasRange(): Boolean = has("endLine") && has("endColumn") && has("line") && has("column")
 }

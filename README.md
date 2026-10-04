@@ -95,6 +95,17 @@ is exactly the compiler's:
 - fragment `output.x` to its entry in the pass's `outputs { … }` block, and
   `input.x` to the vertex stage's `output.x` assignment
 - uses of a constant, including ones the compiler folded into a literal
+- **the compiler's standard modules** (`Math`, `Color`, ...), which are
+  embedded in `bwslc` and have no file on disk. The compiler names each one's
+  source on GitHub, pinned to its release tag (or `master` for a development
+  build). When a file that uses one has been compiled, the plugin fetches that
+  directory in the background into a read-only cache in the IDE's system
+  directory, and Ctrl+click opens the copy. A tagged version is fetched once, a
+  branch once per session. Find Usages works from a standard declaration, and
+  Rename is not offered on one. It needs a network connection the first time;
+  until a file has been fetched, or if the copy no longer matches the compiler
+  (a position that does not hold the name is not trusted), nothing happens
+  instead of a guess
 
 ### Find Usages
 
@@ -196,9 +207,27 @@ is exactly the compiler's:
 - **Types** and **intrinsics**, in the places they are valid
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type
+- **Functions, structs, enums and imported modules**, sorted after the locals:
+  what the enclosing module, pipeline and pass declare, shown with return type
+  and parameters (a function is inserted with its parentheses). A module name
+  continues with `::`
+- **`Module::` members** — the functions, structs, enums and constants of the
+  module (an `import ... as` alias works too), or the values of an enum after
+  `Enum::`. Nothing else is offered there, also when the caret is inside an
+  existing call name
+- **`using`** makes a module's functions and constants available without a
+  qualifier, so they are suggested too
+- **After `import`**, the modules that can be imported: the standard modules
+  (once they have been fetched, see below), the module files in the project and
+  the module paths, and the other modules of the file. After `using`, the
+  modules and aliases the file imports
 - **`attributes.` members** — the attributes the pass uses
 - **`input.` members** in a fragment stage — the vertex stage's outputs
 - **`extends`** after a submodule's name
+
+These names come from the last compile of the saved file, like the locals: a
+function typed since then is offered once the file has been saved and compiled.
+Aliases and imports are read from the text, so they are current.
 
 ### Settings
 
@@ -252,9 +281,7 @@ Not implemented yet:
 - [ ] Spell-checking of comments and strings
 
 **Completion**
-- [ ] Function, struct and module names, including `Mod::` members
 - [ ] Struct fields and swizzles after `.`, and fields inside methods
-- [ ] Constants and functions declared in the enclosing module, pass or pipeline
 - [ ] Completion that sees code typed since the last save
 - [ ] Argument-aware ranking and smart completion by expected type
 
@@ -264,8 +291,6 @@ Not implemented yet:
 - [ ] File Structure view and breadcrumbs
 - [ ] Go to Type Declaration
 - [ ] Call hierarchy
-- [ ] Navigation into the compiler's built-in standard modules (`stdlib://`
-      sources)
 - [ ] Ctrl+click on intrinsics, with their documentation
 
 **Compiler integration**

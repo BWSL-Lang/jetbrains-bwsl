@@ -41,7 +41,9 @@ data class AstNodePos(
      * The file this node was written in: its own `sourceFile`, or the nearest enclosing one. Its
      * line/column are relative to that file. Null for nodes below the level that records one.
      */
-    val sourceFile: String? = null
+    val sourceFile: String? = null,
+    /** Where an embedded standard-library file can be read (its `sourceUrl`), inherited like [sourceFile]. */
+    val sourceUrl: String? = null
 )
 
 /**
@@ -165,7 +167,7 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                     for (entry in value.asJsonArray) {
                         val obj = entry.takeIf { it.isJsonObject }?.asJsonObject ?: continue
                         val bucket = LinkedHashMap<String, AstNodePos>()
-                        collectNodes(entry, bucket, targets, file = null)
+                        collectNodes(entry, bucket, targets, file = null, url = null)
                         if (obj.get("id")?.asStringOrNull() in rootIds) {
                             val entryFile = obj.get("sourceFile")?.asStringOrNull()
                             for ((id, node) in bucket) {
@@ -177,7 +179,7 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                         }
                     }
                 }
-                else -> collectNodes(value, nodes, targets, file = null)
+                else -> collectNodes(value, nodes, targets, file = null, url = null)
             }
         }
         nodesById = nodes
@@ -226,12 +228,14 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
         element: JsonElement,
         into: MutableMap<String, AstNodePos>,
         assignmentTargets: MutableMap<String, String>,
-        file: String?
+        file: String?,
+        url: String?
     ) {
         when {
             element.isJsonObject -> {
                 val obj = element.asJsonObject
                 val objFile = obj.get("sourceFile")?.asStringOrNull() ?: file
+                val objUrl = obj.get("sourceUrl")?.asStringOrNull() ?: url
                 val id = obj.get("id")?.asStringOrNull()
                 if (!id.isNullOrEmpty()) {
                     val kind = obj.get("type")?.asStringOrNull() ?: ""
@@ -255,17 +259,18 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                         endLine = obj.get("endLine")?.asIntOrNull(),
                         endColumn = obj.get("endColumn")?.asIntOrNull(),
                         interpolation = obj.get("interpolation")?.asStringOrNull(),
-                        sourceFile = objFile
+                        sourceFile = objFile,
+                        sourceUrl = objUrl
                     )
                     if (kind == "ASSIGNMENT") {
                         obj.get("target")?.takeIf { it.isJsonObject }?.asJsonObject
                             ?.get("id")?.asStringOrNull()?.let { assignmentTargets[id] = it }
                     }
                 }
-                for ((_, value) in obj.entrySet()) collectNodes(value, into, assignmentTargets, objFile)
+                for ((_, value) in obj.entrySet()) collectNodes(value, into, assignmentTargets, objFile, objUrl)
             }
             element.isJsonArray -> {
-                for (item in element.asJsonArray) collectNodes(item, into, assignmentTargets, file)
+                for (item in element.asJsonArray) collectNodes(item, into, assignmentTargets, file, url)
             }
             else -> {}
         }

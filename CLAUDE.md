@@ -183,6 +183,32 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Standard-library sources (`BwslStdlibSources.kt`). The compiler embeds its standard modules: the
+  AST gives them `sourceFile` `stdlib://modules/<file>.bwsl` and a `sourceUrl`
+  (`https://github.com/<owner>/<repo>/blob/<ref>/modules/<file>`, `<ref>` the release tag, or
+  `master` for a dev build). `compileAndCache` hands every `sourceUrl` to
+  `downloadInBackground`, which fetches the file and the rest of its directory (listed through the
+  GitHub contents API, so unimported modules are known too) into `<system>/bwsl/stdlib/<ref>/modules/`,
+  read-only. A tag is fetched once, a branch once per session. `AstNodePos.sourceUrl` is inherited
+  down like `sourceFile`; `resolveInSourceFile` opens the copy for a `stdlib://` node and **only
+  trusts it if the text at the node's name range equals the node's name**, since the copy is of the
+  repository, not necessarily of the compiler's build (a mismatch resolves to nothing, not a guess).
+  `findSourceKeyOf` maps a copy back to its `stdlib://` name so Find Usages from a standard
+  declaration finds the identity through the importing file's AST; `BwslRenameProcessor` refuses
+  elements in a copy. The downloader is injectable (`fetchText`, `cacheRoot`) so tests serve the
+  compiler repo's own `modules/` directory instead of the network.
+- Name completion (`BwslAstNames.kt`, the contributor): `collectNamesVisibleAt` reads the cached
+  raw AST (the enclosing own module/pipeline's functions, structs and enums; the enclosing pass's
+  functions; the functions and constants of modules named by `using`; the names of imported modules)
+  and `collectMembersOf` the members of a `Qualifier::` (a module of the payload's `modules`, or an
+  enum's values). The AST's `imports` entries record the module but **not** an `as` alias (only a
+  `using` records `writtenName`), so `collectImportDeclarationsOf` reads `import X [as Y]` from the
+  tokens. After `::` only members are offered (the contributor used to offer keywords there). The
+  trigger accepts every name token (`FUNCTION_CALL`, `MODULE_NAME`, ...), not only `IDENTIFIER`, so
+  it also works inside an existing `Mod::name(...)`.
+- Reading a process: **read stdout and stderr at the same time** (`compileAst`, the test helper).
+  Reading one to its end first deadlocks when a file with many errors fills the other pipe, and the
+  15 s timeout never starts because it comes after the reads.
 - Editor support that needs only tokens (`BwslEditing.kt`, `BwslFolding.kt`): `BwslCommenter`
   (`//`, `/* */`), `BwslBraceMatcher` (`{}` structural, `()` and `[]`; `<`/`>` deliberately not a
   pair, and a closing bracket is only auto-inserted before whitespace, a comment, the end or

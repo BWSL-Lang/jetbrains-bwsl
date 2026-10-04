@@ -3,14 +3,22 @@ package com.bwsl.plugin.completion
 import com.bwsl.plugin.*
 import com.bwsl.plugin.references.findPreviousNonWhitespace
 
+import com.google.gson.JsonObject
+import com.intellij.codeInsight.AutoPopupController
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
+import com.intellij.codeInsight.completion.InsertHandler
 import com.intellij.codeInsight.completion.PrioritizedLookupElement
+import com.intellij.codeInsight.completion.util.ParenthesesInsertHandler
+import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.openapi.editor.EditorModificationUtil
 import com.intellij.patterns.PlatformPatterns
+import com.intellij.psi.tree.TokenSet
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.elementType
 import com.intellij.util.ProcessingContext
 
@@ -51,6 +59,15 @@ private val TYPE_KEYWORDS = listOf(
 // Above the default priority (0), so locals sort ahead of keywords, types and intrinsics.
 private const val LOCAL_PRIORITY = 100.0
 
+// Names the file declares or imports: after the locals, ahead of keywords, types and intrinsics.
+private const val NAME_PRIORITY = 50.0
+
+// Where a name can be completed: an identifier, or a name that is followed by `(` or lexes as a module name.
+private val NAME_TOKENS = TokenSet.create(
+    BwslTokenTypes.IDENTIFIER, BwslTokenTypes.FUNCTION_CALL, BwslTokenTypes.INTRINSIC_CALL,
+    BwslTokenTypes.MODULE_NAME, BwslTokenTypes.MODULE_QUALIFIER
+)
+
 private val INTRINSIC_NAMES = listOf(
     "abs", "acos", "all", "any", "asin", "atan", "ceil", "clamp", "cos", "cross",
     "degrees", "distance", "dot", "exp", "exp2", "floor", "fmod", "frac",
@@ -78,19 +95,71 @@ private fun classifyCurrentBlockContext(parameters: CompletionParameters): BwslB
  * Empty when no AST is cached (there is no lexical fallback).
  */
 private fun collectVisibleLocals(parameters: CompletionParameters): List<VisibleLocal> {
+    val ast = findCompletionAst(parameters) ?: return emptyList()
+    return collectVisibleLocalsAt(ast.root, ast.raw, ast.line, ast.column)
+}
+
+/** The cached AST of the file being completed, and the 1-based position of the caret in it. */
+private class CompletionAst(val root: AstRoot, val raw: JsonObject, val line: Int, val column: Int)
+
+/** The cached AST for the completion position, or null when none is cached (there is no lexical fallback). */
+private fun findCompletionAst(parameters: CompletionParameters): CompletionAst? {
     val file = parameters.originalFile
-    val path = file.virtualFile?.path ?: return emptyList()
-    val root = BwslAstCache.findRoot(path) ?: return emptyList()
-    val raw = BwslAstCache.findRawRoot(path) ?: return emptyList()
-    val (line, column) = toLineColumn(file, parameters.offset) ?: return emptyList()
-    return collectVisibleLocalsAt(root, raw, line, column)
+    val path = file.virtualFile?.path ?: return null
+    val root = BwslAstCache.findRoot(path) ?: return null
+    val raw = BwslAstCache.findRawRoot(path) ?: return null
+    val (line, column) = toLineColumn(file, parameters.offset) ?: return null
+    return CompletionAst(root, raw, line, column)
+}
+
+/** Choosing a module's name continues with `::` and offers the module's members straight away. */
+private val QUALIFIER_INSERT_HANDLER = InsertHandler<LookupElement> { context, _ ->
+    if (!context.document.charsSequence.startsWith("::", context.tailOffset)) {
+        EditorModificationUtil.insertStringAtCaret(context.editor, "::")
+    } else {
+        context.editor.caretModel.moveToOffset(context.tailOffset + 2)
+    }
+    AutoPopupController.getInstance(context.project).scheduleAutoPopup(context.editor)
+}
+
+private fun buildLookupElementFor(name: DeclaredName): LookupElement {
+    val base = LookupElementBuilder.create(name.name)
+    val element = when (name.kind) {
+        DeclaredName.Kind.FUNCTION -> base
+            .withTypeText(name.type.orEmpty())
+            .withTailText("(${name.parameters.orEmpty().joinToString(", ")})", true)
+            .withInsertHandler(ParenthesesInsertHandler.getInstance(name.parameters.orEmpty().isNotEmpty()))
+        DeclaredName.Kind.MODULE -> base.withTypeText("module").withInsertHandler(QUALIFIER_INSERT_HANDLER)
+        DeclaredName.Kind.CONSTANT -> base.withTypeText(name.type.orEmpty()).withTailText(" constant", true)
+        DeclaredName.Kind.ENUM_VALUE -> base.withTypeText(name.type.orEmpty()).withTailText(" enum value", true)
+        DeclaredName.Kind.STRUCT, DeclaredName.Kind.ENUM -> base.withTypeText(name.kind.label)
+    }
+    return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY)
+}
+
+/**
+ * The modules `import` can name: the standard modules fetched so far, the module files in the project
+ * and the module paths (bwslc finds a module in `<Module>.bwsl`), and the other modules of this file;
+ * not the ones this file imports already.
+ */
+private fun collectImportableModuleNames(parameters: CompletionParameters): List<String> {
+    val file = parameters.originalFile
+    val ownRoot = file.virtualFile?.path?.let { BwslAstCache.findRoot(it) }
+    val alreadyImported = collectImportDeclarationsOf(file).map { it.module }.toSet()
+    val fromFiles = collectIndexedFiles(file.project)
+        .filter { it.path != file.virtualFile?.path }
+        .filter { indexed -> BwslAstCache.findRoot(indexed.path)?.collectOwnPipelines()?.isEmpty() != false }
+        .map { it.nameWithoutExtension }
+    val inThisFile = ownRoot?.collectOwnModules()?.map { it.name }.orEmpty()
+    return (BwslStdlibSources.collectModuleNames() + fromFiles + inThisFile)
+        .distinct().filter { it !in alreadyImported }.sorted()
 }
 
 class BwslCompletionContributor : CompletionContributor() {
     init {
         extend(
             CompletionType.BASIC,
-            PlatformPatterns.psiElement().withElementType(BwslTokenTypes.IDENTIFIER),
+            PlatformPatterns.psiElement().withElementType(NAME_TOKENS),
             object : CompletionProvider<CompletionParameters>() {
                 override fun addCompletions(
                     parameters: CompletionParameters,
@@ -141,6 +210,35 @@ class BwslCompletionContributor : CompletionContributor() {
                         return
                     }
 
+                    // `Module::` is followed by a member of that module (or a value of an enum), and nothing else.
+                    val previousLeaf = PsiTreeUtil.prevCodeLeaf(parameters.position)
+                    if (previousLeaf?.elementType == BwslTokenTypes.COLONCOLON) {
+                        val qualifier = PsiTreeUtil.prevCodeLeaf(previousLeaf)?.text
+                        val ast = findCompletionAst(parameters)
+                        if (qualifier != null && ast != null) {
+                            val aliases = collectImportDeclarationsOf(parameters.originalFile)
+                                .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
+                            for (member in collectMembersOf(ast.root, ast.raw, ast.line, ast.column, qualifier, aliases)) {
+                                result.addElement(buildLookupElementFor(member))
+                            }
+                        }
+                        return
+                    }
+
+                    // `import <module>` names a module that can be imported; `using <module>` one that is.
+                    if (previousLeaf?.elementType == BwslTokenTypes.KW_IMPORT) {
+                        for (name in collectImportableModuleNames(parameters)) {
+                            result.addElement(LookupElementBuilder.create(name).withTypeText("module"))
+                        }
+                        return
+                    }
+                    if (previousLeaf?.elementType == BwslTokenTypes.KW_USING) {
+                        for (import in collectImportDeclarationsOf(parameters.originalFile)) {
+                            result.addElement(LookupElementBuilder.create(import.visibleName).withTypeText("module"))
+                        }
+                        return
+                    }
+
                     val blockContext = classifyCurrentBlockContext(parameters)
 
                     if (blockContext == BwslBlockContext.TOP_LEVEL) {
@@ -183,6 +281,17 @@ class BwslCompletionContributor : CompletionContributor() {
                                     LOCAL_PRIORITY
                                 )
                             )
+                        }
+                    }
+
+                    // The functions, structs, enums and imported modules the file declares, from the last compile.
+                    if (!afterMemberOrQualifier && blockContext != BwslBlockContext.PIPELINE_BODY && blockContext != BwslBlockContext.PASS_BODY) {
+                        findCompletionAst(parameters)?.let { ast ->
+                            for (name in collectNamesVisibleAt(ast.root, ast.raw, ast.line, ast.column)) {
+                                val isExpressionName = name.kind == DeclaredName.Kind.FUNCTION || name.kind == DeclaredName.Kind.CONSTANT
+                                if (isExpressionName && blockContext != BwslBlockContext.STATEMENT_BODY) continue
+                                result.addElement(buildLookupElementFor(name))
+                            }
                         }
                     }
 

@@ -29,7 +29,7 @@ data class ShadowingDeclaration(
  */
 fun collectShadowingDeclarations(root: AstRoot, rawJson: JsonObject): List<ShadowingDeclaration> {
     val own = root.roots.toSet()
-    val declarations = ArrayList<DeclaredName>()
+    val declarations = ArrayList<DeclarationSite>()
     for (key in listOf("modules", "pipelines")) {
         val entries = rawJson.get(key)?.takeIf { it.isJsonArray }?.asJsonArray ?: continue
         for (entry in entries) {
@@ -46,7 +46,7 @@ fun collectShadowingDeclarations(root: AstRoot, rawJson: JsonObject): List<Shado
 }
 
 /** A declared name, and the position to ask what is in scope just before it. */
-private class DeclaredName(
+private class DeclarationSite(
     val name: String,
     val kind: VisibleLocal.Kind,
     val nameLine: Int,
@@ -55,7 +55,7 @@ private class DeclaredName(
     val queryColumn: Int
 )
 
-private class DeclarationCollector(private val out: MutableList<DeclaredName>) {
+private class DeclarationCollector(private val out: MutableList<DeclarationSite>) {
 
     fun visit(element: JsonElement, inBlock: Boolean) {
         when {
@@ -105,6 +105,6 @@ private class DeclarationCollector(private val out: MutableList<DeclaredName>) {
         val name = node.getStringOrNull("name") ?: return
         val nameLine = node.getIntOrNull("nameLine") ?: return
         val nameColumn = node.getIntOrNull("nameColumn") ?: return
-        out += DeclaredName(name, kind, nameLine, nameColumn, queryLine, queryColumn)
+        out += DeclarationSite(name, kind, nameLine, nameColumn, queryLine, queryColumn)
     }
 }
