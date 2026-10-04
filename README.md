@@ -132,6 +132,16 @@ unsaved edits.
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
 
+### Inlay hints
+
+- **Parameter names** in front of call arguments, for calls to functions and
+  methods the compiler resolved, including `Module::` calls. An argument that
+  is just the parameter's own name gets none, and neither do intrinsics. Shown
+  while the editor holds the text that was compiled. Switch off under
+  Settings | Editor | Inlay Hints
+- No hints for inferred types (every BWSL declaration names its type) or array
+  lengths of locals (written in the declaration)
+
 ### Navigation (Ctrl+click)
 
 Every reference resolves through the compiler's own reference index, so scoping
@@ -369,7 +379,8 @@ Not implemented yet:
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
-- [ ] Inlay hints: parameter names at call sites, inferred types, array lengths
+- [ ] Inlay hints for the length of an array parameter (the compiler does not
+      mark array parameters in the AST yet, BWSL#106)
 - [ ] Semantic highlighting that colours parameters, locals, fields and
       constants differently
 

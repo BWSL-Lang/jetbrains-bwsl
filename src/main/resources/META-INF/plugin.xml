@@ -93,6 +93,16 @@
             level="WARNING"
             implementationClass="com.bwsl.plugin.BwslMissingImportInspection"/>
 
+        <codeInsight.declarativeInlayProvider
+            language="BWSL"
+            group="PARAMETERS_GROUP"
+            providerId="bwsl.parameter.names"
+            isEnabledByDefault="true"
+            bundle="messages.BwslBundle"
+            nameKey="inlay.parameter.names.name"
+            descriptionKey="inlay.parameter.names.description"
+            implementationClass="com.bwsl.plugin.BwslParameterNameHintsProvider"/>
+
         <psi.referenceContributor
             language="BWSL"
             implementation="com.bwsl.plugin.references.BwslReferenceContributor"/>

@@ -240,6 +240,12 @@ is wrapped at 80 characters.
   target module is the owner (through `owner` links) of no edge's target other than other
   import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
+- Inlay hints (`BwslInlayHints.kt`, a declarative `InlayHintsProvider` registered as
+  `codeInsight.declarativeInlayProvider`, strings in `messages/BwslBundle.properties`):
+  `collectParameterNameHints` takes each `FUNCTION_CALL` token followed by `(`, the function or
+  method its edge resolves to (`collectDeclarationIdsAt`), the parameter symbols it owns, and
+  splits the arguments by bracket depth. Only with an AST of the current text
+  (`findInspectionInput`).
 - Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
   (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
   `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).
