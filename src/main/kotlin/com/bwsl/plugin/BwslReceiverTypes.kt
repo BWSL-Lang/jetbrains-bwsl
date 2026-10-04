@@ -26,7 +26,7 @@ class ReceiverContext(
 )
 
 /** One step of an expression before a `.`: where it starts, then what is taken from it one `.` or `[ ]` at a time. */
-private sealed interface Step {
+internal sealed interface Step {
     /** `x`, `self`, or `Module::CONSTANT`. */
     data class Name(val name: String, val qualifier: String?) : Step
 
@@ -56,9 +56,28 @@ fun collectReceiverMembers(file: PsiFile, dotOffset: Int, context: ReceiverConte
     val leaves = collectLeaves(file)
     val dotIndex = leaves.indexOfFirst { it.range.startOffset == dotOffset && it.type == BwslTokenTypes.DOT }
     if (dotIndex <= 0) return emptyList()
-    val steps = parseReceiver(leaves, dotIndex - 1) ?: return emptyList()
+    val steps = parseReceiver(leaves, dotIndex - 1)?.steps ?: return emptyList()
     val type = deduceType(steps, context) ?: return emptyList()
     return collectMembersOfType(type, context, typedPrefix)
+}
+
+/**
+ * The type of the expression whose last token is the one at [lastIndex] of [leaves] (a name, a call,
+ * a field, an index, a chain of them), or null when it cannot be worked out.
+ */
+internal fun deduceTypeOfExpressionEndingAt(leaves: List<Leaf>, lastIndex: Int, context: ReceiverContext): ReceiverType? {
+    val steps = parseReceiver(leaves, lastIndex)?.steps ?: return null
+    return deduceType(steps, context)
+}
+
+/** The functions called [name] that a `qualifier::name(...)` call can mean, or the methods of [receiver]; null `qualifier` and `receiver` mean the functions in scope. */
+internal fun collectCallableOverloads(name: String, qualifier: String?, receiver: ReceiverType?, context: ReceiverContext): List<DeclaredName> {
+    val candidates = when {
+        receiver != null -> findStruct(context, receiver.name)?.let { describeMethodsOf(it) }.orEmpty()
+        qualifier != null -> findModuleNamed(context.raw, context.aliases[qualifier] ?: qualifier)?.let { describeMembersOfModule(it) }.orEmpty()
+        else -> collectNamesVisibleAt(context.root, context.raw, context.line, context.column)
+    }
+    return candidates.filter { it.kind == DeclaredName.Kind.FUNCTION && it.name == name }
 }
 
 /** The members of a value of [type]. */
@@ -202,8 +221,11 @@ private fun findStruct(context: ReceiverContext, typeName: String): JsonObject? 
 
 // --- reading the expression before the dot ------------------------------------------------------------
 
-/** The steps of the expression whose last token is at [lastIndex], or null when it is not one this can read (a parenthesised or arithmetic expression). */
-private fun parseReceiver(leaves: List<Leaf>, lastIndex: Int): List<Step>? {
+/** An expression read from the tokens: its [steps], and the index of its first token. */
+internal class ParsedReceiver internal constructor(internal val steps: List<Step>, val startIndex: Int)
+
+/** The expression whose last token is at [lastIndex], or null when it is not one this can read (a parenthesised or arithmetic expression). */
+internal fun parseReceiver(leaves: List<Leaf>, lastIndex: Int): ParsedReceiver? {
     val steps = ArrayDeque<Step>()
     var index = lastIndex
     while (true) {
@@ -226,11 +248,11 @@ private fun parseReceiver(leaves: List<Leaf>, lastIndex: Int): List<Step>? {
             BwslTokenTypes.COLONCOLON -> {
                 val qualifier = leaves.getOrNull(nameIndex - 2)?.node?.text ?: return null
                 steps.addFirst(if (isCall) Step.Call(name.node.text, qualifier) else Step.Name(name.node.text, qualifier))
-                return steps.toList()
+                return ParsedReceiver(steps.toList(), nameIndex - 2)
             }
             else -> {
                 steps.addFirst(if (isCall) Step.Call(name.node.text, null) else Step.Name(name.node.text, null))
-                return steps.toList()
+                return ParsedReceiver(steps.toList(), nameIndex)
             }
         }
     }

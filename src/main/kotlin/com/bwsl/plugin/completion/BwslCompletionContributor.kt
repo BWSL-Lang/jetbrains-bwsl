@@ -126,7 +126,33 @@ private val QUALIFIER_INSERT_HANDLER = InsertHandler<LookupElement> { context, _
     AutoPopupController.getInstance(context.project).scheduleAutoPopup(context.editor)
 }
 
-private fun buildLookupElementFor(name: DeclaredName): LookupElement {
+// Added to a suggestion whose type is what the caret expects (the parameter being filled in, the declared
+// type being initialised): it sorts ahead of everything that does not match, whatever else ranks it.
+private const val TYPE_MATCH_BONUS = 1000.0
+
+/** The aliases, text and cached AST position that working out types at the caret needs. */
+private fun buildReceiverContext(parameters: CompletionParameters, ast: CompletionAst): ReceiverContext {
+    val aliases = collectImportDeclarationsOf(parameters.originalFile)
+        .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
+    return ReceiverContext(ast.root, ast.raw, ast.line, ast.column, aliases, parameters.originalFile.text)
+}
+
+/** A parameter, local, constant or loop variable in scope; ranked first when its type is one of [expectedTypes]. */
+private fun buildLocalLookupElement(local: VisibleLocal, expectedTypes: Set<String>): LookupElement =
+    PrioritizedLookupElement.withPriority(
+        LookupElementBuilder.create(local.name)
+            .withTypeText(local.type ?: "")
+            .withTailText(" ${local.kind.label}", true),
+        LOCAL_PRIORITY + if (doesTypeMatch(local.type, expectedTypes)) TYPE_MATCH_BONUS else 0.0
+    )
+
+/** What a name's type is for matching against what the caret expects: a function's is what it returns. */
+private fun DeclaredName.valueType(): String? = when (kind) {
+    DeclaredName.Kind.FUNCTION, DeclaredName.Kind.CONSTANT, DeclaredName.Kind.FIELD, DeclaredName.Kind.ENUM_VALUE -> type
+    else -> null
+}
+
+private fun buildLookupElementFor(name: DeclaredName, expectedTypes: Set<String> = emptySet()): LookupElement {
     val base = LookupElementBuilder.create(name.name)
     val element = when (name.kind) {
         DeclaredName.Kind.FUNCTION -> base
@@ -139,7 +165,34 @@ private fun buildLookupElementFor(name: DeclaredName): LookupElement {
         DeclaredName.Kind.FIELD -> base.withTypeText(name.type.orEmpty()).withTailText(" field", true)
         DeclaredName.Kind.STRUCT, DeclaredName.Kind.ENUM -> base.withTypeText(name.kind.label)
     }
-    return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY)
+    return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY + if (doesTypeMatch(name.valueType(), expectedTypes)) TYPE_MATCH_BONUS else 0.0)
+}
+
+/** A suggestion that stands for a value, with the type it has (null when not known). */
+private class TypedCandidate(val element: LookupElement, val type: String?)
+
+/**
+ * What can be written as a value here, with each one's type: the locals in scope, the functions and
+ * constants of the file, and after a `.` or a `Module::` the members. Keywords, type names and
+ * intrinsics are not values with a known type, so they are not in it.
+ */
+private fun collectTypedCandidates(parameters: CompletionParameters, ast: CompletionAst, prefix: String): List<TypedCandidate> {
+    val file = parameters.originalFile
+    val previousLeaf = PsiTreeUtil.prevCodeLeaf(parameters.position)
+    val context = buildReceiverContext(parameters, ast)
+    return when (previousLeaf?.elementType) {
+        BwslTokenTypes.DOT -> collectReceiverMembers(file, previousLeaf.textRange.startOffset, context, prefix)
+            .map { TypedCandidate(buildLookupElementFor(it), it.valueType()) }
+        BwslTokenTypes.COLONCOLON -> {
+            val qualifier = PsiTreeUtil.prevCodeLeaf(previousLeaf)?.text
+            qualifier?.let { collectMembersOf(ast.root, ast.raw, ast.line, ast.column, it, context.aliases) }.orEmpty()
+                .map { TypedCandidate(buildLookupElementFor(it), it.valueType()) }
+        }
+        else -> collectVisibleLocals(parameters).map { TypedCandidate(buildLocalLookupElement(it, emptySet()), it.type) } +
+            collectNamesVisibleAt(ast.root, ast.raw, ast.line, ast.column)
+                .filter { it.kind == DeclaredName.Kind.FUNCTION || it.kind == DeclaredName.Kind.CONSTANT || it.kind == DeclaredName.Kind.FIELD }
+                .map { TypedCandidate(buildLookupElementFor(it), it.valueType()) }
+    }
 }
 
 /**
@@ -191,6 +244,23 @@ private fun collectImportableModuleNames(parameters: CompletionParameters): List
 
 class BwslCompletionContributor : CompletionContributor() {
     init {
+        // Smart completion (Ctrl+Shift+Space): only the values whose type is what the caret expects. When
+        // nothing is expected (or it cannot be told) every value with a known type is offered, so it is never empty for no reason.
+        extend(
+            CompletionType.SMART,
+            PlatformPatterns.psiElement().withElementType(NAME_TOKENS),
+            object : CompletionProvider<CompletionParameters>() {
+                override fun addCompletions(parameters: CompletionParameters, context: ProcessingContext, result: CompletionResultSet) {
+                    val ast = findCompletionAst(parameters) ?: return
+                    val expected = collectExpectedTypesAt(parameters.originalFile, parameters.offset, buildReceiverContext(parameters, ast))
+                    for (candidate in collectTypedCandidates(parameters, ast, result.prefixMatcher.prefix)) {
+                        if (candidate.type == null) continue
+                        if (expected.isEmpty() || doesTypeMatch(candidate.type, expected)) result.addElement(candidate.element)
+                    }
+                }
+            }
+        )
+
         extend(
             CompletionType.BASIC,
             PlatformPatterns.psiElement().withElementType(NAME_TOKENS),
@@ -246,6 +316,11 @@ class BwslCompletionContributor : CompletionContributor() {
 
                     // `Module::` is followed by a member of that module (or a value of an enum), and nothing else.
                     val previousLeaf = PsiTreeUtil.prevCodeLeaf(parameters.position)
+                    // What the caret is expecting (the parameter being filled in, the type being initialised):
+                    // suggestions of that type are ranked first.
+                    val expectedTypes = findCompletionAst(parameters)
+                        ?.let { collectExpectedTypesAt(parameters.originalFile, parameters.offset, buildReceiverContext(parameters, it)) }
+                        .orEmpty()
                     if (previousLeaf?.elementType == BwslTokenTypes.COLONCOLON) {
                         val qualifier = PsiTreeUtil.prevCodeLeaf(previousLeaf)?.text
                         val ast = findCompletionAst(parameters)
@@ -253,7 +328,7 @@ class BwslCompletionContributor : CompletionContributor() {
                             val aliases = collectImportDeclarationsOf(parameters.originalFile)
                                 .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
                             val members = collectMembersOf(ast.root, ast.raw, ast.line, ast.column, qualifier, aliases)
-                            for (member in members) result.addElement(buildLookupElementFor(member))
+                            for (member in members) result.addElement(buildLookupElementFor(member, expectedTypes))
                             // A module the file does not import yet: its members, and choosing one imports it.
                             if (members.isEmpty()) {
                                 val excluded = collectModulesNotToImport(parameters, ast)
@@ -288,7 +363,7 @@ class BwslCompletionContributor : CompletionContributor() {
                                 .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
                             val context = ReceiverContext(ast.root, ast.raw, ast.line, ast.column, aliases, parameters.originalFile.text)
                             val members = collectReceiverMembers(parameters.originalFile, previousLeaf.textRange.startOffset, context, result.prefixMatcher.prefix)
-                            for (member in members) result.addElement(buildLookupElementFor(member))
+                            for (member in members) result.addElement(buildLookupElementFor(member, expectedTypes))
                         }
                     }
 
@@ -326,14 +401,7 @@ class BwslCompletionContributor : CompletionContributor() {
                         prevSibling?.elementType == BwslTokenTypes.DOT || prevSibling?.elementType == BwslTokenTypes.COLONCOLON
                     if (blockContext == BwslBlockContext.STATEMENT_BODY && !afterMemberOrQualifier) {
                         for (local in collectVisibleLocals(parameters)) {
-                            result.addElement(
-                                PrioritizedLookupElement.withPriority(
-                                    LookupElementBuilder.create(local.name)
-                                        .withTypeText(local.type ?: "")
-                                        .withTailText(" ${local.kind.label}", true),
-                                    LOCAL_PRIORITY
-                                )
-                            )
+                            result.addElement(buildLocalLookupElement(local, expectedTypes))
                         }
                     }
 
@@ -343,7 +411,7 @@ class BwslCompletionContributor : CompletionContributor() {
                             for (name in collectNamesVisibleAt(ast.root, ast.raw, ast.line, ast.column)) {
                                 val isExpressionName = name.kind == DeclaredName.Kind.FUNCTION || name.kind == DeclaredName.Kind.CONSTANT
                                 if (isExpressionName && blockContext != BwslBlockContext.STATEMENT_BODY) continue
-                                result.addElement(buildLookupElementFor(name))
+                                result.addElement(buildLookupElementFor(name, expectedTypes))
                             }
 
                             // Names of modules that are not imported yet; choosing one writes `Module::name` and imports the module.

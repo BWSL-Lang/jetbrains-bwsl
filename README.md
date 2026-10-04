@@ -244,6 +244,16 @@ is exactly the compiler's:
   (once they have been fetched, see below), the module files in the project and
   the module paths, and the other modules of the file. After `using`, the
   modules and aliases the file imports
+- **Ranking by expected type** — a suggestion whose type is what the caret
+  expects sorts first: the parameter being filled in (`blend(x, |` wants the
+  second parameter's type, for a function, a method, a `Module::` function or
+  an intrinsic, whose classes such as `floatN` are spelt out), the declared type
+  being initialised (`float2 q = |`), the target of an assignment (`l.intensity
+  = |`) and the function's return type after `return`. Locals, constants,
+  functions (by what they return) and fields all take part
+- **Smart completion** (Ctrl+Shift+Space) offers only the values of that type;
+  where nothing is expected, such as after `a + `, it offers every value with a
+  known type rather than nothing
 - **After a `.`** — what the value before it has: a struct's **fields and
   methods**, a vector's **swizzles**, an array's `length`. A swizzle is offered
   for each component (`x y z w`, `r g b a`) and as the prefixes `xy`, `xyz`,
@@ -324,7 +334,6 @@ Not implemented yet:
 
 **Completion**
 - [ ] Completion that sees code typed since the last save
-- [ ] Argument-aware ranking and smart completion by expected type
 
 **Navigation and search**
 - [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs,

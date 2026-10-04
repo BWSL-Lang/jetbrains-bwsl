@@ -249,6 +249,21 @@ is wrapped at 80 characters.
   `length` intrinsic is always there and the array member is told apart by its `int` type text.
   Fields and methods of the enclosing struct are also added to `collectNamesVisibleAt` (a struct's
   range holds its methods' bodies).
+- Expected types (`BwslExpectedTypes.kt`). `collectExpectedTypesAt` reads the tokens before the
+  caret: it drops a word ending at the caret (being typed), skips back over a member chain or
+  `Module::` (`skipBackOverMemberAccess`, via `parseReceiver(...).startIndex`, so `float t = l.|`
+  looks at `float t =`), then looks at the token before: an assignment operator (a declaration
+  `Type name =`, with the type read from the tokens and checked for a boundary before it, else the
+  type of the target chain through the receiver machinery), `return` (the innermost enclosing
+  function/method/pass function in the raw AST), or `(`/`,` (walk back to the unmatched `(` counting
+  top-level commas, then the callee: a method through the receiver's struct, `Mod::f`, a function in
+  scope, or an intrinsic whose table classes `floatN`, `floatVecN`, `numeric`, `scalar`, `matN`,
+  `boolVecN`, `texture` are expanded to types; `T` expands to nothing). Overloads give a *set*.
+  `doesTypeMatch` compares ignoring a module qualifier. Basic completion adds `TYPE_MATCH_BONUS`
+  (1000) to the priority of a typed suggestion that matches; a separate `CompletionType.SMART`
+  provider offers only matching typed values (locals, functions by return type, constants, fields,
+  members after `.`/`::`), and *all* typed values when nothing is expected. Only what directly
+  precedes the caret counts, so `a + |` expects nothing; no implicit conversions are assumed.
 - Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
   compile of a file that uses a standard module starts a background download, which would otherwise
   reach GitHub and could land in another test's cache directory).
