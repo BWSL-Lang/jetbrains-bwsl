@@ -240,6 +240,9 @@ is wrapped at 80 characters.
   target module is the owner (through `owner` links) of no edge's target other than other
   import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
+- Semantic highlighting (`BwslSemanticHighlighting.kt`, an `Annotator` that runs once on the file):
+  `collectSemanticHighlights` colours the name range of every own node whose own symbol, or the
+  target of its edge, is a parameter, variable, loop-iterator, constant or struct-field.
 - Inlay hints (`BwslInlayHints.kt`, a declarative `InlayHintsProvider` registered as
   `codeInsight.declarativeInlayProvider`, strings in `messages/BwslBundle.properties`):
   `collectParameterNameHints` takes each `FUNCTION_CALL` token followed by `(`, the function or

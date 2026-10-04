@@ -132,6 +132,14 @@ unsaved edits.
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
 
+### Semantic highlighting
+
+Parameters, locals (and loop variables), constants and struct fields each get
+their own colour, at the declaration and at every use, by what the compiler
+resolved the name to. Functions, types and modules keep their syntax colours.
+The colours are under Settings | Editor | Color Scheme | BWSL | Semantic, and
+show while the editor holds the text that was compiled.
+
 ### Inlay hints
 
 - **Parameter names** in front of call arguments, for calls to functions and
@@ -381,8 +389,6 @@ Not implemented yet:
 - [ ] Unresolved-reference highlighting
 - [ ] Inlay hints for the length of an array parameter (the compiler does not
       mark array parameters in the AST yet, BWSL#106)
-- [ ] Semantic highlighting that colours parameters, locals, fields and
-      constants differently
 
 **Completion**
 - [ ] Completion that sees code typed since the last save

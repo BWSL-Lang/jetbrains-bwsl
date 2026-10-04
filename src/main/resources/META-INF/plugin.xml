@@ -55,6 +55,10 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslAnnotator"/>
 
+        <annotator
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSemanticAnnotator"/>
+
         <colorSettingsPage
             implementation="com.bwsl.plugin.BwslColorSettingsPage"/>
 
