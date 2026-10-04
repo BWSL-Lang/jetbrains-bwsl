@@ -39,7 +39,7 @@ class BwslFormattingModelBuilder : FormattingModelBuilder {
 
 /** A token of the file, with what the indent and spacing rules need to know about its surroundings. */
 internal class Leaf(
-    node: ASTNode,
+    val node: ASTNode,
     val previous: Leaf?,
     /** Whether a line break lies between the previous token and this one (or this is the first token). */
     val isFirstOnLine: Boolean

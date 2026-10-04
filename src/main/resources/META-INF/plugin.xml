@@ -107,6 +107,22 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslFormattingModelBuilder"/>
 
+        <lang.commenter
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslCommenter"/>
+
+        <lang.braceMatcher
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslBraceMatcher"/>
+
+        <quoteHandler
+            fileType="BWSL"
+            className="com.bwsl.plugin.BwslQuoteHandler"/>
+
+        <lang.foldingBuilder
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslFoldingBuilder"/>
+
         <langCodeStyleSettingsProvider
             implementation="com.bwsl.plugin.BwslLanguageCodeStyleSettingsProvider"/>
 

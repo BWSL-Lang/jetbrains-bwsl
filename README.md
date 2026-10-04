@@ -20,6 +20,23 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **File icons** — `.bwsl` files get one icon for pipeline files and another for
   module files
 
+### Brackets, quotes, comments and folding
+
+- **Comment with Line Comment** (Ctrl+/) toggles `//` on the caret's line or
+  every selected line, and **Comment with Block Comment** (Ctrl+Shift+/)
+  wraps a selection in `/* */`
+- **Bracket matching**: the partner of a `{ }`, `( )` or `[ ]` next to the caret
+  is highlighted and **Move Caret to Matching Brace** jumps to it. `<` and `>`
+  are not paired, since they are also comparisons
+- **Auto-closing**: typing `{`, `(`, `[` or `"` inserts the closing one, and
+  typing the closing one steps over it. No closing bracket is inserted when an
+  identifier or number follows. Enter between `{` and `}` puts the caret on an
+  indented line with the `}` below it
+- **Code folding** of every `{ ... }` block that spans lines (functions,
+  structs, passes, stages, loops and `if` bodies), of a multi-line `/* */`
+  comment, and of a run of two or more `//` lines, which folds to its first
+  line. It works from the text, so it does not need the file to compile
+
 ### Formatting (Ctrl+Alt+L)
 
 - **Reformat Code** for a file or a selection. It re-indents every line by how
@@ -219,9 +236,6 @@ Not implemented yet:
 **Refactoring and editing**
 - [ ] Formatter options beyond indentation and spacing: brace placement,
       wrapping long lines and aligning continued expressions
-- [ ] Comment / uncomment with the comment shortcut
-- [ ] Brace and quote matching and auto-closing
-- [ ] Code folding (blocks, functions, comments)
 - [ ] Live templates and snippets for common shapes (`pipeline`, `pass`,
       functions, loops)
 - [ ] Extend selection and smart Enter

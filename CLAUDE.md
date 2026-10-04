@@ -183,6 +183,16 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Editor support that needs only tokens (`BwslEditing.kt`, `BwslFolding.kt`): `BwslCommenter`
+  (`//`, `/* */`), `BwslBraceMatcher` (`{}` structural, `()` and `[]`; `<`/`>` deliberately not a
+  pair, and a closing bracket is only auto-inserted before whitespace, a comment, the end or
+  something that closes), `BwslQuoteHandler` (a `SimpleTokenSetQuoteHandler` on `STRING_LIT`) and
+  `BwslFoldingBuilder`. Folding reuses the formatter's `collectLeaves`: a stack pairs `{`/`}`
+  (a region only if they are on different lines, placeholder `{...}`), a multi-line block comment
+  folds as `/*...*/`, and consecutive `//` comments that each start a line, one directly under the
+  other, fold to `// <first line>...`. None of it needs an AST, so it works while the file does not
+  compile. The Enter-between-braces behaviour comes from the brace matcher plus the formatter's
+  `getChildAttributes`.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line
