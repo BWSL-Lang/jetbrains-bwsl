@@ -115,6 +115,23 @@ That means the compiler has to be configured (see [Setup](#setup)).
   menu) for files that contain a pipeline, with a configurable output format and
   directory
 
+### Inspections and quick fixes
+
+Read from the compiler's reference index of the last compile, so they show
+while the editor holds the text that was compiled and are off while there are
+unsaved edits.
+
+- **Unused parameter, variable or constant** (greyed out): nothing reads it. A
+  name that is only assigned says so. Module-, pipeline- and pass-level
+  constants and loop variables are not reported. *Remove unused declaration*
+  deletes a local's statement, unless its initialiser calls something
+- **Unused import**: an `import` or `using` whose module nothing refers to,
+  neither through `Module::` nor by a name it declares. *Remove unused import*
+  deletes the line
+- **Module used but not imported**: a `Module::` for a module the project (or
+  the standard library, once fetched) knows but the file does not import.
+  *Import 'Module'* adds the line
+
 ### Navigation (Ctrl+click)
 
 Every reference resolves through the compiler's own reference index, so scoping
@@ -352,8 +369,6 @@ Not implemented yet:
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
-- [ ] Inspections and quick fixes (unused variables and parameters, unused
-      imports, missing import for a used module)
 - [ ] Inlay hints: parameter names at call sites, inferred types, array lengths
 - [ ] Semantic highlighting that colours parameters, locals, fields and
       constants differently

@@ -232,6 +232,14 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Inspections (`BwslInspections.kt`: three `LocalInspectionTool`s, registered in plugin.xml with
+  descriptions under `inspectionDescriptions/`) read the cached AST through `findInspectionInput`,
+  which returns null unless the file's text hashes to what was compiled. Unused: a `variable`/
+  `constant` symbol with no `owner` (a local) or a `parameter` whose own node is in this file, with no
+  incoming edge, or only `write` edges. An unused import: an own `…/import:n`/`…/using:n` node whose
+  target module is the owner (through `owner` links) of no edge's target other than other
+  import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
+  edge whose name is a module some cached AST knows. Fixes work on tokens.
 - Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
   (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
   `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).

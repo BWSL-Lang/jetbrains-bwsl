@@ -66,6 +66,33 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslAstAnnotator"/>
 
+        <localInspection
+            language="BWSL"
+            shortName="BwslUnusedDeclaration"
+            displayName="Unused parameter, variable or constant"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslUnusedDeclarationInspection"/>
+
+        <localInspection
+            language="BWSL"
+            shortName="BwslUnusedImport"
+            displayName="Unused import"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslUnusedImportInspection"/>
+
+        <localInspection
+            language="BWSL"
+            shortName="BwslMissingImport"
+            displayName="Module used but not imported"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslMissingImportInspection"/>
+
         <psi.referenceContributor
             language="BWSL"
             implementation="com.bwsl.plugin.references.BwslReferenceContributor"/>
