@@ -27,6 +27,9 @@ Follow `docs/conventions/coding-conventions.md` when naming or writing code. In 
 function is named as a verb phrase (`find…`, `collect…`, `build…`, `is…`/`has…`/`can…` for
 predicates, …); that file says which verb to use for which kind of function.
 
+When editing `README.md`, follow `docs/conventions/doc-conventions.md`: prose
+is wrapped at 80 characters.
+
 ## Architecture overview
 
 - `BwslLexerAdapter.kt` — flex-generated lexer adapter. Tracks `prevSignificantType` to detect a
