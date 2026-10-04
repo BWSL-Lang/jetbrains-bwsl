@@ -232,6 +232,14 @@ is wrapped at 80 characters.
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
   counts as imported.
+- Spell-checking (`BwslSpellchecking.kt`). `BwslSpellcheckingStrategy` returns the text tokenizer for
+  `LINE_COMMENT`, `BLOCK_COMMENT` and `STRING_LIT` and nothing for anything else (BWSL's comments
+  are plain tokens, not `PsiComment`, so the platform's default strategy sees none of them).
+  `BwslBundledDictionaryProvider` registers `com/bwsl/plugin/bwsl.dic` (one word per line) for the
+  shading vocabulary. Build: `bundledModule('intellij.spellchecker')` for the API, and
+  `<dependencies><module name="intellij.spellchecker"/>` in plugin.xml. **The typo inspection itself
+  is `GrazieSpellCheckingInspection` in the Natural Languages plugin (`tanvd.grazi`) in this IDE
+  version**, so the tests add `testBundledPlugin('tanvd.grazi')`; the plugin does not depend on it.
 - Reading a process: **read stdout and stderr at the same time** (`compileAst`, the test helper).
   Reading one to its end first deadlocks when a file with many errors fills the other pipe, and the
   15 s timeout never starts because it comes after the reads.

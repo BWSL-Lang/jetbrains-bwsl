@@ -16,6 +16,10 @@
 
     <depends>com.intellij.modules.platform</depends>
 
+    <dependencies>
+        <module name="intellij.spellchecker"/>
+    </dependencies>
+
     <extensions defaultExtensionNs="com.intellij">
 
         <notificationGroup id="BWSL Compiler" displayType="BALLOON" isLogByDefault="true"/>
@@ -118,6 +122,13 @@
         <quoteHandler
             fileType="BWSL"
             className="com.bwsl.plugin.BwslQuoteHandler"/>
+
+        <spellchecker.support
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSpellcheckingStrategy"/>
+
+        <spellchecker.bundledDictionaryProvider
+            implementation="com.bwsl.plugin.BwslBundledDictionaryProvider"/>
 
         <lang.foldingBuilder
             language="BWSL"

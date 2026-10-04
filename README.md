@@ -37,6 +37,14 @@ That means the compiler has to be configured (see [Setup](#setup)).
   comment, and of a run of two or more `//` lines, which folds to its first
   line. It works from the text, so it does not need the file to compile
 
+### Spell-checking
+
+- Typos in **comments** (`//` and `/* */`) and **string literals** are
+  reported by the IDE's spell checker, with its usual quick fixes (rename, save
+  to dictionary, ignore). Names (identifiers, functions, types) are not checked
+- A small bundled dictionary knows the vocabulary of shaders and the compiler
+  (`bwslc`, `SPIRV`, `GLSL`, `swizzle`, `Fresnel`, `GGX`, ...)
+
 ### Formatting (Ctrl+Alt+L)
 
 - **Reformat Code** for a file or a selection. It re-indents every line by how
@@ -291,7 +299,6 @@ Not implemented yet:
 - [ ] Semantic highlighting that colours parameters, locals, fields and
       constants differently
 - [ ] Documentation comments shown in hover docs
-- [ ] Spell-checking of comments and strings
 
 **Completion**
 - [ ] Struct fields and swizzles after `.`, and fields inside methods
