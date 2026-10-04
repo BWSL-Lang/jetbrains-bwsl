@@ -162,6 +162,25 @@ is wrapped at 80 characters.
   are hard errors, and `-ast-json` prints nothing for them. The conflicts reach the platform's
   conflicts dialog (a `ConflictsInTestsException` in tests). Skipped when the compiler's view is
   stale (the rename then refuses with the reason) or bwslc cannot be run.
+- Formatting (`BwslFormatting.kt`, `BwslCodeStyle.kt`). The PSI is flat, so the formatting model is
+  flat: one block per token (`collectLeaves`, looking through REFERENCE/CALL_EXPRESSION) directly
+  under the file, each carrying the absolute indent of its line, computed up front by
+  `IndentTracker` from what precedes it: `{` frames, open `(`/`[` (continuation indent), operator
+  continuation lines, and braceless bodies. A body is a *construct* (`if (...)`, `else`, `for`,
+  `loop`, ...) opened when its header closes; it indents a level only if its first token starts a
+  line, ends at its `;` or closing `}`, and an `else` after it attaches to the `if` just ended
+  (walk outwards, stopping there), which is what puts `else` at its `if`'s level. `spacingBetween`
+  has a rule only where the meaning is unambiguous and returns null (leave as is) otherwise: `<`/
+  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. `getChildAttributes`
+  (from `indentForNewLine`) is what Enter uses; `BwslTypedHandler` re-indents a typed `}`. Two
+  things bit during development and are load-bearing: **block ranges must be read once when the
+  model is built** (the formatter edits the tree as it goes, so a node's own range drifts), and the
+  lexer's whitespace rule is `{WHITE_SPACE}+` - the platform formatter replaces *one* whitespace
+  leaf per gap, and a lexer that emits one token per space corrupts text when it shrinks two of
+  them. `BwslFormattingTest` formats every fifth file of the compiler's `tests`/`modules` (found
+  next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
+  pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
+  passed, 663 unchanged).
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line

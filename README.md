@@ -20,6 +20,29 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **File icons** — `.bwsl` files get one icon for pipeline files and another for
   module files
 
+### Formatting (Ctrl+Alt+L)
+
+- **Reformat Code** for a file or a selection. It re-indents every line by how
+  deeply it is nested, and normalises the spaces between tokens where the
+  meaning is clear: after commas, around assignments, comparisons, `&&`, `||`
+  and `->`, around binary `+ - * / %`, before `{`, inside `( )` and `[ ]`, and
+  in `name :: (...)`. It never moves a token to another line or changes one,
+  so the program means what it meant; this is checked against all 1,045 files
+  in the compiler's own repository
+- Understands braceless bodies: a statement under `if (...)`, `else`, `for`,
+  `loop` and the like is indented one level, and an `else` lines up with the
+  `if` it belongs to. A body on the same line as its header stays there
+- Continued expressions are indented: a line after an operator, one that
+  starts with an operator, and lines inside open `( )` or `[ ]`
+- **Auto-indent**: Enter indents the next line (a level after `{` or a
+  braceless header, the same level after `;`), and typing `}` at the start of a
+  line moves it to the indent of the line that opened its block
+- Left alone on purpose: signs (`-x`), `<` and `>` (a comparison or a
+  generic's brackets), `:`, `?`, `^` (an operator or a pointer), `..`, blank
+  lines and trailing comments. Line breaks are kept as written
+- **Settings → Editor → Code Style → BWSL**: indent size (4 by default),
+  continuation indent (4), tabs or spaces, and how many blank lines to keep
+
 ### Compiler diagnostics
 
 - **Errors and warnings in the editor**, from `bwslc`'s JSON diagnostics, with
@@ -191,7 +214,8 @@ is exactly the compiler's:
 Not implemented yet:
 
 **Refactoring and editing**
-- [ ] Code formatter, auto-indent and **Reformat Code**
+- [ ] Formatter options beyond indentation and spacing: brace placement,
+      wrapping long lines, aligning continued expressions and `case` labels
 - [ ] Comment / uncomment with the comment shortcut
 - [ ] Brace and quote matching and auto-closing
 - [ ] Code folding (blocks, functions, comments)

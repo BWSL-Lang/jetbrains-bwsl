@@ -103,6 +103,19 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>
 
+        <lang.formatter
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslFormattingModelBuilder"/>
+
+        <langCodeStyleSettingsProvider
+            implementation="com.bwsl.plugin.BwslLanguageCodeStyleSettingsProvider"/>
+
+        <codeStyleSettingsProvider
+            implementation="com.bwsl.plugin.BwslCodeStyleSettingsProvider"/>
+
+        <typedHandler
+            implementation="com.bwsl.plugin.BwslTypedHandler"/>
+
         <postStartupActivity
             implementation="com.bwsl.plugin.BwslProjectIndexStartup"/>
 
