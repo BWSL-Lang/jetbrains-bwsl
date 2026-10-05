@@ -17,6 +17,9 @@ private data class GitHubRelease(val tag_name: String = "", val assets: List<Git
 object BwslCompilerDownloader {
     private const val LATEST_RELEASE_URL = "https://api.github.com/repos/BWSL-Lang/BWSL/releases/latest"
 
+    /** The tag of the newest release (`v0.9.0`), or null when GitHub cannot be reached or says something else. */
+    fun findLatestReleaseTag(): String? = fetchTextFromGitHub(LATEST_RELEASE_URL)?.let { parseLatestReleaseTag(it) }
+
     /** Where a downloaded compiler is stored, so it can be reused across IDE sessions. */
     fun getInstallPath(): Path {
         val osName = System.getProperty("os.name").lowercase()

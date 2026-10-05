@@ -20,6 +20,86 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **File icons** — `.bwsl` files get one icon for pipeline files and another for
   module files
 
+### Extend Selection and Smart Enter
+
+- **Extend Selection** (Ctrl+W, and Ctrl+Shift+W to shrink) grows from the
+  caret outwards: the argument, the contents of the parentheses or brackets
+  around it, the group with its brackets, the statement, the contents of the
+  block, the block with its braces, and the header that owns it (the whole
+  function, struct, pass or `if`). An `if` with its `else` is one statement
+- **Complete Current Statement** (Ctrl+Shift+Enter) works on the caret's line
+  wherever the caret is on it: it closes the parentheses and brackets opened on
+  the line, adds the `;` a statement lacks, and adds a `{ }` block after a
+  header (`if (...)`, `for`, `else`, a function declaration, `struct`,
+  `module`, `pass`, ...), leaving the caret inside it on an indented line.
+  Where no `;` is written (an `attributes` entry, an `import`, a `case` label,
+  a line that ends in an operator) it adds none, and a line that is complete
+  just starts a new one
+
+### Brackets, quotes, comments and folding
+
+- **Comment with Line Comment** (Ctrl+/) toggles `//` on the caret's line or
+  every selected line, and **Comment with Block Comment** (Ctrl+Shift+/)
+  wraps a selection in `/* */`
+- **Bracket matching**: the partner of a `{ }`, `( )` or `[ ]` next to the caret
+  is highlighted and **Move Caret to Matching Brace** jumps to it. `<` and `>`
+  are not paired, since they are also comparisons
+- **Auto-closing**: typing `{`, `(`, `[` or `"` inserts the closing one, and
+  typing the closing one steps over it. No closing bracket is inserted when an
+  identifier or number follows. Enter between `{` and `}` puts the caret on an
+  indented line with the `}` below it
+- **Code folding** of every `{ ... }` block that spans lines (functions,
+  structs, passes, stages, loops and `if` bodies), of a multi-line `/* */`
+  comment, and of a run of two or more `//` lines, which folds to its first
+  line. It works from the text, so it does not need the file to compile
+
+### Spell-checking
+
+- Typos in **comments** (`//` and `/* */`) and **string literals** are
+  reported by the IDE's spell checker, with its usual quick fixes (rename, save
+  to dictionary, ignore). Names (identifiers, functions, types) are not checked
+- A small bundled dictionary knows the vocabulary of shaders and the compiler
+  (`bwslc`, `SPIRV`, `GLSL`, `swizzle`, `Fresnel`, `GGX`, ...)
+
+### Formatting (Ctrl+Alt+L)
+
+- **Reformat Code** for a file or a selection. It re-indents every line by how
+  deeply it is nested, and normalises the spaces between tokens where the
+  meaning is clear: after commas, around assignments, comparisons, `&&`, `||`
+  and `->`, around binary `+ - * / %`, before `{`, inside `( )` and `[ ]`, and
+  in `name :: (...)`. It never moves a token to another line or changes one,
+  so the program means what it meant; this is checked against all 1,045 files
+  in the compiler's own repository
+- Understands braceless bodies: a statement under `if (...)`, `else`, `for`,
+  `loop` and the like is indented one level, and an `else` lines up with the
+  `if` it belongs to. A body on the same line as its header stays there
+- `switch`: `case` and `default` labels sit one level inside the `switch`, and
+  the statements after a label are indented one more until the next label or
+  the closing `}`.
+- Continued expressions are indented: a line after an operator, one that
+  starts with an operator, and lines inside open `( )` or `[ ]`
+- **Auto-indent**: Enter indents the next line (a level after `{` or a
+  braceless header, the same level after `;`), and typing `}` at the start of a
+  line moves it to the indent of the line that opened its block
+- Left alone on purpose: signs (`-x`), `<` and `>` (a comparison or a
+  generic's brackets), `:`, `?`, `^` (an operator or a pointer), `..`, blank
+  lines and trailing comments. Line breaks are kept as written
+- **Settings → Editor → Code Style → BWSL**: indent size (4 by default),
+  continuation indent (4), tabs or spaces, and how many blank lines to keep
+- **Options that move tokens**, all off by default (so by default no token
+  moves to another line), under **Wrapping and Braces**:
+  - **Brace placement**: *Keep as written*, *End of line* (`{` ends the header's
+    line and `} else {` stays together) or *Next line* (`{` on a line of its own
+    and `else` starting a line). Only a block that spans lines is moved: a
+    single-line `{ x }` stays, and so does the `{` after a `case 1:` label
+  - **Wrap call arguments that pass the right margin**: the arguments or
+    parameters of the shallowest call on an over-long line go one per line,
+    then those of the next call in, until the line fits. It uses the right
+    margin of the code style
+  - **Align continued expressions**: a line that continues an expression lines
+    up with where the expression began (after the `=` or `return`) or with the
+    first argument after `(`, instead of being indented
+
 ### Compiler diagnostics
 
 - **Errors and warnings in the editor**, from `bwslc`'s JSON diagnostics, with
@@ -27,9 +107,76 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - Checks the text in the editor, so **unsaved edits are validated** too
 - Honours the configured **module paths**, so imports resolve as they do when
   you compile
+- **Weak warning when a declaration shadows another**: a parameter, local,
+  constant or loop variable that reuses the name of one already in scope (a
+  parameter or an enclosing local, a loop variable, or a module-, pipeline- or
+  pass-level constant). bwslc allows shadowing without comment for now [See #103](https://github.com/BWSL-Lang/BWSL/issues/103)
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
+
+### Inspections and quick fixes
+
+Read from the compiler's reference index of the last compile, so they show
+while the editor holds the text that was compiled and are off while there are
+unsaved edits.
+
+- **Unused parameter, variable or constant** (greyed out): nothing reads it. A
+  name that is only assigned says so. Module-, pipeline- and pass-level
+  constants and loop variables are not reported. *Remove unused declaration*
+  deletes a local's statement, unless its initialiser calls something
+- **Unused import**: an `import` or `using` whose module nothing refers to,
+  neither through `Module::` nor by a name it declares. *Remove unused import*
+  deletes the line
+- **Module used but not imported**: a `Module::` for a module the project (or
+  the standard library, once fetched) knows but the file does not import.
+  *Import 'Module'* adds the line
+
+### File Structure and breadcrumbs
+
+- **File Structure** (Ctrl+F12) and the Structure tool window list modules,
+  pipelines, structs (with fields and methods), enums, passes (with their
+  stages), functions and constants, in source order, with autoscroll from the
+  caret
+- **Breadcrumbs** under the editor name the declarations around the caret, from
+  the module or pipeline inwards (`Shapes > Circle > area()`)
+- Both are read from the tokens, so they follow the text as you type and work
+  while the file does not compile. The inside of a function or stage is not
+  listed
+
+### Go to Type Declaration (Ctrl+Shift+B)
+
+From a variable, parameter, struct field or function (on its declaration or any
+use) to the struct its type names, including a `Module::Type` in another
+module's file. Built-in types such as `float4` have no source and give
+nothing.
+
+### Go to Class / Go to Symbol / Search Everywhere
+
+- **Go to Class** (Ctrl+N) lists modules, pipelines and structs; **Go to
+  Symbol** (Ctrl+Alt+Shift+N) lists passes, functions, methods and module-level
+  constants. Both feed **Search Everywhere** (Shift twice). Each row shows the
+  module or struct that holds it and its file
+- Built from the compiler's AST of each project file, so a file that has not
+  compiled, or has been edited since, is not listed
+
+### Semantic highlighting
+
+Parameters, locals (and loop variables), constants and struct fields each get
+their own colour, at the declaration and at every use, by what the compiler
+resolved the name to. Functions, types and modules keep their syntax colours.
+The colours are under Settings | Editor | Color Scheme | BWSL | Semantic, and
+show while the editor holds the text that was compiled.
+
+### Inlay hints
+
+- **Parameter names** in front of call arguments, for calls to functions and
+  methods the compiler resolved, including `Module::` calls. An argument that
+  is just the parameter's own name gets none, and neither do intrinsics. Shown
+  while the editor holds the text that was compiled. Switch off under
+  Settings | Editor | Inlay Hints
+- No hints for inferred types (every BWSL declaration names its type) or array
+  lengths of locals (written in the declaration)
 
 ### Navigation (Ctrl+click)
 
@@ -48,11 +195,24 @@ is exactly the compiler's:
 - fragment `output.x` to its entry in the pass's `outputs { … }` block, and
   `input.x` to the vertex stage's `output.x` assignment
 - uses of a constant, including ones the compiler folded into a literal
+- **the compiler's standard modules** (`Math`, `Color`, ...), which are
+  embedded in `bwslc` and have no file on disk. The compiler names each one's
+  source on GitHub, pinned to its release tag (or `master` for a development
+  build). When a file that uses one has been compiled, the plugin fetches that
+  directory in the background into a read-only cache in the IDE's system
+  directory, and Ctrl+click opens the copy. A tagged version is fetched once, a
+  branch once per session. Find Usages works from a standard declaration, and
+  Rename is not offered on one. It needs a network connection the first time;
+  until a file has been fetched, or if the copy no longer matches the compiler
+  (a position that does not hold the name is not trusted), nothing happens
+  instead of a guess
 
 ### Find Usages
 
 - On any declaration: functions, methods, structs, fields, parameters, locals,
-  constants, attributes, fragment outputs and modules
+  constants, attributes, fragment outputs, modules and stage values
+  (`output.uv` / `input.uv`, which have no declaration of their own: the
+  vertex stage's first assignment stands in for it)
 - Works from the declaration's name or from any use of it
 - Finds usages across every BWSL file in the project and in the module paths,
   including files you have never opened. It waits for any file that is not up to
@@ -88,8 +248,9 @@ is exactly the compiler's:
 ### Rename (Shift+F6)
 
 - Renames a declaration and every usage in one step: functions, methods,
-  structs, fields, parameters, locals, constants, attributes, fragment outputs
-  and modules
+  structs, fields, parameters, locals, constants, attributes, fragment outputs,
+  modules and stage values (renaming `output.uv` renames the vertex stage's
+  assignments and the fragment stage's `input.uv` reads together)
 - Works from the declaration's name or from any use of it, and respects scope: a
   parameter renamed in one function is untouched in another, and so are
   same-named functions in other modules
@@ -99,6 +260,20 @@ is exactly the compiler's:
 - Brings the project index up to date first (behind a progress dialog, only when
   something is stale), so usages in files you never opened are renamed too,
   including module files outside the project
+- **Checks the new name with the compiler** before changing anything, and
+  lists what it finds in the platform's conflicts dialog, where you can still
+  go ahead. It applies the rename to a temporary copy of the sources and
+  compares that with an unrenamed copy, so it reports:
+  - errors the rename would introduce: a duplicate declaration in one scope, an
+    overload that already exists, a stage value whose type conflicts with the
+    one it would be merged into, or any other rule the compiler enforces (the
+    first attribute has to be called `position`, for one)
+  - names that would silently mean something else: a local renamed to the name
+    of a parameter, which would then capture the parameter's uses
+  - stage values that would be merged, when the new name is already one in the
+    same pass
+
+  The check needs the compiler, and is skipped when it can't be run
 - Refuses, with an explanation, when the compiler's view of any project file is
   not current: it has unsaved changes, has changed since the compiler last
   checked it, has never been compiled, or doesn't compile. A rename from a stale
@@ -110,6 +285,14 @@ is exactly the compiler's:
 - **Variables, parameters, constants and fields** — declared type and kind
 - **Functions and methods** — qualified name (`Module::Struct::name()`) and
   signature, including calls into other files
+- **Documentation comments** — the `///` lines (or `/** */` block) written
+  directly above a function, constant, struct, enum or field are shown in its
+  popup, for a call and for the declaration itself. Blank lines separate
+  paragraphs, text in `backticks` is code, and web addresses are links. A
+  doc comment in another file is shown for a call into it, and so is one in a
+  standard module once its source has been fetched. A blank line or an
+  ordinary `//` comment between the comment and the declaration means it is not
+  about it
 - **Intrinsics** — signature and description
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
@@ -132,9 +315,59 @@ is exactly the compiler's:
 - **Types** and **intrinsics**, in the places they are valid
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type
+- **Functions, structs, enums and imported modules**, sorted after the locals:
+  what the enclosing module, pipeline and pass declare, shown with return type
+  and parameters (a function is inserted with its parentheses). A module name
+  continues with `::`
+- **`Module::` members** — the functions, structs, enums and constants of the
+  module (an `import ... as` alias works too), or the values of an enum after
+  `Enum::`. Nothing else is offered there, also when the caret is inside an
+  existing call name
+- **Auto-import** — press Ctrl+Space a second time to also see the functions,
+  structs, enums and constants of modules the file does not import yet (the
+  module files of the project and the module paths, and the compiler's
+  standard modules once they have been fetched). Choosing one writes
+  `Module::name` and adds `import Module` to the module or pipeline you are in,
+  after its last import. After typing `Module::` for a module that is not
+  imported, its members are offered at once and choosing one adds the import
+- **`using`** makes a module's functions and constants available without a
+  qualifier, so they are suggested too
+- **After `import`**, the modules that can be imported: the standard modules
+  (once they have been fetched, see below), the module files in the project and
+  the module paths, and the other modules of the file. After `using`, the
+  modules and aliases the file imports
+- **Ranking by expected type** — a suggestion whose type is what the caret
+  expects sorts first: the parameter being filled in (`blend(x, |` wants the
+  second parameter's type, for a function, a method, a `Module::` function or
+  an intrinsic, whose classes such as `floatN` are spelt out), the declared type
+  being initialised (`float2 q = |`), the target of an assignment (`l.intensity
+  = |`) and the function's return type after `return`. Locals, constants,
+  functions (by what they return) and fields all take part
+- **Smart completion** (Ctrl+Shift+Space) offers only the values of that type;
+  where nothing is expected, such as after `a + `, it offers every value with a
+  known type rather than nothing
+- **After a `.`** — what the value before it has: a struct's **fields and
+  methods**, a vector's **swizzles**, an array's `length`. A swizzle is offered
+  for each component (`x y z w`, `r g b a`) and as the prefixes `xy`, `xyz`,
+  `rgb`, ...; once you have typed `xy` it is extended with each component that
+  can follow (the two families are not mixed, and a `float3` has no `w`). The
+  value can be a name, `self`, a call, a constructor, a field, a method call
+  or an index, in any chain: `lights[1].color.`, `makeLight().`, `m[1].` (a
+  matrix column). Keywords and type names are no longer offered after a dot
+- **Inside a struct's methods** its own fields and methods are suggested
+  without a qualifier
 - **`attributes.` members** — the attributes the pass uses
 - **`input.` members** in a fragment stage — the vertex stage's outputs
 - **`extends`** after a submodule's name
+
+Which type a value has comes from the last compile, and the expression before
+the dot is read from the text. A value that is a parenthesised or arithmetic
+expression has no type here, and nothing is guessed. The compiler records no
+array size for a function parameter, so `length` is not offered on one.
+
+These names come from the last compile of the saved file, like the locals: a
+function typed since then is offered once the file has been saved and compiled.
+Aliases and imports are read from the text, so they are current.
 
 ### Settings
 
@@ -142,6 +375,13 @@ is exactly the compiler's:
 
 - **Compiler path**, with a **Download Latest…** button that fetches the right
   `bwslc` for your OS and architecture from the BWSL GitHub releases
+- **Check for a newer compiler release on startup** — on by default. When a
+  project opens (at most once a day, in the background) the plugin asks GitHub
+  for the newest `bwslc` release and compares it with your compiler's version.
+  If yours is older, a notification offers **Update** (downloads it, makes it
+  the compiler path) or **Skip this version**. A development build (`0.0.0-dev`)
+  is not compared and never nagged. **Tools → Check for BWSL Compiler Update**
+  asks right away and says what it found
 - **Module paths** — the directories passed to `bwslc` as `-modules`
 - **Output format** — SPIR-V, all formats, Metal, HLSL, GLSL 450 or GLSL ES /
   WebGL
@@ -170,45 +410,19 @@ is exactly the compiler's:
 Not implemented yet:
 
 **Refactoring and editing**
-- [ ] Rename conflict detection: warn before renaming to a name already used in
-      the same scope
-- [ ] Rename for stage values (`output.uv` / `input.uv`), which have no
-      declaration to start from
-- [ ] Code formatter, auto-indent and **Reformat Code**
-- [ ] Comment / uncomment with the comment shortcut
-- [ ] Brace and quote matching and auto-closing
-- [ ] Code folding (blocks, functions, comments)
 - [ ] Live templates and snippets for common shapes (`pipeline`, `pass`,
       functions, loops)
-- [ ] Extend selection and smart Enter
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
-- [ ] Inspections and quick fixes (unused variables and parameters, unused
-      imports, missing import for a used module)
-- [ ] Auto-import when completing a name from a module that isn't imported yet
-- [ ] Inlay hints: parameter names at call sites, inferred types, array lengths
-- [ ] Semantic highlighting that colours parameters, locals, fields and
-      constants differently
-- [ ] Documentation comments shown in hover docs
-- [ ] Spell-checking of comments and strings
+- [ ] Inlay hints for the length of an array parameter (the compiler does not
+      mark array parameters in the AST yet, BWSL#106)
 
 **Completion**
-- [ ] Function, struct and module names, including `Mod::` members
-- [ ] Struct fields and swizzles after `.`, and fields inside methods
-- [ ] Constants and functions declared in the enclosing module, pass or pipeline
 - [ ] Completion that sees code typed since the last save
-- [ ] Argument-aware ranking and smart completion by expected type
 
 **Navigation and search**
-- [ ] Find Usages on stage values (`output.uv` / `input.uv`)
-- [ ] Go to Symbol / Go to Class / Search Everywhere for functions, structs,
-      modules and passes
-- [ ] File Structure view and breadcrumbs
-- [ ] Go to Type Declaration
 - [ ] Call hierarchy
-- [ ] Navigation into the compiler's built-in standard modules (`stdlib://`
-      sources)
 - [ ] Ctrl+click on intrinsics, with their documentation
 
 **Compiler integration**
@@ -222,7 +436,6 @@ Not implemented yet:
 - [ ] Show the compiled output (SPIR-V disassembly, GLSL, HLSL, Metal) next to
       the source
 - [ ] Shader variant selection in the compile action
-- [ ] Notice a newer `bwslc` release and offer to update
 
 **Platform and ecosystem**
 - [ ] BWSL code blocks highlighted inside Markdown

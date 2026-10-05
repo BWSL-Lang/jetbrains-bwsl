@@ -11,10 +11,19 @@ import com.intellij.psi.util.elementType
 private fun renderSignatureHtml(returnType: String, name: String, params: List<String>): String =
     "${returnType.ifBlank { "void" }} ${name}(${params.joinToString(", ")})"
 
-private fun renderDoc(qualifiedName: String?, signature: String, description: String?): String = buildString {
+/**
+ * The popup for a declaration: its [signature], what the author wrote above it ([documentation], from
+ * its doc comment), then its [qualifiedName] and [description].
+ */
+private fun renderDoc(qualifiedName: String?, signature: String, description: String?, documentation: String? = null): String = buildString {
     append(DocumentationMarkup.DEFINITION_START)
     append(signature)
     append(DocumentationMarkup.DEFINITION_END)
+    if (documentation != null) {
+        append(DocumentationMarkup.CONTENT_START)
+        append(documentation)
+        append(DocumentationMarkup.CONTENT_END)
+    }
     if (qualifiedName != null || description != null) {
         append(DocumentationMarkup.CONTENT_START)
         if (qualifiedName != null) append(qualifiedName)
@@ -163,7 +172,26 @@ private fun renderVariableTypeDoc(element: PsiElement): String? {
         else -> return null
     }
     val type = symbol.type.takeIf { it.isNotBlank() } ?: return null
-    return renderDoc(null, "$type ${symbol.name}", description)
+    return renderDoc(null, "$type ${symbol.name}", description, findDocumentationFor(index, element, symbol))
+}
+
+/** What the author wrote in the doc comment above the declaration of [symbol], as HTML, or null if there is none. */
+private fun findDocumentationFor(index: BwslAstIndex, at: PsiElement, symbol: AstSymbol): String? {
+    val file = at.containingFile
+    // A use resolves to the declaration, in this file or another one; the declaration's own name is the declaration.
+    val declaration = resolveSymbolAt(file, index, at.textOffset).firstOrNull()
+        ?: index.nodesById[symbol.declaration]?.let { index.findNameRangeOf(it) }?.let { findElementAtOffset(file, it.first) }
+        ?: return null
+    return findDocCommentAbove(declaration.containingFile, declaration.textOffset)?.let { renderDocCommentHtml(it) }
+}
+
+/** A struct or enum, shown when it has a doc comment (they have no signature of their own to show otherwise). */
+private fun renderTypeDoc(element: PsiElement): String? {
+    val index = buildAstIndex(element.containingFile) ?: return null
+    val symbol = findSymbolAt(index, element.textOffset) ?: return null
+    if (symbol.kind != "struct" && symbol.kind != "enum") return null
+    val documentation = findDocumentationFor(index, element, symbol) ?: return null
+    return renderDoc(null, "${symbol.kind} ${symbol.name}", null, documentation)
 }
 
 /** The names of the module/struct/pass that enclose [symbol], outermost first (a pipeline is not part of a function's path). */
@@ -191,7 +219,12 @@ private fun renderFunctionDoc(at: PsiElement): String? {
     val symbol = findSymbolAt(index, at.textOffset) ?: return null
     val signature = buildFunctionSignature(index, symbol) ?: return null
     val qualifiedName = (collectQualifiedPathOf(index, symbol) + symbol.name).joinToString("::") + "()"
-    return renderDoc(qualifiedName, renderSignatureHtml(signature.returnType, signature.name, signature.params), null)
+    return renderDoc(
+        qualifiedName,
+        renderSignatureHtml(signature.returnType, signature.name, signature.params),
+        null,
+        findDocumentationFor(index, at, symbol)
+    )
 }
 
 class BwslDocumentationProvider : AbstractDocumentationProvider() {
@@ -236,7 +269,7 @@ class BwslDocumentationProvider : AbstractDocumentationProvider() {
                     renderShaderMemberDoc(element)?.let { return it }
                 if (element.text == "input" || element.text == "output")
                     renderShaderQualifierDoc(element)?.let { return it }
-                renderVariableTypeDoc(element)
+                renderVariableTypeDoc(element) ?: renderTypeDoc(element)
             }
             else -> null
         }

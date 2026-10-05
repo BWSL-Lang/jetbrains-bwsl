@@ -42,7 +42,7 @@ BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
 <YYINITIAL> {
 
   // Whitespace & comments (must be first)
-  {WHITE_SPACE}   { return TokenType.WHITE_SPACE; }
+  {WHITE_SPACE}+  { return TokenType.WHITE_SPACE; }
   {LINE_CMT}      { return BwslTokenTypes.LINE_COMMENT; }
   {BLOCK_CMT}     { return BwslTokenTypes.BLOCK_COMMENT; }
 

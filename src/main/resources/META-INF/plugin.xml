@@ -16,6 +16,10 @@
 
     <depends>com.intellij.modules.platform</depends>
 
+    <dependencies>
+        <module name="intellij.spellchecker"/>
+    </dependencies>
+
     <extensions defaultExtensionNs="com.intellij">
 
         <notificationGroup id="BWSL Compiler" displayType="BALLOON" isLogByDefault="true"/>
@@ -51,6 +55,10 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslAnnotator"/>
 
+        <annotator
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSemanticAnnotator"/>
+
         <colorSettingsPage
             implementation="com.bwsl.plugin.BwslColorSettingsPage"/>
 
@@ -61,6 +69,54 @@
         <externalAnnotator
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslAstAnnotator"/>
+
+        <localInspection
+            language="BWSL"
+            shortName="BwslUnusedDeclaration"
+            displayName="Unused parameter, variable or constant"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslUnusedDeclarationInspection"/>
+
+        <localInspection
+            language="BWSL"
+            shortName="BwslUnusedImport"
+            displayName="Unused import"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslUnusedImportInspection"/>
+
+        <localInspection
+            language="BWSL"
+            shortName="BwslMissingImport"
+            displayName="Module used but not imported"
+            groupName="BWSL"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="com.bwsl.plugin.BwslMissingImportInspection"/>
+
+        <typeDeclarationProvider implementation="com.bwsl.plugin.BwslTypeDeclarationProvider"/>
+
+        <lang.psiStructureViewFactory
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslStructureViewFactory"/>
+
+        <breadcrumbsInfoProvider implementation="com.bwsl.plugin.BwslBreadcrumbsProvider"/>
+
+        <gotoClassContributor implementation="com.bwsl.plugin.BwslGotoClassContributor"/>
+        <gotoSymbolContributor implementation="com.bwsl.plugin.BwslGotoSymbolContributor"/>
+
+        <codeInsight.declarativeInlayProvider
+            language="BWSL"
+            group="PARAMETERS_GROUP"
+            providerId="bwsl.parameter.names"
+            isEnabledByDefault="true"
+            bundle="messages.BwslBundle"
+            nameKey="inlay.parameter.names.name"
+            descriptionKey="inlay.parameter.names.description"
+            implementationClass="com.bwsl.plugin.BwslParameterNameHintsProvider"/>
 
         <psi.referenceContributor
             language="BWSL"
@@ -103,8 +159,54 @@
             language="BWSL"
             implementationClass="com.bwsl.plugin.completion.BwslCompletionContributor"/>
 
+        <lang.formatter
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslFormattingModelBuilder"/>
+
+        <lang.commenter
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslCommenter"/>
+
+        <lang.braceMatcher
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslBraceMatcher"/>
+
+        <quoteHandler
+            fileType="BWSL"
+            className="com.bwsl.plugin.BwslQuoteHandler"/>
+
+        <spellchecker.support
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSpellcheckingStrategy"/>
+
+        <spellchecker.bundledDictionaryProvider
+            implementation="com.bwsl.plugin.BwslBundledDictionaryProvider"/>
+
+        <lang.smartEnterProcessor
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslSmartEnterProcessor"/>
+
+        <extendWordSelectionHandler
+            implementation="com.bwsl.plugin.BwslExtendWordSelectionHandler"/>
+
+        <lang.foldingBuilder
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslFoldingBuilder"/>
+
+        <langCodeStyleSettingsProvider
+            implementation="com.bwsl.plugin.BwslLanguageCodeStyleSettingsProvider"/>
+
+        <codeStyleSettingsProvider
+            implementation="com.bwsl.plugin.BwslCodeStyleSettingsProvider"/>
+
+        <typedHandler
+            implementation="com.bwsl.plugin.BwslTypedHandler"/>
+
         <postStartupActivity
             implementation="com.bwsl.plugin.BwslProjectIndexStartup"/>
+
+        <postStartupActivity
+            implementation="com.bwsl.plugin.BwslCompilerUpdateStartup"/>
 
     </extensions>
 
@@ -120,6 +222,12 @@
                 description="Compile the current BWSL shader file with bwslc">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="Bwsl.CheckCompilerUpdate"
+                class="com.bwsl.plugin.BwslCheckCompilerUpdateAction"
+                text="Check for BWSL Compiler Update"
+                description="Check whether a newer bwslc release is available">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>

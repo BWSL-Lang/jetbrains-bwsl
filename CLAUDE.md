@@ -49,7 +49,16 @@ is wrapped at 80 characters.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
   parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from.
+  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. Its
+  `apply` also shows the shadowing warnings (`BwslShadowing.kt`): bwslc allows a parameter, local,
+  const or loop variable to reuse a visible name and says nothing (probed), so
+  `collectShadowingDeclarations` collects each such declaration from the raw AST and asks
+  `collectVisibleLocalsAt` (the completion walker, so the two share one notion of scope) what is in
+  scope *just before* it: at its own start for a local, one column before the function for a
+  parameter, one column before a loop variable. The result carries the hash of the text bwslc
+  compiled, and `apply` shows nothing unless the editor text still hashes to it (the compile reads
+  the saved file, so positions are wrong while there are unsaved edits). Module-, pipeline- and
+  pass-level consts are visible throughout their container and are not checked.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
@@ -118,9 +127,11 @@ is wrapped at 80 characters.
   a module file outside the project would otherwise only be searched in itself. `collectPayloadFiles`
   is the indexed files that have an AST. `BwslFindUsagesHandlerFactory` brings the index up to date
   (modal progress, only when stale) before a real Find Usages, then returns no handler so the default
-  one runs; it skips highlight-usages requests. Limits: a file that does not compile has no known
-  usages; a stage-interface value (`output.uv`) has no declaration so it
-  is not a target.
+  one runs; it skips highlight-usages requests. A stage-interface value (`output.uv`) has no
+  declaration node, so `findSymbolDeclaredBy` treats the target of the first assignment in the
+  symbol's `definitions` as its declaration (the place the resolver already sends a reference to):
+  that makes it a target, and every `output`/`input` edge to the symbol a usage. Limit: a file that
+  does not compile has no known usages.
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.
@@ -134,6 +145,227 @@ is wrapped at 80 characters.
   `checkCompilerViewOf` finds any *indexed* file whose view is not current (unsaved changes; changed
   since its AST was built; produces no AST; never compiled), or when the text at an occurrence is
   not the old name. An AST cached without its inputs counts as stale.
+- Rename conflict detection (`BwslRenameConflicts.kt`, `findExistingNameConflicts`) asks the
+  compiler instead of re-implementing scoping, so it is not another set of scope rules. The rename is
+  applied to a *copy* of the sources (`SourceMirror`: a temp directory per source directory and
+  module path, with the renamed text and, for a module in a same-named file, the new file name) and
+  compared with an unrenamed copy, both compiled with bwslc, in parallel. It reports (1) errors the
+  rename introduces (`-errors-json -no-validate -check`, matched by message so a moved line is not a
+  new error; a file that stops producing an AST counts), (2) any change in the reference index's
+  edges, and (3) for a stage value, a change in the number of stage-interface symbols (a merge).
+  This works because of facts probed against bwslc, not assumed: node and symbol ids follow source
+  order, so a rename changes no id and the edge sets are *identical* unless some name now resolves to
+  a different declaration; the one id that carries a name, `PASS:n/interface:<name>`, is mapped
+  old to new before comparing. Shadowing is legal in BWSL (a local may reuse a parameter's, a
+  const's or a function's name), so capture is silent in the compiler and only the edge diff finds it;
+  a duplicate in one block, an identical overload, a duplicate struct, field, parameter or module
+  are hard errors, and `-ast-json` prints nothing for them. The conflicts reach the platform's
+  conflicts dialog (a `ConflictsInTestsException` in tests). Skipped when the compiler's view is
+  stale (the rename then refuses with the reason) or bwslc cannot be run.
+- Formatting (`BwslFormatting.kt`, `BwslCodeStyle.kt`). The PSI is flat, so the formatting model is
+  flat: one block per token (`collectLeaves`, looking through REFERENCE/CALL_EXPRESSION) directly
+  under the file, each carrying the absolute indent of its line, computed up front by
+  `IndentTracker` from what precedes it: `{` frames, open `(`/`[` (continuation indent), operator
+  continuation lines, braceless bodies, and `case`/`default` labels (the `:` that ends a label, found
+  at the paren depth the label started at, opens a `KW_CASE` construct; a `;` never ends it, the
+  next label or the switch's `}` does, and a `default` only counts as a label when a `:` follows). A body is a *construct* (`if (...)`, `else`, `for`,
+  `loop`, ...) opened when its header closes; it indents a level only if its first token starts a
+  line, ends at its `;` or closing `}`, and an `else` after it attaches to the `if` just ended
+  (walk outwards, stopping there), which is what puts `else` at its `if`'s level. `spacingBetween`
+  has a rule only where the meaning is unambiguous and returns null (leave as is) otherwise: `<`/
+  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. `getChildAttributes`
+  (from `indentForNewLine`) is what Enter uses; `BwslTypedHandler` re-indents a typed `}`. Two
+  things bit during development and are load-bearing: **block ranges must be read once when the
+  model is built** (the formatter edits the tree as it goes, so a node's own range drifts), and the
+  lexer's whitespace rule is `{WHITE_SPACE}+` - the platform formatter replaces *one* whitespace
+  leaf per gap, and a lexer that emits one token per space corrupts text when it shrinks two of
+  them. `BwslFormattingTest` formats every fifth file of the compiler's `tests`/`modules` (found
+  next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
+  pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
+  passed, 663 unchanged).
+- Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
+  its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
+  does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for
+  that, a pre-release or anything non-numeric, so such a compiler is never "out of date".
+  `BwslCompilerDownloader.findLatestReleaseTag` reads GitHub's `releases/latest`; `decideUpdate`
+  offers a newer tag unless it is the one in `skippedCompilerVersion`. The check runs in the
+  background once per session and at most once a day (`lastCompilerUpdateCheck`), can be turned off
+  (`checkForCompilerUpdates`), and **Tools → Check for BWSL Compiler Update** asks at once and also
+  offers a skipped version. **Update** downloads to the plugin's install path and sets it as the
+  compiler path. The version reader and tag lookup are injectable for tests.
+- Standard-library sources (`BwslStdlibSources.kt`). The compiler embeds its standard modules: the
+  AST gives them `sourceFile` `stdlib://modules/<file>.bwsl` and a `sourceUrl`
+  (`https://github.com/<owner>/<repo>/blob/<ref>/modules/<file>`, `<ref>` the release tag, or
+  `master` for a dev build). `compileAndCache` hands every `sourceUrl` to
+  `downloadInBackground`, which fetches the file and the rest of its directory (listed through the
+  GitHub contents API, so unimported modules are known too) into `<system>/bwsl/stdlib/<ref>/modules/`,
+  read-only. A tag is fetched once, a branch once per session. `AstNodePos.sourceUrl` is inherited
+  down like `sourceFile`; `resolveInSourceFile` opens the copy for a `stdlib://` node and **only
+  trusts it if the text at the node's name range equals the node's name**, since the copy is of the
+  repository, not necessarily of the compiler's build (a mismatch resolves to nothing, not a guess).
+  `findSourceKeyOf` maps a copy back to its `stdlib://` name so Find Usages from a standard
+  declaration finds the identity through the importing file's AST; `BwslRenameProcessor` refuses
+  elements in a copy. The downloader is injectable (`fetchText`, `cacheRoot`) so tests serve the
+  compiler repo's own `modules/` directory instead of the network.
+- Name completion (`BwslAstNames.kt`, the contributor): `collectNamesVisibleAt` reads the cached
+  raw AST (the enclosing own module/pipeline's functions, structs and enums; the enclosing pass's
+  functions; the functions and constants of modules named by `using`; the names of imported modules)
+  and `collectMembersOf` the members of a `Qualifier::` (a module of the payload's `modules`, or an
+  enum's values). The AST's `imports` entries record the module but **not** an `as` alias (only a
+  `using` records `writtenName`), so `collectImportDeclarationsOf` reads `import X [as Y]` from the
+  tokens. After `::` only members are offered (the contributor used to offer keywords there). The
+  trigger accepts every name token (`FUNCTION_CALL`, `MODULE_NAME`, ...), not only `IDENTIFIER`, so
+  it also works inside an existing `Mod::name(...)`.
+- Auto-import (`BwslImports.kt`, the contributor). `collectImportableNames` takes the members of
+  **every module entry in every cached AST** (own or imported), minus the modules the file imports
+  (read from the tokens) and the one the caret is in, deduplicated; so it works for project module
+  files and module paths as soon as the index has compiled them. The standard modules have no file to
+  compile (compiling a copy of `math.bwsl` fails: it redeclares the embedded `Math`), so
+  `BwslStdlibSources.writeProbeFiles` writes `Probe_<Module>.bwsl` = `module BwslProbe<Module> { import
+  <Module> }` into a directory *outside* the cache, one per module found in the copies, and the
+  background index compiles those (`refreshNow(includeStandardModules = true)`, not the modal one that
+  rename and Find Usages wait on); the imported module's entry then holds its members. Names
+  starting `BwslProbe` are never offered. Importable names appear from the second invocation
+  (`parameters.invocationCount >= 2`; the first adds an advertisement), or at once after a typed
+  `Module::` that names no visible module. The insert handler writes `Module::` (unless typed),
+  runs the parentheses handler, commits, then `findImportInsertion` (token-based, so right for text
+  newer than the last compile) inserts `import Module` after the last import of the enclosing
+  top-level `{}` with that import's indent, or first in the block. A module imported under an alias
+  counts as imported.
+- Inspections (`BwslInspections.kt`: three `LocalInspectionTool`s, registered in plugin.xml with
+  descriptions under `inspectionDescriptions/`) read the cached AST through `findInspectionInput`,
+  which returns null unless the file's text hashes to what was compiled. Unused: a `variable`/
+  `constant` symbol with no `owner` (a local) or a `parameter` whose own node is in this file, with no
+  incoming edge, or only `write` edges. An unused import: an own `…/import:n`/`…/using:n` node whose
+  target module is the owner (through `owner` links) of no edge's target other than other
+  import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
+  edge whose name is a module some cached AST knows. Fixes work on tokens.
+- File Structure and breadcrumbs (`BwslStructure.kt`): token-based on purpose (they must follow text
+  being typed, like folding), not AST-driven. `collectOutline` pairs braces and walks each region
+  statement by statement (a statement ends at its `;` or at the `}` of its block; `import`/`using` have
+  no `;`): container keywords (module, submodule, pipeline, struct, enum, pass) recurse, `name :: (`
+  is a function (method in a struct), `vertex`/`fragment`/`compute` a stage, `const … name =` a
+  constant, `Type name;` in a struct a field. The structure view's elements are not PSI (the PSI has no
+  named elements) and navigate with an `OpenFileDescriptor`; the breadcrumbs provider overrides
+  `getParent` to walk the outline, since the PSI is flat.
+- Go to Type Declaration (`BwslTypeDeclarations.kt`, `typeDeclarationProvider`; the platform hands
+  over the declaration's name element, so the provider works from its offset): the symbol's
+  `type`/`return-type` edge to a `struct` symbol, resolved with `resolveDeclarationPosition`.
+- Go to Class / Symbol (`BwslGotoContributors.kt`, `gotoClassContributor`/`gotoSymbolContributor`
+  over `ChooseByNameContributor`): `collectProjectSymbols` walks the project's BWSL files
+  (`FileTypeIndex`) that have a cached AST of their current text, lists the symbols of kind
+  module/pipeline/struct/pass/function/method/constant whose declaration is an own node, and the rows
+  are lightweight `NavigationItem`s opening an `OpenFileDescriptor` (the PSI has no named elements).
+- Semantic highlighting (`BwslSemanticHighlighting.kt`, an `Annotator` that runs once on the file):
+  `collectSemanticHighlights` colours the name range of every own node whose own symbol, or the
+  target of its edge, is a parameter, variable, loop-iterator, constant or struct-field.
+- Inlay hints (`BwslInlayHints.kt`, a declarative `InlayHintsProvider` registered as
+  `codeInsight.declarativeInlayProvider`, strings in `messages/BwslBundle.properties`):
+  `collectParameterNameHints` takes each `FUNCTION_CALL` token followed by `(`, the function or
+  method its edge resolves to (`collectDeclarationIdsAt`), the parameter symbols it owns, and
+  splits the arguments by bracket depth. Only with an AST of the current text
+  (`findInspectionInput`).
+- Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
+  (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
+  `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).
+  Both work on tokens. `collectSelectionRanges` pairs every bracket (`findGroups`), then for each
+  group around the caret, innermost first, adds: for `( )`/`[ ]` the argument, the contents, the group;
+  for `{ }` the statement, the contents, the block, and the header statement (found in the parent
+  region) with the block. A statement (`findStatementBounds`) starts after the previous `;` or `}`
+  (not a `}` before `else`) at the region's level, skipping whole groups, and ends at its `;` or at the
+  `}` that closes a block (not one followed by `else`). The platform picks the smallest returned range
+  that is larger than the selection. `planStatementCompletion` returns *edits* (closing brackets, then
+  `;` or ` {\n\n}`), not a text, so it can be tested without touching the document; the processor
+  applies them last-to-first and re-indents the two new lines with `adjustLineIndent`. A `;` is only
+  added where the enclosing `{`'s owner is not `attributes`/`resources`/`variants`/`outputs`/`inputs`
+  or a `module`/`pipeline`/`submodule`/`enum` body (except a `const`), and never for `import`, `using`,
+  `case`/`default` or a line ending in a continuing token. Returning null makes the platform start a new line.
+- Formatter options (`BwslCodeStyleSettings` in `BwslCodeStyle.kt`, used in `BwslFormatting.kt`):
+  `BRACE_STYLE` (`BraceStyle`: keep/end of line/next line), `WRAP_CALL_ARGUMENTS`,
+  `ALIGN_CONTINUED_EXPRESSIONS`, all off by default so the "no token moves" guarantee holds. Facts
+  that shaped them: (1) **do not use the common `WRAP_LONG_LINES` flag**: it is what makes the
+  platform execute wraps *and* a hard wrapper that cuts a line wherever it passes the margin, through
+  `1.055` as `1` `.` `055`; and `Wrap` objects on flat blocks never fired without it. So
+  `collectWrappedCallArguments` simulates the layout itself (indent per token, spacing from
+  `spacingBetween`, one line at a time) and returns the tokens that must start a line, chopping the
+  commas of the shallowest call on an over-long line, then the next, until it fits; it depends only
+  on the tokens, so a second pass changes nothing; they become `SpacingRule(minLineFeeds = 1)`.
+  (2) Braces: `SpacingRule` carries min/max spaces, `minLineFeeds` and `keepLineBreaks`; only a `{`
+  that follows a brace owner (`)`, a name, a string, any `KW_`) and whose block spans lines is moved,
+  so `case 1: {` and `{ x }` stay. A block counts as multi-line also when the formatter adds a break
+  inside it (a wrapped argument, an `else` moved to its own line, a nested multi-line block) -
+  `collectMultiLineBraces(leaves, text, wrapped, movesElse)` - otherwise its brace moved only on the
+  second pass. (3) Alignment uses platform `Alignment` objects (one per expression after `=`/`return`,
+  one per paren group), which do work on flat blocks. `BwslFormattingOptionsTest` runs the compiler's
+  `tests`/`modules` with every option on and requires unchanged tokens and a stable second pass
+  (verified over all 1,045 files; the committed sample is every seventh).
+- Member completion (`BwslReceiverTypes.kt`). After a `.` the receiver is **read from the tokens**
+  (`parseReceiver` walks back from the token before the dot: `)` to its `(` and the name before it,
+  `]` to its `[`, `.`/`::` to the previous element) into steps (Name, Call, Field, Method, Index),
+  then typed left to right: the base from the visible locals (`collectVisibleLocalsAt`), the
+  enclosing struct's fields (inside a method), constants, or a call's return type (an overloaded
+  name whose return types differ has none); a field from the struct's `fields[].dataType`, a vector
+  swizzle by `^(float|int|uint|double)[234]$` (families `xyzw` and `rgba`, never mixed, limited to
+  the component count), a method from `methods[].returnType`, `[i]` as element/column/component.
+  Probed facts that shaped it: an array **local's** `declaredType` is just `"array"` (its element
+  type is read from the source at `typeLine`/`typeColumn`, `VisibleLocal.typePosition`), an array
+  **parameter** records no array at all (so no `length` on one), a field has `arraySize`, and
+  `stpq` is not a swizzle family. Nothing is guessed: an untypable receiver gives no members. A
+  swizzle in progress is extended from `result.prefixMatcher.prefix`. After a dot keywords and type
+  names are skipped; the intrinsics stay (method-style calls like `v.normalize()`), so the generic
+  `length` intrinsic is always there and the array member is told apart by its `int` type text.
+  Fields and methods of the enclosing struct are also added to `collectNamesVisibleAt` (a struct's
+  range holds its methods' bodies).
+- Expected types (`BwslExpectedTypes.kt`). `collectExpectedTypesAt` reads the tokens before the
+  caret: it drops a word ending at the caret (being typed), skips back over a member chain or
+  `Module::` (`skipBackOverMemberAccess`, via `parseReceiver(...).startIndex`, so `float t = l.|`
+  looks at `float t =`), then looks at the token before: an assignment operator (a declaration
+  `Type name =`, with the type read from the tokens and checked for a boundary before it, else the
+  type of the target chain through the receiver machinery), `return` (the innermost enclosing
+  function/method/pass function in the raw AST), or `(`/`,` (walk back to the unmatched `(` counting
+  top-level commas, then the callee: a method through the receiver's struct, `Mod::f`, a function in
+  scope, or an intrinsic whose table classes `floatN`, `floatVecN`, `numeric`, `scalar`, `matN`,
+  `boolVecN`, `texture` are expanded to types; `T` expands to nothing). Overloads give a *set*.
+  `doesTypeMatch` compares ignoring a module qualifier. Basic completion adds `TYPE_MATCH_BONUS`
+  (1000) to the priority of a typed suggestion that matches; a separate `CompletionType.SMART`
+  provider offers only matching typed values (locals, functions by return type, constants, fields,
+  members after `.`/`::`), and *all* typed values when nothing is expected. Only what directly
+  precedes the caret counts, so `a + |` expects nothing; no implicit conversions are assumed.
+- Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
+  compile of a file that uses a standard module starts a background download, which would otherwise
+  reach GitHub and could land in another test's cache directory).
+- Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
+  the AST: from the name's token it goes back to the first token of that line (the declaration's
+  start, so `const float PI` and `struct Point` work), then collects the comments directly above
+  (exactly one newline between each and what follows). `///` lines (not `////`) and `/** */`
+  blocks count; a blank line or an ordinary `//` stops the walk. `findDocumentationFor` in the
+  provider resolves the hovered symbol to its declaration element with `resolveSymbolAt` (so a call
+  into another file, or into a fetched copy of a standard module, reads *that* file's text) or, on
+  a declaration's own name, uses the own node, and `renderDocCommentHtml` escapes, joins
+  paragraphs, marks up `code` and links. It is a separate CONTENT block between the signature and
+  the qualified name. A struct or enum has no signature popup, so `renderTypeDoc` only shows one
+  when it has a doc comment.
+- Spell-checking (`BwslSpellchecking.kt`). `BwslSpellcheckingStrategy` returns the text tokenizer for
+  `LINE_COMMENT`, `BLOCK_COMMENT` and `STRING_LIT` and nothing for anything else (BWSL's comments
+  are plain tokens, not `PsiComment`, so the platform's default strategy sees none of them).
+  `BwslBundledDictionaryProvider` registers `com/bwsl/plugin/bwsl.dic` (one word per line) for the
+  shading vocabulary. Build: `bundledModule('intellij.spellchecker')` for the API, and
+  `<dependencies><module name="intellij.spellchecker"/>` in plugin.xml. **The typo inspection itself
+  is `GrazieSpellCheckingInspection` in the Natural Languages plugin (`tanvd.grazi`) in this IDE
+  version**, so the tests add `testBundledPlugin('tanvd.grazi')`; the plugin does not depend on it.
+- Reading a process: **read stdout and stderr at the same time** (`compileAst`, the test helper).
+  Reading one to its end first deadlocks when a file with many errors fills the other pipe, and the
+  15 s timeout never starts because it comes after the reads.
+- Editor support that needs only tokens (`BwslEditing.kt`, `BwslFolding.kt`): `BwslCommenter`
+  (`//`, `/* */`), `BwslBraceMatcher` (`{}` structural, `()` and `[]`; `<`/`>` deliberately not a
+  pair, and a closing bracket is only auto-inserted before whitespace, a comment, the end or
+  something that closes), `BwslQuoteHandler` (a `SimpleTokenSetQuoteHandler` on `STRING_LIT`) and
+  `BwslFoldingBuilder`. Folding reuses the formatter's `collectLeaves`: a stack pairs `{`/`}`
+  (a region only if they are on different lines, placeholder `{...}`), a multi-line block comment
+  folds as `/*...*/`, and consecutive `//` comments that each start a line, one directly under the
+  other, fold to `// <first line>...`. None of it needs an AST, so it works while the file does not
+  compile. The Enter-between-braces behaviour comes from the brace matcher plus the formatter's
+  `getChildAttributes`.
 - **Not** index-driven, by design: completion (`completion/`). It runs on half-typed code where the
   cached AST is stale, so it works from the typed model (`BwslAstScope.kt`: `findScope`,
   `classifyBlockContextAt`, `collectVertexOutputAssignments`, `collectPassUsedAttributes`, `deduceExprType`) and line

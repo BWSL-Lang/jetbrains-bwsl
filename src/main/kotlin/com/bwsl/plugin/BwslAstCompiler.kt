@@ -2,12 +2,14 @@ package com.bwsl.plugin
 
 import com.google.gson.Gson
 import com.google.gson.JsonElement
+import com.google.gson.JsonSyntaxException
 import com.google.gson.JsonObject
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.IOException
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 private val log = logger<BwslProjectConfig>()
@@ -31,12 +33,17 @@ internal fun resolveCompilerPath(): String? {
 internal fun compileAst(compilerPath: String, filePath: String, modulePaths: List<String>): CompiledAst? {
     val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
     val process = ProcessBuilder(listOf(compilerPath, filePath, "-ast-json") + moduleArgs).start()
-    val rawBytes = process.inputStream.readBytes()
-    val stderrText = process.errorStream.bufferedReader().readText()
+    process.outputStream.close()
+    // Both streams are read while the process runs: a file with many errors fills the error pipe, and
+    // a process blocked on writing it never ends, so reading one stream to its end first would wait forever.
+    val stdout = CompletableFuture.supplyAsync { process.inputStream.readBytes() }
+    val stderr = CompletableFuture.supplyAsync { process.errorStream.bufferedReader().readText() }
     if (!process.waitFor(15, TimeUnit.SECONDS)) {
-        process.destroy()
+        process.destroyForcibly()
         throw IOException("bwslc -ast-json timed out for $filePath")
     }
+    val rawBytes = stdout.get()
+    val stderrText = stderr.get()
     if (stderrText.isNotBlank()) {
         log.warn("bwslc -ast-json stderr for $filePath: $stderrText")
     }
@@ -55,6 +62,27 @@ internal fun compileAst(compilerPath: String, filePath: String, modulePaths: Lis
     val rawJson = Gson().fromJson(json, JsonObject::class.java)
     log.warn("bwslc -ast-json parsed for $filePath: modules=${root.modules.size} pipelines=${root.pipelines.size}")
     return CompiledAst(root, rawJson)
+}
+
+/**
+ * Runs `bwslc <filePath> -errors-json -no-validate -check` and returns its diagnostics. `-check`
+ * keeps bwslc from writing output files. Throws [IOException] when bwslc could not be run or timed out.
+ */
+internal fun collectDiagnostics(compilerPath: String, filePath: String, modulePaths: List<String>): List<Diagnostic> {
+    val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
+    val process = ProcessBuilder(listOf(compilerPath, filePath, "-errors-json", "-no-validate", "-check") + moduleArgs)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().readText()
+    if (!process.waitFor(15, TimeUnit.SECONDS)) {
+        process.destroy()
+        throw IOException("bwslc -errors-json timed out for $filePath")
+    }
+    return try {
+        Gson().fromJson(output, CompilerOutput::class.java)?.diagnostics ?: emptyList()
+    } catch (_: JsonSyntaxException) {
+        emptyList()
+    }
 }
 
 /**
@@ -77,12 +105,15 @@ internal fun snapshotCandidateInputs(file: VirtualFile, modulePaths: List<String
 }
 
 /** Every `sourceFile` the payload names: the compiled file and each file a declaration was written in. */
-internal fun collectSourceFiles(rawJson: JsonObject): Set<String> {
+internal fun collectSourceFiles(rawJson: JsonObject): Set<String> = collectStringFields(rawJson, "sourceFile")
+
+/** The value of every field called [name] with a string value, anywhere in the payload. */
+internal fun collectStringFields(rawJson: JsonObject, name: String): Set<String> {
     val found = LinkedHashSet<String>()
     fun visit(element: JsonElement) {
         when {
             element.isJsonObject -> for ((key, value) in element.asJsonObject.entrySet()) {
-                if (key == "sourceFile") value.asStringOrNull()?.let { found += it } else visit(value)
+                if (key == name) value.asStringOrNull()?.let { found += it } else visit(value)
             }
             element.isJsonArray -> element.asJsonArray.forEach { visit(it) }
         }
@@ -113,5 +144,7 @@ internal fun compileAndCache(
     val dependencyKeys = collectSourceFiles(compiled.rawJson).map { normalizePathKey(it) }.toSet()
     val inputs = candidateInputs.filterKeys { it == ownKey || it in dependencyKeys }
     BwslAstCache.update(filePath, compiled.root, compiled.rawJson, inputs)
+    // Standard modules are embedded in the compiler; fetch their sources so navigation can open them.
+    BwslStdlibSources.downloadInBackground(collectStringFields(compiled.rawJson, "sourceUrl"))
     return true
 }

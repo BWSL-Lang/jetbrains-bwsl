@@ -4,7 +4,18 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 
 /** A parameter, local variable, constant or loop variable in scope at some position. */
-data class VisibleLocal(val name: String, val type: String?, val kind: Kind) {
+/**
+ * [isArray] is known for locals only: the AST records no array size for a parameter. For an array local the
+ * AST's type is just `array`; [typePosition], the 1-based line and column where its declared type is
+ * written, says where to read the element type from.
+ */
+data class VisibleLocal(
+    val name: String,
+    val type: String?,
+    val kind: Kind,
+    val isArray: Boolean = false,
+    val typePosition: Pair<Int, Int>? = null
+) {
     enum class Kind(val label: String) {
         PARAMETER("parameter"),
         VARIABLE("variable"),
@@ -57,7 +68,7 @@ private class LocalsWalker(
 
         // A node with a source range only matters if the position is inside it: a block that has
         // closed, or one that starts later, has nothing in scope here.
-        if (o.hasRange() && !o.doesRangeContainCaret()) return
+        if (o.hasRange() && !o.doesRangeContain(line, column)) return
 
         when (type) {
             "FUNCTION" -> o.get("parameters")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { p ->
@@ -71,7 +82,10 @@ private class LocalsWalker(
                 if (!inBlock || doesStartBeforeCaret(o)) {
                     val kind = if (o.get("isConst")?.takeIf { it.isJsonPrimitive }?.asBoolean == true)
                         VisibleLocal.Kind.CONSTANT else VisibleLocal.Kind.VARIABLE
-                    o.getStringOrNull("name")?.let { add(it, o.getStringOrNull("declaredType"), kind) }
+                    o.getStringOrNull("name")?.let {
+                        val typePosition = o.getIntOrNull("typeLine")?.let { l -> o.getIntOrNull("typeColumn")?.let { c -> l to c } }
+                        add(it, o.getStringOrNull("declaredType"), kind, (o.getIntOrNull("arrayDimensions") ?: 0) > 0, typePosition)
+                    }
                 }
                 return
             }
@@ -87,8 +101,8 @@ private class LocalsWalker(
         for ((_, value) in o.entrySet()) visit(value, childrenInBlock)
     }
 
-    private fun add(name: String, type: String?, kind: VisibleLocal.Kind) {
-        out[name] = VisibleLocal(name, type?.takeIf { it.isNotBlank() }, kind)
+    private fun add(name: String, type: String?, kind: VisibleLocal.Kind, isArray: Boolean = false, typePosition: Pair<Int, Int>? = null) {
+        out[name] = VisibleLocal(name, type?.takeIf { it.isNotBlank() }, kind, isArray, typePosition)
     }
 
     private fun doesStartBeforeCaret(o: JsonObject): Boolean {
@@ -116,14 +130,4 @@ private class LocalsWalker(
         return l to c
     }
 
-    private fun JsonObject.doesRangeContainCaret(): Boolean {
-        val startLine = getIntOrNull("line") ?: return true
-        val startColumn = getIntOrNull("column") ?: return true
-        val endLine = getIntOrNull("endLine") ?: return true
-        val endColumn = getIntOrNull("endColumn") ?: return true
-        if (line < startLine || (line == startLine && column < startColumn)) return false
-        return line < endLine || (line == endLine && column <= endColumn)
-    }
-
-    private fun JsonObject.hasRange(): Boolean = has("endLine") && has("endColumn") && has("line") && has("column")
 }

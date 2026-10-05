@@ -8,7 +8,7 @@ import com.intellij.psi.tree.IElementType
 private val INTRINSIC_NAMES = setOf(
     "abs", "acos", "all", "any", "asin", "atan", "ceil", "clamp", "cos", "cross",
     "degrees", "distance", "dot", "exp", "exp2", "floor", "fmod", "frac",
-    "inversesqrt", "length", "lerp", "log", "log2", "max", "min", "mix", "mod",
+    "inversesqrt", "length", "lerp", "log", "log2", "max", "min", "mod",
     "normalize", "pow", "radians", "reflect", "refract", "round", "saturate",
     "sign", "sin", "smoothstep", "sqrt", "step", "tan", "trunc"
 )

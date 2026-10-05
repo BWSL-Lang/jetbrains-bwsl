@@ -86,19 +86,25 @@ class BwslProjectIndex(private val project: Project) : Disposable {
             if (!project.isDisposed) {
                 object : Task.Backgroundable(project, "Checking BWSL files", true) {
                     override fun run(indicator: ProgressIndicator) {
-                        refreshNow(indicator)
+                        refreshNow(indicator, includeStandardModules = true)
                     }
                 }.queue()
             }
         }, delayMillis)
     }
 
-    /** Compiles every indexed file that has no current AST; returns how many it compiled. */
+    /**
+     * Compiles every indexed file that has no current AST; returns how many it compiled. With
+     * [includeStandardModules] the compiler's standard modules are compiled too (through a probe
+     * module each), which gives completion their members (auto-import); a rename or a search does not
+     * wait for them.
+     */
     @Synchronized
-    fun refreshNow(indicator: ProgressIndicator? = null): Int {
+    fun refreshNow(indicator: ProgressIndicator? = null, includeStandardModules: Boolean = false): Int {
         val compilerPath = resolveCompilerPath() ?: return 0
         val modulePaths = collectModulePaths(project)
-        val stale = collectFilesToCompile(modulePaths)
+        val stale = collectFilesToCompile(modulePaths) +
+            if (includeStandardModules) collectStandardModuleFilesToCompile(modulePaths) else emptyList()
         if (stale.isEmpty()) return 0
 
         val executor = AppExecutorUtil.createBoundedApplicationPoolExecutor("BWSL project index", MAX_PARALLEL_COMPILES)
@@ -130,9 +136,19 @@ class BwslProjectIndex(private val project: Project) : Disposable {
 
     /** The files on the local disk (bwslc needs a real path) that have no current AST and no known failure. */
     internal fun collectFilesToCompile(modulePaths: List<String> = collectModulePaths(project)): List<VirtualFile> {
-        val files = collectIndexedFiles(project).filter { it.isInLocalFileSystem }
+        val files = collectIndexedFiles(project).filter { it.fileSystem == LocalFileSystem.getInstance() }
         val filesByKey = files.associateBy { normalizePathKey(it.path) }
         return files.filter { !hasCurrentAst(it, filesByKey) && !isKnownUncompilable(it, modulePaths) }
+    }
+
+    /**
+     * The probe modules (see [BwslStdlibSources.writeProbeFiles]) of the compiler's standard modules that
+     * have no current AST and no known failure. Compiling one caches the standard module it imports.
+     */
+    internal fun collectStandardModuleFilesToCompile(modulePaths: List<String> = collectModulePaths(project)): List<VirtualFile> {
+        val probes = BwslStdlibSources.writeProbeFiles().mapNotNull { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
+        val probesByKey = probes.associateBy { normalizePathKey(it.path) }
+        return probes.filter { !hasCurrentAst(it, probesByKey) && !isKnownUncompilable(it, modulePaths) }
     }
 
     private fun compileProjectFile(compilerPath: String, file: VirtualFile, modulePaths: List<String>) {

@@ -68,7 +68,7 @@ class BwslTargetElementEvaluator : TargetElementEvaluatorEx2() {
         val file = element.containingFile ?: return null
         val index = buildAstIndex(file) ?: return null
         val declaration = index.findNodeAtOffset(element.textOffset)
-            ?.takeIf { index.symbolsById.containsKey(it.id) } ?: return null
+            ?.takeIf { findSymbolDeclaredBy(index, it) != null } ?: return null
         return index.findNameRangeOf(declaration)?.let { findElementAtOffset(file, it.first) }
     }
 }

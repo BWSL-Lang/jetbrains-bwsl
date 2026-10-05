@@ -30,6 +30,10 @@ class BwslColorSettingsPage : ColorSettingsPage {
         AttributesDescriptor("Braces and Operators//Comma",         BwslSyntaxHighlighter.COMMA),
         AttributesDescriptor("Braces and Operators//Dot",           BwslSyntaxHighlighter.DOT),
         AttributesDescriptor("Braces and Operators//Semicolon",     BwslSyntaxHighlighter.SEMICOLON),
+        AttributesDescriptor("Semantic//Parameter",      BwslSyntaxHighlighter.PARAMETER),
+        AttributesDescriptor("Semantic//Local variable", BwslSyntaxHighlighter.LOCAL_VARIABLE),
+        AttributesDescriptor("Semantic//Struct field",   BwslSyntaxHighlighter.FIELD),
+        AttributesDescriptor("Semantic//Constant",       BwslSyntaxHighlighter.CONSTANT),
         AttributesDescriptor("Identifier",            BwslSyntaxHighlighter.IDENTIFIER),
         AttributesDescriptor("Bad character",         BwslSyntaxHighlighter.BAD_CHARACTER),
     )

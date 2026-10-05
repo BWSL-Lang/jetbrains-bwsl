@@ -3,8 +3,10 @@ package com.bwsl.plugin
 import com.intellij.lang.refactoring.NamesValidator
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -15,9 +17,10 @@ import com.intellij.refactoring.listeners.RefactoringElementListener
 import com.intellij.refactoring.rename.RenamePsiElementProcessor
 import com.intellij.usageView.UsageInfo
 import com.intellij.util.IncorrectOperationException
+import com.intellij.util.containers.MultiMap
 
 /** One occurrence of the name being renamed: the declaration or a usage. */
-private data class RenameEdit(val file: PsiFile, val range: TextRange)
+internal data class RenameEdit(val file: PsiFile, val range: TextRange)
 
 /**
  * Rename for BWSL declarations: functions, methods, structs, fields, parameters, locals, constants,
@@ -32,7 +35,10 @@ private data class RenameEdit(val file: PsiFile, val range: TextRange)
  */
 class BwslRenameProcessor : RenamePsiElementProcessor() {
 
-    override fun canProcessElement(element: PsiElement): Boolean = findDeclarationIdentityOf(element) != null
+    /** Not a standard-library declaration: its file is a read-only copy of the compiler's source. */
+    override fun canProcessElement(element: PsiElement): Boolean =
+        element.containingFile?.virtualFile?.path?.let { BwslStdlibSources.isCopy(it) } != true &&
+            findDeclarationIdentityOf(element) != null
 
     /**
      * Before the rename starts, brings the compiler's view of the whole project up to date, so the
@@ -51,7 +57,38 @@ class BwslRenameProcessor : RenamePsiElementProcessor() {
     override fun prepareRenaming(element: PsiElement, newName: String, allRenames: MutableMap<PsiElement, String>) {
         val symbol = findDeclarationIdentityOf(element)?.symbol ?: return
         val file = element.containingFile ?: return
-        if (symbol.kind == "module" && file.name == "${symbol.name}.bwsl") allRenames[file] = "$newName.bwsl"
+        if (isModuleInFileOfSameName(symbol, file)) allRenames[file] = "$newName.bwsl"
+    }
+
+    /**
+     * Asks the compiler whether the new name would break anything - see [collectRenameConflicts] -
+     * and reports what it finds as conflicts, which the platform shows before it applies the rename.
+     * Does nothing when the compiler's view is not current (the rename then refuses, with the reason)
+     * or no compiler is configured.
+     */
+    override fun findExistingNameConflicts(element: PsiElement, newName: String, conflicts: MultiMap<PsiElement, String>) {
+        val symbol = findDeclarationIdentityOf(element)?.symbol ?: return
+        val project = element.project
+        if (checkCompilerViewIsCurrent(project) != null) return
+        val compilerPath = resolveCompilerPath() ?: return
+
+        val file = element.containingFile
+        val edits = collectRenameEdits(element, findReferences(element, GlobalSearchScope.projectScope(project), false))
+        val fileRenames = if (isModuleInFileOfSameName(symbol, file)) {
+            mapOf(normalizePathKey(file.virtualFile.path) to "$newName.bwsl")
+        } else {
+            emptyMap()
+        }
+        val modulePaths = collectModulePaths(project)
+        val found = ProgressManager.getInstance().runProcessWithProgressSynchronously(
+            ThrowableComputable<List<String>, RuntimeException> {
+                collectRenameConflicts(compilerPath, modulePaths, edits, element.text, newName, symbol.kind == "stage-interface", fileRenames)
+            },
+            "Checking the rename with the compiler",
+            true,
+            project
+        )
+        found.forEach { conflicts.putValue(element, it) }
     }
 
     /**
@@ -107,6 +144,10 @@ class BwslNamesValidator : NamesValidator {
     }
 }
 
+/** A module is found by the compiler in a file named after it, so that file is renamed with the module. */
+private fun isModuleInFileOfSameName(symbol: AstSymbol, file: PsiFile): Boolean =
+    symbol.kind == "module" && file.name == "${symbol.name}.bwsl"
+
 private fun collectRenameEdits(declaration: PsiElement, usages: Array<UsageInfo>): List<RenameEdit> {
     val edits = ArrayList<RenameEdit>()
     edits += RenameEdit(declaration.containingFile, declaration.textRange)
@@ -114,6 +155,16 @@ private fun collectRenameEdits(declaration: PsiElement, usages: Array<UsageInfo>
         val file = usage.file?.takeIf { it.language == BwslLanguage } ?: continue
         val segment = usage.segment ?: continue
         edits += RenameEdit(file, TextRange(segment.startOffset, segment.endOffset))
+    }
+    return edits.distinct()
+}
+
+private fun collectRenameEdits(declaration: PsiElement, references: Collection<PsiReference>): List<RenameEdit> {
+    val edits = ArrayList<RenameEdit>()
+    edits += RenameEdit(declaration.containingFile, declaration.textRange)
+    for (reference in references) {
+        val file = reference.element.containingFile?.takeIf { it.language == BwslLanguage } ?: continue
+        edits += RenameEdit(file, reference.rangeInElement.shiftRight(reference.element.textRange.startOffset))
     }
     return edits.distinct()
 }

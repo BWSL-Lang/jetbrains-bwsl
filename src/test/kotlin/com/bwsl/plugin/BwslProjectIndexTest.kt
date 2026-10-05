@@ -16,24 +16,19 @@ import java.nio.file.Files
  */
 class BwslProjectIndexTest : BwslAstFixtureTestCase() {
 
-    private lateinit var originalCompilerPath: String
     private lateinit var originalModulePaths: MutableList<String>
     private lateinit var modulesDirectory: File
 
     override fun setUp() {
         super.setUp()
         val settings = BwslSettings.getInstance()
-        originalCompilerPath = settings.compilerPath
         originalModulePaths = settings.modulePaths
         modulesDirectory = Files.createTempDirectory("bwsl_index_test_").toFile()
-        settings.compilerPath = System.getProperty("bwslc.path")
-            ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
         settings.modulePaths = mutableListOf(modulesDirectory.path)
     }
 
     override fun tearDown() {
         try {
-            BwslSettings.getInstance().compilerPath = originalCompilerPath
             BwslSettings.getInstance().modulePaths = originalModulePaths
             modulesDirectory.deleteRecursively()
         } finally {
@@ -148,6 +143,23 @@ class BwslProjectIndexTest : BwslAstFixtureTestCase() {
         val userText = PsiManager.getInstance(project).findFile(user)!!.text
         assertTrue("the usage in User must follow, got: $userText", userText.contains("Common::assist()"))
         assertFalse(userText.contains("helper"))
+    }
+
+    fun testRenameModuleMovesItsFileAndRenamesTheImportInAFileThatWasNeverOpened() {
+        val (common, user) = writeCommonAndUser()
+        BwslProjectIndex.getInstance(project).refreshNow()
+        myFixture.configureFromExistingVirtualFile(common)
+        myFixture.editor.caretModel.moveToOffset(myFixture.file.text.indexOf("Common") + 2)
+
+        val failure = runCatching { myFixture.renameElementAtCaret("Shared") }.exceptionOrNull()
+
+        assertNull("rename should have worked, got: ${describeFailure(failure)}", failure)
+        assertEquals("Shared.bwsl", myFixture.file.name)
+        val userText = PsiManager.getInstance(project).findFile(user)!!.text
+        assertTrue(
+            "the import and the qualifier must follow, got: $userText",
+            userText.contains("import Shared") && userText.contains("Shared::helper()")
+        )
     }
 
     fun testRenameRefusesWhileAProjectFileHasNeverBeenCompiled() {

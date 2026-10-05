@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 /**
@@ -78,9 +79,17 @@ object BwslcAstHelper {
                 command += listOf("-modules", modulesDir.absolutePath)
             }
             val process = ProcessBuilder(command).start()
-            val rawBytes = process.inputStream.readBytes()
-            val stderrText = process.errorStream.bufferedReader().readText()
-            check(process.waitFor(15, TimeUnit.SECONDS)) { "bwslc -ast-json timed out" }
+            process.outputStream.close()
+            // Read both streams while it runs: a source with many errors fills the error pipe, and
+            // reading stdout to its end first would then wait forever.
+            val stdout = CompletableFuture.supplyAsync { process.inputStream.readBytes() }
+            val stderr = CompletableFuture.supplyAsync { process.errorStream.bufferedReader().readText() }
+            if (!process.waitFor(15, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                error("bwslc -ast-json timed out")
+            }
+            val rawBytes = stdout.get()
+            val stderrText = stderr.get()
             check(rawBytes.isNotEmpty()) { "bwslc -ast-json produced no output (exit ${process.exitValue()}): $stderrText" }
             val hasUtf16Bom = rawBytes.size >= 2 && rawBytes[0] == 0xFF.toByte() && rawBytes[1] == 0xFE.toByte()
             return if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)

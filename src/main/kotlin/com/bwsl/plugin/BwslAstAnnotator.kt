@@ -2,7 +2,9 @@ package com.bwsl.plugin
 
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
 
 private val log = logger<BwslAstAnnotator>()
@@ -18,7 +20,18 @@ data class AstCollectedInfo(
     val candidateInputs: Map<String, Int>
 )
 
-class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
+/**
+ * What a compile found out about the file: the declarations that shadow another, positioned in the
+ * text bwslc compiled, whose hash is [compiledTextHash] - they are only shown while the editor still
+ * holds that text.
+ */
+data class AstAnnotationResult(val shadowing: List<ShadowingDeclaration>, val compiledTextHash: Int?)
+
+/**
+ * Compiles the edited file with bwslc to keep its AST cached (see [compileAndCache]) and, from that
+ * AST, warns about declarations that shadow another.
+ */
+class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, AstAnnotationResult>() {
 
     override fun collectInformation(file: PsiFile): AstCollectedInfo? {
         val virtualFile = file.virtualFile ?: return null
@@ -31,15 +44,38 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Boolean>() {
         return AstCollectedInfo(compilerPath, virtualFile.path, modulePaths, snapshotCandidateInputs(virtualFile, modulePaths))
     }
 
-    override fun doAnnotate(info: AstCollectedInfo): Boolean? =
+    override fun doAnnotate(info: AstCollectedInfo): AstAnnotationResult? =
         try {
-            compileAndCache(info.compilerPath, info.filePath, info.modulePaths, info.candidateInputs).takeIf { it }
+            if (compileAndCache(info.compilerPath, info.filePath, info.modulePaths, info.candidateInputs)) {
+                val root = BwslAstCache.findRoot(info.filePath)
+                val rawJson = BwslAstCache.findRawRoot(info.filePath)
+                if (root == null || rawJson == null) null
+                else AstAnnotationResult(
+                    collectShadowingDeclarations(root, rawJson),
+                    info.candidateInputs[normalizePathKey(info.filePath)]
+                )
+            } else {
+                null
+            }
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${info.filePath}", e)
             null
         }
 
-    override fun apply(file: PsiFile, result: Boolean, holder: AnnotationHolder) {
-        // AST is stored in BwslAstCache; no annotations to apply here
+    override fun apply(file: PsiFile, result: AstAnnotationResult, holder: AnnotationHolder) {
+        val text = file.text
+        if (BwslAstCache.hashText(text) != result.compiledTextHash) return
+        for ((range, message) in buildShadowingWarnings(text, result.shadowing)) {
+            holder.newAnnotation(HighlightSeverity.WEAK_WARNING, message).range(range).create()
+        }
+    }
+}
+
+/** The warning for each shadowing declaration: the range of its name in [text], and what to say. */
+internal fun buildShadowingWarnings(text: String, shadowing: List<ShadowingDeclaration>): List<Pair<TextRange, String>> {
+    val positions = SourcePositions(text)
+    return shadowing.mapNotNull { declaration ->
+        val start = positions.toOffset(declaration.line, declaration.column) ?: return@mapNotNull null
+        TextRange(start, start + declaration.name.length) to declaration.describe()
     }
 }

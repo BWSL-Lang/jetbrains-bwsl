@@ -29,6 +29,9 @@ dependencies {
     intellijPlatform {
         intellijIdea('2026.2')
         bundledPlugin('intellij.libraries.misc.plugin')
+        bundledModule('intellij.spellchecker')
+        // The typo inspection lives in the Natural Languages plugin (bundled in the IDEs); only the tests need it.
+        testBundledPlugin('tanvd.grazi')
         testFramework(TestFrameworkType.JUnit5.INSTANCE)
         testFramework(TestFrameworkType.Platform.INSTANCE)
     }

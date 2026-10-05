@@ -13,6 +13,10 @@ import com.intellij.psi.tree.TokenSet
 class BwslSyntaxHighlighter : SyntaxHighlighterBase() {
 
     companion object {
+        @JvmField val PARAMETER      = createTextAttributesKey("BWSL_PARAMETER",      DefaultLanguageHighlighterColors.PARAMETER)
+        @JvmField val LOCAL_VARIABLE = createTextAttributesKey("BWSL_LOCAL_VARIABLE", DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
+        @JvmField val FIELD          = createTextAttributesKey("BWSL_FIELD",          DefaultLanguageHighlighterColors.INSTANCE_FIELD)
+        @JvmField val CONSTANT       = createTextAttributesKey("BWSL_CONSTANT",       DefaultLanguageHighlighterColors.CONSTANT)
         @JvmField val DECORATOR    = createTextAttributesKey("BWSL_DECORATOR",    DefaultLanguageHighlighterColors.METADATA)
         @JvmField val BLOCK_KEYWORD= createTextAttributesKey("BWSL_BLOCK_KEYWORD",DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
         @JvmField val FUNCTION_DECLARATION = createTextAttributesKey("BWSL_FUNCTION_DECLARATION",DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
