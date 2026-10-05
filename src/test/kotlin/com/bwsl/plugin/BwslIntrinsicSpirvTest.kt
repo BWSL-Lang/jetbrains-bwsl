@@ -7,7 +7,16 @@ class BwslIntrinsicSpirvTest : BwslAstFixtureTestCase() {
         val html = renderSpirvHtml("lerp")!!
 
         assertTrue(html, html.contains("GLSL.std.450 FMix"))
-        assertTrue(html, html.contains("href=\"https://registry.khronos.org/SPIR-V/specs/unified1/GLSL.std.450.html\""))
+        assertTrue(html, html.contains("href=\"https://registry.khronos.org/SPIR-V/specs/unified1/GLSL.std.450.html#:~:text=FMix\""))
+    }
+
+    fun testAnExtendedInstructionIsSelectedInThePageByItsName() {
+        assertEquals("https://registry.khronos.org/SPIR-V/specs/unified1/GLSL.std.450.html#:~:text=Sin", buildSpirvSpecUrl("Sin"))
+    }
+
+    fun testAnInstructionWhoseNameIsAlsoInOtherProseIsToldApartByWhatFollowsIt() {
+        assertTrue(buildSpirvSpecUrl("RoundEven").endsWith("#:~:text=RoundEven,-Result%20is%20the%20value"))
+        assertTrue(buildSpirvSpecUrl("Degrees").endsWith("#:~:text=Degrees,-Converts%20radians"))
     }
 
     fun testACoreInstructionLinksToItsAnchorInTheSpecification() {

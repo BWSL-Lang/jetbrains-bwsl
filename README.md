@@ -295,10 +295,11 @@ is exactly the compiler's:
   about it
 - **Intrinsics** — signature and description, and the **SPIR-V instruction**
   they are emitted as (`GLSL.std.450 FMix` for `lerp`, `OpFMod` for `mod`),
-  linked to the Khronos specification. Where the backend picks by type, every
-  candidate is listed (`clamp`: `FClamp / SClamp / UClamp`). An intrinsic the
-  compiler lowers to several instructions, or whose table names none, shows no
-  SPIR-V line
+  linked to the Khronos specification (a `GLSL.std.450` instruction is found in
+  its page by name, in a browser that supports text fragments). Where the
+  backend picks by type, every candidate is listed (`clamp`: `FClamp / SClamp /
+  UClamp`). An intrinsic the compiler lowers to several instructions, or whose
+  table names none, shows no SPIR-V line
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
   types the compiler inferred

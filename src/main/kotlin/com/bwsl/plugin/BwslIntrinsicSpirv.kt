@@ -79,9 +79,23 @@ fun findSpirvInstructionsOf(intrinsic: String): List<String> = SPIRV_INSTRUCTION
 /** Every intrinsic that has a mapping, for checking the table against the compiler's. */
 internal fun collectSpirvMappedIntrinsics(): Map<String, List<String>> = SPIRV_INSTRUCTIONS
 
-/** The link to the Khronos specification of [instruction]: a core instruction has its own anchor, an extended one only the page. */
-fun buildSpirvSpecUrl(instruction: String): String =
-    if (instruction.startsWith("Op")) "$SPIRV_SPEC#$instruction" else GLSL_STD_450_SPEC
+// The GLSL.std.450 page has no anchor per instruction, so a link selects the instruction's name with a text
+// fragment (`#:~:text=`): a browser that supports them scrolls to it and highlights it, any other opens the
+// page. The name is the first whole-word match in the page for all but these, whose name is also in the prose
+// of another instruction (`Round` speaks of `RoundEven`), so what directly follows the definition is added.
+private val GLSL_STD_450_FRAGMENT_SUFFIX = mapOf(
+    "RoundEven" to "Result is the value",
+    "ModfStruct" to "Result is a structure",
+    "FrexpStruct" to "Result is a structure",
+    "Degrees" to "Converts radians"
+)
+
+/** The link to the Khronos specification of [instruction]: a core instruction has its own anchor, an extended one is found in the page by its name. */
+fun buildSpirvSpecUrl(instruction: String): String {
+    if (instruction.startsWith("Op")) return "$SPIRV_SPEC#$instruction"
+    val suffix = GLSL_STD_450_FRAGMENT_SUFFIX[instruction]?.let { ",-" + it.replace(" ", "%20") }.orEmpty()
+    return "$GLSL_STD_450_SPEC#:~:text=$instruction$suffix"
+}
 
 /**
  * The line of the documentation popup that names the SPIR-V instructions of [intrinsic], each linked to

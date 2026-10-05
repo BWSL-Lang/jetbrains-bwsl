@@ -350,7 +350,9 @@ is wrapped at 80 characters.
   instructions in the compiler's table (`SPV_MAP(core op, GLSLstd450 op)` in `src/core/bwsl_stdlib.h`,
   plus its comments for type-dependent variants and the wave ops, whose op is only a number there). A
   name with an `Op` prefix is core (the spec page has an anchor per instruction); any other is
-  `GLSL.std.450` (that page has no per-instruction anchors, so it links to the page). Left out: rows
+  `GLSL.std.450` (that page has no per-instruction anchors, so the link is a text fragment, `#:~:text=Name`,
+  checked offline against the page: the name's first whole-word match is its definition for all but
+  `RoundEven`, `ModfStruct`, `FrexpStruct` and `Degrees`, which get a suffix of the words after the name). Left out: rows
   with both ops `NONE` (`rcp`, `log10`, `isfinite`, ...) and the `*_offset` sampling variants, whose
   op the table does not say. The mapping is a snapshot of that table: **tests cannot read the compiler's
   source** (they only have the compiler binary), so `BwslIntrinsicSpirvTest` checks what a binary can
