@@ -195,6 +195,9 @@ is exactly the compiler's:
 - fragment `output.x` to its entry in the pass's `outputs { … }` block, and
   `input.x` to the vertex stage's `output.x` assignment
 - uses of a constant, including ones the compiler folded into a literal
+- **Intrinsics** (and the `discard` keyword) to their page in the official
+  documentation, opened in the browser. `fmod` and the barriers have no page
+  yet, so nothing happens on them, nor on the `length()` of an array
 - **the compiler's standard modules** (`Math`, `Color`, ...), which are
   embedded in `bwslc` and have no file on disk. The compiler names each one's
   source on GitHub, pinned to its release tag (or `master` for a development
@@ -293,13 +296,18 @@ is exactly the compiler's:
   standard module once its source has been fetched. A blank line or an
   ordinary `//` comment between the comment and the declaration means it is not
   about it
-- **Intrinsics** — signature and description, and the **SPIR-V instruction**
-  they are emitted as (`GLSL.std.450 FMix` for `lerp`, `OpFMod` for `mod`),
-  linked to the Khronos specification (a `GLSL.std.450` instruction is found in
-  its page by name, in a browser that supports text fragments). Where the
-  backend picks by type, every candidate is listed (`clamp`: `FClamp / SClamp /
-  UClamp`). An intrinsic the compiler lowers to several instructions, or whose
-  table names none, shows no SPIR-V line
+- **Intrinsics** — the signature, and the description from the **official
+  documentation** (`https://www.bwsl.dev/docs/intrinsics/<name>`): its one-line
+  summary and first paragraph, with a link to the page. The page is fetched in
+  the background the first time an intrinsic is hovered and kept for a week in
+  the IDE's system directory, so the first hover shows the built-in one-line
+  description. Also the **SPIR-V instruction** the intrinsic is emitted as
+  (`GLSL.std.450 FMix` for `lerp`, `OpFMod` for `mod`), linked to the Khronos
+  specification (a `GLSL.std.450` instruction is found in its page by name, in a
+  browser that supports text fragments). Where the backend picks by type, every
+  candidate is listed (`clamp`: `FClamp / SClamp / UClamp`). An intrinsic the
+  compiler lowers to several instructions, or whose table names none, shows no
+  SPIR-V line
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
   types the compiler inferred
@@ -431,7 +439,6 @@ Not implemented yet:
 
 **Navigation and search**
 - [ ] Call hierarchy
-- [ ] Ctrl+click on intrinsics, with their documentation
 
 **Compiler integration**
 - [ ] Use the editor's unsaved text for navigation, documentation, the

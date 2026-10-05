@@ -346,6 +346,20 @@ is wrapped at 80 characters.
 - Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
   compile of a file that uses a standard module starts a background download, which would otherwise
   reach GitHub and could land in another test's cache directory).
+- Intrinsic documentation (`BwslIntrinsicDocs.kt`, `BwslIntrinsicNavigation.kt`). The official page of an
+  intrinsic is `https://www.bwsl.dev/docs/intrinsics/<name>` (server-rendered HTML, no raw markdown
+  or API). `parseDocPage` takes the page's `<meta name="description">` as the summary and the first
+  `<p>` of `div.prose.docs-prose` as the intro (only `code`/`em`/`strong` kept); it is fragile to a site
+  redesign and then yields null, so the hover falls back to the built-in line. `findDoc` reads the disk
+  cache (`<system>/bwsl/intrinsic-docs/<name>.json`, a week) and starts one background fetch per name
+  per session when there is no fresh copy; it answers null until the copy is there. `UNDOCUMENTED`
+  (`fmod`, `barrier`, `memoryBarrier`, `storageBarrier`) lists the table's intrinsics with no page,
+  and `discard` (a keyword here) has one; `BwslIntrinsicDocsTest` compares that with the site's
+  listing page, and is *skipped* (an `Assume`) when the site cannot be reached. Ctrl+click is a
+  `gotoDeclarationHandler` returning a `FakePsiElement` (`BwslDocumentationTarget`) whose `navigate`
+  calls `BwslBrowser.open` (replaced in tests); the `.` before an array's `length()` is found by
+  climbing to the first ancestor with a previous sibling, since the token is wrapped twice. The fixture
+  base class stubs the fetch and the cache directory.
 - Intrinsic SPIR-V mapping (`BwslIntrinsicSpirv.kt`). `SPIRV_INSTRUCTIONS` maps an intrinsic to the
   instructions in the compiler's table (`SPV_MAP(core op, GLSLstd450 op)` in `src/core/bwsl_stdlib.h`,
   plus its comments for type-dependent variants and the wave ops, whose op is only a number there). A

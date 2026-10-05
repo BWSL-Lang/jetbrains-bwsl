@@ -39,7 +39,14 @@ private fun renderIntrinsicDoc(name: String, hasReceiver: Boolean): String? {
     }
     val fn = BwslIntrinsics.ALL.firstOrNull { it.name == name } ?: return null
     val signature = renderSignatureHtml(fn.returnType, fn.name, fn.params.map { "${it.type} ${it.name}" })
-    val description = listOfNotNull(fn.description.takeIf { it.isNotBlank() }, renderSpirvHtml(fn.name)).joinToString("<br/>")
+    // What the official documentation says, once it has been fetched; until then the built-in line.
+    val official = BwslIntrinsicDocs.findDoc(fn.name)
+    val description = listOfNotNull(
+        official?.summary ?: fn.description.takeIf { it.isNotBlank() },
+        official?.introHtml?.takeIf { it.isNotEmpty() && it != official.summary },
+        official?.let { "<a href=\"${BwslIntrinsicDocs.buildPageUrl(fn.name)}\">Documentation</a>" },
+        renderSpirvHtml(fn.name)
+    ).joinToString("<br/>")
     return renderDoc(null, signature, description.takeIf { it.isNotEmpty() })
 }
 

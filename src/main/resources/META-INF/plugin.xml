@@ -97,6 +97,8 @@
             level="WARNING"
             implementationClass="com.bwsl.plugin.BwslMissingImportInspection"/>
 
+        <gotoDeclarationHandler implementation="com.bwsl.plugin.BwslIntrinsicGotoDeclarationHandler"/>
+
         <typeDeclarationProvider implementation="com.bwsl.plugin.BwslTypeDeclarationProvider"/>
 
         <lang.psiStructureViewFactory
