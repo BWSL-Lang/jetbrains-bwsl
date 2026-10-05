@@ -346,6 +346,16 @@ is wrapped at 80 characters.
 - Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
   compile of a file that uses a standard module starts a background download, which would otherwise
   reach GitHub and could land in another test's cache directory).
+- Intrinsic SPIR-V mapping (`BwslIntrinsicSpirv.kt`). `SPIRV_INSTRUCTIONS` maps an intrinsic to the
+  instructions in the compiler's table (`SPV_MAP(core op, GLSLstd450 op)` in `src/core/bwsl_stdlib.h`,
+  plus its comments for type-dependent variants and the wave ops, whose op is only a number there). A
+  name with an `Op` prefix is core (the spec page has an anchor per instruction); any other is
+  `GLSL.std.450` (that page has no per-instruction anchors, so it links to the page). Left out: rows
+  with both ops `NONE` (`rcp`, `log10`, `isfinite`, ...) and the `*_offset` sampling variants, whose
+  op the table does not say. `BwslIntrinsicSpirvTest` reads the compiler's header and checks the
+  mapping and the *names* of `BwslIntrinsics` against it; **it silently does nothing unless
+  `bwslc.path` is a build inside the compiler's repository** (the default test run downloads a release
+  into `build/bwslc`), so run it with `-Pbwslc=<repo>uildwslc.exe` when the intrinsics change.
 - Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
   the AST: from the name's token it goes back to the first token of that line (the declaration's
   start, so `const float PI` and `struct Point` work), then collects the comments directly above

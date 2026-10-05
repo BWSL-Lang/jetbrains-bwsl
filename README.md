@@ -293,7 +293,12 @@ is exactly the compiler's:
   standard module once its source has been fetched. A blank line or an
   ordinary `//` comment between the comment and the declaration means it is not
   about it
-- **Intrinsics** — signature and description
+- **Intrinsics** — signature and description, and the **SPIR-V instruction**
+  they are emitted as (`GLSL.std.450 FMix` for `lerp`, `OpFMod` for `mod`),
+  linked to the Khronos specification. Where the backend picks by type, every
+  candidate is listed (`clamp`: `FClamp / SClamp / UClamp`). An intrinsic the
+  compiler lowers to several instructions, or whose table names none, shows no
+  SPIR-V line
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
   types the compiler inferred
