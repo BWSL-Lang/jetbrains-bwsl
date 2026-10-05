@@ -22,6 +22,8 @@ private const val PASS_BLOCKS = "language/pass-blocks"
 private const val COMPUTE = "language/compute-shaders"
 private const val STRUCTS = "types/structs"
 private const val ENUMS = "types/enums"
+private const val FUNCTIONS = "language/functions"
+private const val CONSTANTS = "language#variables-and-constants"
 
 /**
  * The documentation page each keyword is explained on. A keyword that is not here (`if`, `return`, the type
@@ -46,12 +48,13 @@ private val KEYWORD_PAGES: Map<IElementType, String> = mapOf(
     BwslTokenTypes.KW_CONTINUE to LOOPS,
     BwslTokenTypes.KW_EVAL to EVAL,
     BwslTokenTypes.KW_STRUCT to STRUCTS, BwslTokenTypes.KW_SELF to STRUCTS, BwslTokenTypes.KW_ENUM to ENUMS,
-    BwslTokenTypes.KW_COMPUTE to COMPUTE
+    BwslTokenTypes.KW_COMPUTE to COMPUTE,
+    BwslTokenTypes.KW_RETURN to FUNCTIONS, BwslTokenTypes.KW_CONST to CONSTANTS
 )
 
-/** The documentation pages the keywords lead to, for checking that they exist. */
+/** The documentation pages the keywords lead to (without the section of a page), for checking that they exist. */
 internal fun collectKeywordPages(): Set<String> =
-    KEYWORD_PAGES.values.toSet() + ATTRIBUTES + SHADER_IO
+    (KEYWORD_PAGES.values + ATTRIBUTES + SHADER_IO).map { it.substringBefore('#') }.toSet()
 
 /** The next token after [element] that is not whitespace or a comment. */
 private fun findNextSignificantLeaf(element: PsiElement): PsiElement? =

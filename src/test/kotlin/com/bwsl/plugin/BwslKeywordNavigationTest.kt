@@ -78,6 +78,11 @@ class BwslKeywordNavigationTest : BasePlatformTestCase() {
         assertEquals(docs("types/enums"), findUrl("module M {\n    e<caret>num E { A, B }\n}"))
     }
 
+    fun testReturnLeadsToTheFunctionsPageAndConstToTheSectionOnConstants() {
+        assertEquals(docs("language/functions"), findUrl("module M {\n    f :: (float a) -> float { ret<caret>urn a; }\n}"))
+        assertEquals(docs("language#variables-and-constants"), findUrl("module M {\n    co<caret>nst float K = 2.0;\n}"))
+    }
+
     fun testComputeLeadsToTheComputePage() {
         assertEquals(docs("language/compute-shaders"), findUrl("pipeline P {\n    pass \"A\" {\n        c<caret>ompute \"Main\" [8, 1, 1] { }\n    }\n}"))
     }

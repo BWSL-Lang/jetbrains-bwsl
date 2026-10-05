@@ -207,8 +207,9 @@ is exactly the compiler's:
   `conflict` to Shader Variants; the loop keywords (`for`, `foreach`, `while`,
   `loop`, `until`, `by`, `in`, `skip`, `break`, `continue`) to Loops, and `eval`
   to Eval; `struct` and `self` to Structs; `enum` to Enums; `compute` to Compute
-  Shaders. Keywords without a page of their own (`if`, `return`, the type names,
-  ...) do nothing
+  Shaders; `return` to Functions; `const` to the Variables and Constants section
+  of the Language overview. Keywords without a page of their own (`if`, the type
+  names, ...) do nothing
 - **the compiler's standard modules** (`Math`, `Color`, ...), which are
   embedded in `bwslc` and have no file on disk. The compiler names each one's
   source on GitHub, pinned to its release tag (or `master` for a development
