@@ -72,13 +72,7 @@ private val NAME_TOKENS = TokenSet.create(
     BwslTokenTypes.MODULE_NAME, BwslTokenTypes.MODULE_QUALIFIER
 )
 
-private val INTRINSIC_NAMES = listOf(
-    "abs", "acos", "all", "any", "asin", "atan", "ceil", "clamp", "cos", "cross",
-    "degrees", "distance", "dot", "exp", "exp2", "floor", "fmod", "frac",
-    "inversesqrt", "length", "lerp", "log", "log2", "max", "min", "mod",
-    "normalize", "pow", "radians", "reflect", "refract", "round", "saturate",
-    "sign", "sin", "smoothstep", "sqrt", "step", "tan", "trunc"
-)
+private val INTRINSIC_NAMES = BwslIntrinsics.NAMES.sorted()
 
 /**
  * Determines the [BwslBlockContext] surrounding the completion position via the cached bwslc AST.

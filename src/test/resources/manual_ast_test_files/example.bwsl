@@ -77,7 +77,7 @@ pipeline BasicShading2 {
         fragment {
             MathUtils::Circle c;
             c.radius = 2.0;
-            float brightness = c.area() * 0.01;
+            float brightness = c.area() * 0.01 + fma(1, 1, 1);
             output.color = float4(input.uv * brightness, 0.0, 1.0);
         }
     }

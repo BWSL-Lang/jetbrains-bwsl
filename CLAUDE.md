@@ -35,6 +35,9 @@ is wrapped at 80 characters.
 - `BwslLexerAdapter.kt` — flex-generated lexer adapter. Tracks `prevSignificantType` to detect a
   `.` (DOT) receiver before `identifier(`, distinguishing `INTRINSIC_CALL` vs `FUNCTION_CALL`
   (e.g. `values.length()` stays `INTRINSIC_CALL`, `values.cos()` becomes `FUNCTION_CALL`).
+  The names that count as intrinsics are `BwslIntrinsics.NAMES`, the same table the hover, parameter info
+  and name completion use (the lexer and the completion contributor each had their own, stale, shorter
+  list: no `fma`, but `frac` and `inversesqrt`, which BWSL does not have).
 - `BwslParserDefinition.kt` — defines `BwslReferenceElement` (an `ASTWrapperPsiElement` override)
   for the `REFERENCE` composite element type. **Critical**: plain `ASTWrapperPsiElement.getReferences()`
   does NOT delegate to `ReferenceProvidersRegistry` by default — `BwslReferenceElement` overrides
