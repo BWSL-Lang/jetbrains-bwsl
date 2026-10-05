@@ -6,10 +6,9 @@ JetBrains IDE plugin (Kotlin, IntelliJ Platform SDK) for the BWSL shader languag
 
 This plugin is one of three repositories, all under the BWSL-Lang GitHub organisation:
 
-- **Compiler** (`bwslc`): https://github.com/BWSL-Lang/BWSL. Local clone at `C:UserslundisBWSLBWSL`, built to
-  `buildwslc.exe`. The language itself, the
-  intrinsic table (`src/core/bwsl_stdlib.h`), the standard modules (`modules/`), the AST schema
-  (`docs/ast-json.md`) and the compiler's own tests live there. Compiler bugs and gaps found from the
+- **Compiler** (`bwslc`): https://github.com/BWSL-Lang/BWSL. Local clone at `C:\Users\lundis\BWSL\BWSL`, built to
+  `build\bwslc.exe`. The language itself, the intrinsic table (`src/core/bwsl_stdlib.h`), the standard
+  modules (`modules/`), the AST schema (`docs/ast-json.md`) and the compiler's own tests live there. Compiler bugs and gaps found from the
   plugin are filed as issues on it (written standalone, with complete examples, without reference to
   this repo's implementation).
 - **Documentation** (https://www.bwsl.dev/docs): source at https://github.com/BWSL-Lang/bwsl-docs, no local
