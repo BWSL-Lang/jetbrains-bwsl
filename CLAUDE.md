@@ -352,10 +352,13 @@ is wrapped at 80 characters.
   name with an `Op` prefix is core (the spec page has an anchor per instruction); any other is
   `GLSL.std.450` (that page has no per-instruction anchors, so it links to the page). Left out: rows
   with both ops `NONE` (`rcp`, `log10`, `isfinite`, ...) and the `*_offset` sampling variants, whose
-  op the table does not say. `BwslIntrinsicSpirvTest` reads the compiler's header and checks the
-  mapping and the *names* of `BwslIntrinsics` against it; **it silently does nothing unless
-  `bwslc.path` is a build inside the compiler's repository** (the default test run downloads a release
-  into `build/bwslc`), so run it with `-Pbwslc=<repo>uildwslc.exe` when the intrinsics change.
+  op the table does not say. The mapping is a snapshot of that table: **tests cannot read the compiler's
+  source** (they only have the compiler binary), so `BwslIntrinsicSpirvTest` checks what a binary can
+  tell - every name in `BwslIntrinsics` is known to the compiler under test (called with no arguments:
+  either its arity error names it, or the reference index resolves the call to `builtin:function:<name>`;
+  an unknown name does neither) and every mapped name is in the table. It cannot catch an intrinsic the
+  compiler gained or a changed instruction; when the compiler's table changes, redo the mapping from
+  `src/core/bwsl_stdlib.h` by hand.
 - Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
   the AST: from the name's token it goes back to the first token of that line (the declaration's
   start, so `const float PI` and `struct Point` work), then collects the comments directly above
