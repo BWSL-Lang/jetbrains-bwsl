@@ -88,7 +88,7 @@ private val INTRINSIC_NAMES = listOf(
 private fun classifyCurrentBlockContext(parameters: CompletionParameters): BwslBlockContext {
     val file = parameters.originalFile
     val path = file.virtualFile?.path ?: return BwslBlockContext.STATEMENT_BODY
-    val root = BwslAstCache.findRoot(path) ?: return BwslBlockContext.STATEMENT_BODY
+    val root = BwslAstCache.findRootForCompletion(path) ?: return BwslBlockContext.STATEMENT_BODY
     // Use the position just before the inserted dummy identifier, which is where the real token starts.
     val (line, column) = toLineColumn(file, parameters.offset) ?: return BwslBlockContext.STATEMENT_BODY
     return classifyBlockContextAt(root, line, column, file.text)
@@ -110,8 +110,8 @@ private class CompletionAst(val root: AstRoot, val raw: JsonObject, val line: In
 private fun findCompletionAst(parameters: CompletionParameters): CompletionAst? {
     val file = parameters.originalFile
     val path = file.virtualFile?.path ?: return null
-    val root = BwslAstCache.findRoot(path) ?: return null
-    val raw = BwslAstCache.findRawRoot(path) ?: return null
+    val root = BwslAstCache.findRootForCompletion(path) ?: return null
+    val raw = BwslAstCache.findRawRootForCompletion(path) ?: return null
     val (line, column) = toLineColumn(file, parameters.offset) ?: return null
     return CompletionAst(root, raw, line, column)
 }
@@ -231,7 +231,7 @@ private fun collectModulesNotToImport(parameters: CompletionParameters, ast: Com
  */
 private fun collectImportableModuleNames(parameters: CompletionParameters): List<String> {
     val file = parameters.originalFile
-    val ownRoot = file.virtualFile?.path?.let { BwslAstCache.findRoot(it) }
+    val ownRoot = file.virtualFile?.path?.let { BwslAstCache.findRootForCompletion(it) }
     val alreadyImported = collectImportDeclarationsOf(file).map { it.module }.toSet()
     val fromFiles = collectIndexedFiles(file.project)
         .filter { it.path != file.virtualFile?.path }
@@ -276,7 +276,7 @@ class BwslCompletionContributor : CompletionContributor() {
                         (beforeDot?.text == "attributes" || beforeDot?.text == "input")
                     ) {
                         val file = parameters.originalFile
-                        val root = file.virtualFile?.path?.let { BwslAstCache.findRoot(it) }
+                        val root = file.virtualFile?.path?.let { BwslAstCache.findRootForCompletion(it) }
                         val (line, column) = toLineColumn(file, parameters.offset) ?: (0 to 0)
                         val scope = root?.let { findScope(it, line, column) }
                         val pass = scope?.pass

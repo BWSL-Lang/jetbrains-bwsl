@@ -4,6 +4,7 @@ import com.bwsl.plugin.completion.BwslcAstHelper
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
 import java.nio.file.Files
@@ -189,7 +190,7 @@ class BwslShadowingTest : BasePlatformTestCase() {
         assertEquals("Variable 'x' shadows a parameter of the same name", message)
     }
 
-    fun testTheEditorShowsAWeakWarningForTheShadowingDeclarationAndOnlyWhileTheTextIsWhatWasCompiled() {
+    fun testTheEditorShowsAWeakWarningForTheShadowingDeclarationAlsoForUnsavedText() {
         val original = BwslSettings.getInstance().compilerPath
         BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
             ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
@@ -208,13 +209,29 @@ class BwslShadowingTest : BasePlatformTestCase() {
                 warnings.map { it.description }
             )
 
-            // An unsaved edit moves the text away from what bwslc compiled, so its positions are not trusted.
+            // Unsaved text is compiled in its own right: the warning follows the edit to its new position.
             WriteCommandAction.runWriteCommandAction(project) {
                 myFixture.editor.document.insertString(0, "// edited\n")
             }
+            PsiDocumentManager.getInstance(project).commitAllDocuments()
             val afterEdit = myFixture.doHighlighting(HighlightSeverity.WEAK_WARNING)
                 .filter { it.severity == HighlightSeverity.WEAK_WARNING }
-            assertEquals("no warning while the editor differs from the compiled text", emptyList<String>(), afterEdit.map { it.description })
+            assertEquals(listOf("Variable 'x' shadows a parameter of the same name"), afterEdit.map { it.description })
+            val text = myFixture.editor.document.text
+            assertEquals("x", text.substring(afterEdit.single().startOffset, afterEdit.single().endOffset))
+            assertEquals(text.indexOf("float x = ") + "float ".length, afterEdit.single().startOffset)
+
+            // Removing the shadowing, still unsaved, removes the warning.
+            WriteCommandAction.runWriteCommandAction(project) {
+                val document = myFixture.editor.document
+                val local = document.text.indexOf("float x = ")
+                document.replaceString(local, local + "float x".length, "float y")
+                document.replaceString(document.text.indexOf("return x"), document.text.indexOf("return x") + "return x".length, "return y")
+            }
+            PsiDocumentManager.getInstance(project).commitAllDocuments()
+            val afterFix = myFixture.doHighlighting(HighlightSeverity.WEAK_WARNING)
+                .filter { it.severity == HighlightSeverity.WEAK_WARNING }
+            assertEquals(emptyList<String>(), afterFix.map { it.description })
         } finally {
             BwslSettings.getInstance().compilerPath = original
             directory.deleteRecursively()

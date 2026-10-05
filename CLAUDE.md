@@ -59,6 +59,18 @@ is wrapped at 80 characters.
   compiled, and `apply` shows nothing unless the editor text still hashes to it (the compile reads
   the saved file, so positions are wrong while there are unsaved edits). Module-, pipeline- and
   pass-level consts are visible throughout their container and are not checked.
+  **Unsaved text** (`AstCollectedInfo.hasUnsavedChanges`: the document is modified or its hash differs
+  from the snapshot) is compiled from stdin instead: `compileEditorText` runs
+  `bwslc --stdin --source-file <path> -ast-json`, where `--source-file` is what finds the modules beside
+  the file, so nothing is written to disk and the AST's `sourceFile` is the real path. The result goes to
+  `BwslAstCache.updateLive`, a second slot per file read only through `findRootForCompletion`/
+  `findRawRootForCompletion` (completion); the saved slot, its recorded inputs and so the project
+  index, Find Usages and Rename never see it. A text that does not parse gives no AST and the previous
+  live one stays; a compile of the saved text clears it. Because the live AST is of exactly the editor's
+  text, the shadowing warnings are shown from it too (the result's hash is the editor text's).
+  Diagnostics (`BwslExternalAnnotator`) use the same `--stdin --source-file` for a file on disk;
+  a copy in the system temp directory (the old way, still used for text with no file) cannot find the
+  modules beside the file.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
@@ -374,8 +386,9 @@ is wrapped at 80 characters.
   the *raw* cached AST down to the position (only into containers whose range holds it) rather than
   asking the reference index: it answers "what could be typed here", not "what does this name
   refer to". A name counts once it is declared and only while its block is open; module-, pipeline-
-  and pass-level consts count throughout. The AST is from the last successful compile of the saved
-  file, so a local typed since then is not offered until the file is saved and re-annotated.
+  and pass-level consts count throughout. The AST is the live one (see the annotator above),
+  from the last successful compile of the editor's text, so a local typed since then is offered once the
+  annotator has run, but not while a syntax error is open (no AST, so the previous one stays).
 
 ## The AST and reference index (what the plugin relies on)
 

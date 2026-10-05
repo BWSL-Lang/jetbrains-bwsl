@@ -86,4 +86,22 @@ class BwslExternalAnnotatorTest : BasePlatformTestCase() {
             created.forEach { File(it).delete() }
         }
     }
+
+    fun testAModuleBesideTheFileIsFoundForTheEditorsText() {
+        val directory = java.nio.file.Files.createTempDirectory("bwsl_diag_test_").toFile()
+        try {
+            File(directory, "Lib.bwsl").writeText("module Lib {\n    helper :: (float v) -> float { return v; }\n}\n")
+            val app = File(directory, "App.bwsl")
+            val source = "module App {\n    import Lib\n    f :: (float x) -> float { return Lib::helper(x); }\n}\n"
+            app.writeText(source)
+
+            val withFile = BwslExternalAnnotator().doAnnotate(DiagnosticsRequest(source, emptyList(), app.path))
+            val withoutFile = BwslExternalAnnotator().doAnnotate(DiagnosticsRequest(source))
+
+            assertEquals("the import resolves beside the file, got: $withFile", emptyList<Diagnostic>(), withFile.filter { it.severity == "error" })
+            assertTrue("without a file the module cannot be found", withoutFile.any { it.message.contains("Unknown module") })
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
 }

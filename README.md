@@ -105,8 +105,8 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **Errors and warnings in the editor**, from `bwslc`'s JSON diagnostics, with
   the compiler's source locations
 - Checks the text in the editor, so **unsaved edits are validated** too
-- Honours the configured **module paths**, so imports resolve as they do when
-  you compile
+- Honours the configured **module paths**, and finds the modules **beside the
+  file**, so imports resolve as they do when you compile
 - **Weak warning when a declaration shadows another**: a parameter, local,
   constant or loop variable that reuses the name of one already in scope (a
   parameter or an enclosing local, a loop variable, or a module-, pipeline- or
@@ -365,8 +365,11 @@ the dot is read from the text. A value that is a parenthesised or arithmetic
 expression has no type here, and nothing is guessed. The compiler records no
 array size for a function parameter, so `length` is not offered on one.
 
-These names come from the last compile of the saved file, like the locals: a
-function typed since then is offered once the file has been saved and compiled.
+These names, and the locals, come from the last compile of the text in the
+editor: a function or local declared since the last save is offered once the
+file has been re-checked (a moment after you stop typing). A text that does not
+parse has no AST, so while a syntax error is open the last good compile is
+used, and a declaration typed after it is not offered until the error is fixed.
 Aliases and imports are read from the text, so they are current.
 
 ### Settings
@@ -389,10 +392,12 @@ Aliases and imports are read from the text, so they are current.
 
 ## How it behaves
 
-- Navigation, find usages, documentation, parameter info and the locals in
-  completion read the compiler's AST for the **saved** file. After you edit a
+- Navigation, find usages, documentation, parameter info, the inspections and
+  the hints read the compiler's AST for the **saved** file. After you edit a
   file the AST is refreshed in the background; until it has been saved and
   re-checked, those features reflect the last successful compile.
+- Completion and the shadowing warning read the AST of the text **in the
+  editor**, which bwslc compiles from stdin without saving anything.
 - A file that doesn't compile keeps its previous AST, so navigation keeps
   working while you type.
 - Find usages and rename search the project index, and both bring it up to date
@@ -418,17 +423,16 @@ Not implemented yet:
 - [ ] Inlay hints for the length of an array parameter (the compiler does not
       mark array parameters in the AST yet, BWSL#106)
 
-**Completion**
-- [ ] Completion that sees code typed since the last save
-
 **Navigation and search**
 - [ ] Call hierarchy
 - [ ] Ctrl+click on intrinsics, with their documentation
 
 **Compiler integration**
-- [ ] Validate and analyse the editor's unsaved text for navigation and
-      completion (today only diagnostics do; `bwslc` has a `-stdin` mode worth
-      evaluating)
+- [ ] Use the editor's unsaved text for navigation, documentation, the
+      inspections and the hints too (completion, the shadowing warning and the
+      diagnostics already do)
+- [ ] Completion while a syntax error is open (needs a partial AST from the
+      compiler on parse errors)
 - [ ] Problems tool window entries and compiler output with clickable locations
 - [ ] Run configurations and compile-on-save
 - [ ] Per-project compiler path (module paths can already be set per project in
