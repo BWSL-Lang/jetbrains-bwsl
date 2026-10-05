@@ -32,7 +32,7 @@ class BwslIntrinsicNavigationTest : BasePlatformTestCase() {
     fun testAnIntrinsicLeadsToItsPageInTheDocumentation() {
         val target = findTarget(body("le<caret>rp(a, b, 0.5)"))!!
 
-        assertEquals("lerp", target.intrinsic)
+        assertEquals("lerp", target.subject)
         assertEquals("https://www.bwsl.dev/docs/intrinsics/lerp", target.url)
     }
 
@@ -44,7 +44,7 @@ class BwslIntrinsicNavigationTest : BasePlatformTestCase() {
 
     fun testTheLengthOfAnArrayIsNotTheVectorLengthIntrinsic() {
         assertNull(findTarget("module M {\n    f :: (float[3] values) -> int {\n        return values.len<caret>gth();\n    }\n}"))
-        assertEquals("length", findTarget(body("len<caret>gth(a)"))!!.intrinsic)
+        assertEquals("length", findTarget(body("len<caret>gth(a)"))!!.subject)
     }
 
     fun testTheDiscardKeywordLeadsToItsPage() {

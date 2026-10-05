@@ -1,7 +1,6 @@
 package com.bwsl.plugin
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Assume
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -77,16 +76,4 @@ class BwslIntrinsicDocsTest : BasePlatformTestCase() {
         assertTrue(BwslIntrinsicDocs.isDocumented("fma"))
     }
 
-    // Reads the site's own listing: skipped, and reported as skipped, when the site cannot be reached.
-    fun testThePluginsNamesAreTheSitesNames() {
-        val listing = fetchTextFromWeb(BwslIntrinsicDocs.BASE_URL)
-        Assume.assumeTrue("the documentation site could not be reached", listing != null)
-
-        val site = Regex("""href="/docs/intrinsics/(\w+)"""").findAll(listing!!).map { it.groupValues[1] }.toSet()
-        assertTrue("the listing was read, got ${site.size} names", site.size > 100)
-
-        val documentedHere = BwslIntrinsics.NAMES - BwslIntrinsicDocs.UNDOCUMENTED + "discard"
-        assertEquals("pages the site has and the plugin does not know", emptySet<String>(), site - documentedHere)
-        assertEquals("names the plugin takes to have a page and the site does not list", emptySet<String>(), documentedHere - site)
-    }
 }

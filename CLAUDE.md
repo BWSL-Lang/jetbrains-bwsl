@@ -357,12 +357,20 @@ is wrapped at 80 characters.
   cache (`<system>/bwsl/intrinsic-docs/<name>.json`, a week) and starts one background fetch per name
   per session when there is no fresh copy; it answers null until the copy is there. `UNDOCUMENTED`
   (`fmod`, `barrier`, `memoryBarrier`, `storageBarrier`) lists the table's intrinsics with no page,
-  and `discard` (a keyword here) has one; `BwslIntrinsicDocsTest` compares that with the site's
-  listing page, and is *skipped* (an `Assume`) when the site cannot be reached. Ctrl+click is a
+  and `discard` (a keyword here) has one; `BwslDocumentationSiteTest` compares that with the site's
+  listing page. Ctrl+click is a
   `gotoDeclarationHandler` returning a `FakePsiElement` (`BwslDocumentationTarget`) whose `navigate`
   calls `BwslBrowser.open` (replaced in tests); the `.` before an array's `length()` is found by
   climbing to the first ancestor with a previous sibling, since the token is wrapped twice. The fixture
   base class stubs the fetch and the cache directory.
+  Keywords go to the language pages (`BwslKeywordDocs.kt`: `KEYWORD_PAGES` by token type, so a keyword
+  inside a string or comment is not one; `attributes` is told apart by the token after it, `{` or `.`,
+  and `input`/`output`, plain identifiers to the lexer, count only before a `.`). Which keyword goes
+  to which page is a judgement (the site has no keyword index): `vertex`/`fragment` to the pipeline page,
+  `constraint`/`rules`/`require`/`conflict` to shader variants, the resource qualifiers to resources.
+  Tests that read the site (`BwslDocumentationSiteTest`: the intrinsic listing, every keyword page) are
+  JUnit 5, because a JUnit 3 `TestCase` (every platform fixture test) reports a failed `Assume` as a
+  failure, not a skip; they are skipped when the site cannot be reached.
 - Intrinsic SPIR-V mapping (`BwslIntrinsicSpirv.kt`). `SPIRV_INSTRUCTIONS` maps an intrinsic to the
   instructions in the compiler's table (`SPV_MAP(core op, GLSLstd450 op)` in `src/core/bwsl_stdlib.h`,
   plus its comments for type-dependent variants and the wave ops, whose op is only a number there). A

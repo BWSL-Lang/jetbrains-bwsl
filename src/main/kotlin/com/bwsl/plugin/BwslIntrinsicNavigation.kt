@@ -17,13 +17,13 @@ object BwslBrowser {
 }
 
 /**
- * What Ctrl+click on an intrinsic goes to: its page in the official documentation. An intrinsic has no
- * source to open, so the target is a stand-in element that opens [url] in the browser when navigated to.
+ * What Ctrl+click on an intrinsic or a keyword goes to: its page in the official documentation. Neither has
+ * a source to open, so the target is a stand-in element that opens [url] in the browser when navigated to.
  */
-class BwslDocumentationTarget(private val file: PsiElement, val intrinsic: String, val url: String) : FakePsiElement() {
+class BwslDocumentationTarget(private val file: PsiElement, val subject: String, val url: String) : FakePsiElement() {
     override fun getParent(): PsiElement = file
-    override fun getName(): String = intrinsic
-    override fun getPresentableText(): String = intrinsic
+    override fun getName(): String = subject
+    override fun getPresentableText(): String = subject
     override fun getLocationString(): String = "BWSL documentation"
     override fun getIcon(open: Boolean): Icon? = null
     override fun getPresentation(): ItemPresentation = this
@@ -36,12 +36,13 @@ class BwslDocumentationTarget(private val file: PsiElement, val intrinsic: Strin
 }
 
 /**
- * The documentation page to go to from the token [name], or null: it must be a call of an intrinsic that
- * has a page (not `fmod` or the barriers, which have none) or the `discard` keyword, and not the `length()`
- * of an array, which is not the vector `length` intrinsic.
+ * The documentation page to go to from the token [name], or null: a call of an intrinsic that has a page (not
+ * `fmod` or the barriers, which have none) or the `discard` keyword, and not the `length()` of an array,
+ * which is not the vector `length` intrinsic; or one of the keywords that have a page (see [findKeywordPageFor]).
  */
 internal fun findDocumentationTargetFor(name: PsiElement): BwslDocumentationTarget? {
     val type = name.node?.elementType
+    findKeywordPageFor(name)?.let { return BwslDocumentationTarget(name.containingFile, name.text, "$DOCS_BASE_URL/$it") }
     if (type != BwslTokenTypes.INTRINSIC_CALL && type != BwslTokenTypes.KW_DISCARD) return null
     // The token is wrapped (reference, call), so the `.` before it is a sibling of one of its ancestors.
     val before = generateSequence(name) { it.parent }.takeWhile { it !is PsiFile }.firstNotNullOfOrNull { it.prevSibling }
@@ -53,7 +54,7 @@ internal fun findDocumentationTargetFor(name: PsiElement): BwslDocumentationTarg
     return BwslDocumentationTarget(name.containingFile, name.text, BwslIntrinsicDocs.buildPageUrl(name.text))
 }
 
-/** Ctrl+click (and Ctrl+hover) on an intrinsic: go to its documentation. */
+/** Ctrl+click (and Ctrl+hover) on an intrinsic or a keyword: go to its documentation. */
 class BwslIntrinsicGotoDeclarationHandler : GotoDeclarationHandler {
     override fun getGotoDeclarationTargets(sourceElement: PsiElement?, offset: Int, editor: Editor?): Array<PsiElement>? {
         val element = sourceElement ?: return null

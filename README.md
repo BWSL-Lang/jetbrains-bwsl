@@ -198,6 +198,17 @@ is exactly the compiler's:
 - **Intrinsics** (and the `discard` keyword) to their page in the official
   documentation, opened in the browser. `fmod` and the barriers have no page
   yet, so nothing happens on them, nor on the `length()` of an array
+- **Keywords** to the page that explains them: `module`, `submodule`, `import`,
+  `using`, `as` and `extends` to Modules; `pipeline`, `vertex` and `fragment` to
+  The Pipeline; `pass` to The Pass; `pass_block` to Pass Blocks; `attributes {`
+  and `use` to Vertex Attributes, and `attributes.x`, `input.x`, `output.x`,
+  `inputs` and `outputs` to Shader I/O; `resources`, the buffer, sampler and
+  access keywords to Resources; `variants`, `constraint`, `rules`, `require` and
+  `conflict` to Shader Variants; the loop keywords (`for`, `foreach`, `while`,
+  `loop`, `until`, `by`, `in`, `skip`, `break`, `continue`) to Loops, and `eval`
+  to Eval; `struct` and `self` to Structs; `enum` to Enums; `compute` to Compute
+  Shaders. Keywords without a page of their own (`if`, `return`, the type names,
+  ...) do nothing
 - **the compiler's standard modules** (`Math`, `Color`, ...), which are
   embedded in `bwslc` and have no file on disk. The compiler names each one's
   source on GitHub, pinned to its release tag (or `master` for a development
