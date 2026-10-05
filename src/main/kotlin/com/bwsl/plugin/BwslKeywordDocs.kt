@@ -24,6 +24,7 @@ private const val STRUCTS = "types/structs"
 private const val ENUMS = "types/enums"
 private const val FUNCTIONS = "language/functions"
 private const val CONSTANTS = "language#variables-and-constants"
+private const val CONTROL_FLOW = "language#control-flow"
 
 /**
  * The documentation page each keyword is explained on. A keyword that is not here (`if`, `return`, the type
@@ -49,7 +50,9 @@ private val KEYWORD_PAGES: Map<IElementType, String> = mapOf(
     BwslTokenTypes.KW_EVAL to EVAL,
     BwslTokenTypes.KW_STRUCT to STRUCTS, BwslTokenTypes.KW_SELF to STRUCTS, BwslTokenTypes.KW_ENUM to ENUMS,
     BwslTokenTypes.KW_COMPUTE to COMPUTE,
-    BwslTokenTypes.KW_RETURN to FUNCTIONS, BwslTokenTypes.KW_CONST to CONSTANTS
+    BwslTokenTypes.KW_RETURN to FUNCTIONS, BwslTokenTypes.KW_CONST to CONSTANTS,
+    BwslTokenTypes.KW_IF to CONTROL_FLOW, BwslTokenTypes.KW_ELSE to CONTROL_FLOW, BwslTokenTypes.KW_SWITCH to CONTROL_FLOW,
+    BwslTokenTypes.KW_CASE to CONTROL_FLOW, BwslTokenTypes.KW_DEFAULT to CONTROL_FLOW
 )
 
 /** The documentation pages the keywords lead to (without the section of a page), for checking that they exist. */

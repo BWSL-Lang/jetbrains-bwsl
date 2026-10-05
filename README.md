@@ -208,8 +208,9 @@ is exactly the compiler's:
   `loop`, `until`, `by`, `in`, `skip`, `break`, `continue`) to Loops, and `eval`
   to Eval; `struct` and `self` to Structs; `enum` to Enums; `compute` to Compute
   Shaders; `return` to Functions; `const` to the Variables and Constants section
-  of the Language overview. Keywords without a page of their own (`if`, the type
-  names, ...) do nothing
+  of the Language overview; `if`, `else`, `switch`, `case` and `default` to its
+  Control Flow section. Keywords without a page of their own (the type names,
+  ...) do nothing
 - **the compiler's standard modules** (`Math`, `Color`, ...), which are
   embedded in `bwslc` and have no file on disk. The compiler names each one's
   source on GitHub, pinned to its release tag (or `master` for a development

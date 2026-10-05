@@ -87,10 +87,22 @@ class BwslKeywordNavigationTest : BasePlatformTestCase() {
         assertEquals(docs("language/compute-shaders"), findUrl("pipeline P {\n    pass \"A\" {\n        c<caret>ompute \"Main\" [8, 1, 1] { }\n    }\n}"))
     }
 
-    fun testKeywordsWithoutAPageAndNamesHaveNoTarget() {
-        assertNull(findUrl("module M {\n    f :: (float a) -> float {\n        i<caret>f (a > 0.0) { return a; }\n        return 0.0;\n    }\n}"))
+    fun testConditionalsLeadToTheControlFlowSection() {
+        val body = "module M {\n    f :: (float a) -> float {\n        STATEMENT\n        return 0.0;\n    }\n}"
+        val statements = mapOf(
+            "if (a > 0.0) { return a; } else { return 1.0; }" to listOf("if", "else"),
+            "switch (1) { case 1: return a; default: return 0.0; }" to listOf("switch", "case", "default")
+        )
+        for ((statement, words) in statements) {
+            for (word in words) {
+                val marked = statement.replaceFirst(word, "${word.take(1)}<caret>${word.drop(1)}")
+                assertEquals(word, docs("language#control-flow"), findUrl(body.replace("STATEMENT", marked)))
+            }
+        }
+    }
+
+    fun testTypeNamesAndOrdinaryNamesHaveNoTarget() {
         assertNull(findUrl("module M {\n    f :: (float a) -> fl<caret>oat { return a; }\n}"))
         assertNull(findUrl("module M {\n    f :: (float a) -> float { return a<caret>; }\n}"))
     }
-
 }
