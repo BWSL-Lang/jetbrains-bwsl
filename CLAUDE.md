@@ -260,14 +260,21 @@ is wrapped at 80 characters.
   runs the parentheses handler, commits, then `findImportInsertion` (token-based, so right for text
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
-  counts as imported.
+  counts as imported. `import <caret>` (`collectImportableModuleNames`) takes module *names* from the ASTs of the
+  indexed files (`collectOwnModules`), only where the file is named after the module (bwslc finds
+  `<Module>.bwsl`; case-insensitively where the file system is), never from file names: a project's
+  unrelated `.bwsl` files (test resources, say) used to be offered by name. `Mod.` after a module name in a
+  `resources {}` block offers its structs and enums: BWSL writes a module with `.` only there (a `.` in a
+  statement is a syntax error), `::` everywhere else.
 - Inspections (`BwslInspections.kt`: three `LocalInspectionTool`s, registered in plugin.xml with
   descriptions under `inspectionDescriptions/`) read the cached AST through `findInspectionInput`,
   which returns null unless the file's text hashes to what was compiled. Unused: a `variable`/
   `constant` symbol with no `owner` (a local) or a `parameter` whose own node is in this file, with no
   incoming edge, or only `write` edges. An unused import: an own `…/import:n`/`…/using:n` node whose
   target module is the owner (through `owner` links) of no edge's target other than other
-  import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
+  import/using edges, **and whose name is written nowhere else in the file** (the compiler records no edge for
+  `Mod.Type` in a `resources` block: its `RESOURCE_DECL` symbol has `type: "Lib.Item"` but no `type` edge
+  to the struct or the module, so the index alone calls the import unused). A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
 - File Structure and breadcrumbs (`BwslStructure.kt`): token-based on purpose (they must follow text
   being typed, like folding), not AST-driven. `collectOutline` pairs braces and walks each region

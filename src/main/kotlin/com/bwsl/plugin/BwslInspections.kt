@@ -102,7 +102,13 @@ internal fun collectUnusedImports(input: InspectionInput): List<UnusedImport> {
         val range = positions.findNameRangeOf(node) ?: continue
         result += UnusedImport(node.name ?: continue, TextRange(range.first, range.last + 1))
     }
-    return result.sortedBy { it.range.startOffset }
+    // The compiler records no edge for every use of a module: `Mod.Type` in a `resources` block has none, for
+    // one (see BWSL gaps). So a module whose name is written anywhere besides its own import lines is not
+    // called unused: a false "unused" is worse than a missed one.
+    val declarations = result.groupingBy { it.module }.eachCount()
+    return result.filter { unused ->
+        Regex("(?<![A-Za-z0-9_])" + Regex.escape(unused.module) + "(?![A-Za-z0-9_])").findAll(input.text).count() <= declarations.getValue(unused.module)
+    }.sortedBy { it.range.startOffset }
 }
 
 /**

@@ -16,6 +16,7 @@ import com.intellij.codeInsight.completion.util.ParenthesesInsertHandler
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.editor.EditorModificationUtil
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.tree.TokenSet
@@ -227,10 +228,16 @@ private fun collectImportableModuleNames(parameters: CompletionParameters): List
     val file = parameters.originalFile
     val ownRoot = file.virtualFile?.path?.let { BwslAstCache.findRootForCompletion(it) }
     val alreadyImported = collectImportDeclarationsOf(file).map { it.module }.toSet()
+    // The modules the project's files declare that bwslc can find: it looks for `<Module>.bwsl`, so a module
+    // counts only in a file of its name (case aside where the file system ignores it), and only once the file
+    // has been compiled - the file name alone says nothing about what is in the file.
+    val isCaseInsensitive = !SystemInfo.isFileSystemCaseSensitive
     val fromFiles = collectIndexedFiles(file.project)
         .filter { it.path != file.virtualFile?.path }
-        .filter { indexed -> BwslAstCache.findRoot(indexed.path)?.collectOwnPipelines()?.isEmpty() != false }
-        .map { it.nameWithoutExtension }
+        .flatMap { indexed ->
+            BwslAstCache.findRoot(indexed.path)?.collectOwnModules().orEmpty().map { it.name }
+                .filter { it.equals(indexed.nameWithoutExtension, ignoreCase = isCaseInsensitive) }
+        }
     val inThisFile = ownRoot?.collectOwnModules()?.map { it.name }.orEmpty()
     return (BwslStdlibSources.collectModuleNames() + fromFiles + inThisFile)
         .distinct().filter { it !in alreadyImported }.sorted()
@@ -355,6 +362,16 @@ class BwslCompletionContributor : CompletionContributor() {
                         findCompletionAst(parameters)?.let { ast ->
                             val aliases = collectImportDeclarationsOf(parameters.originalFile)
                                 .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()
+                            // `Module.Type` in a `resources` block: the types of the module (the only place a module is
+                            // qualified with a dot; everywhere else it is `Module::`).
+                            val moduleName = PsiTreeUtil.prevCodeLeaf(previousLeaf)?.text
+                            val module = findModuleNamed(ast.raw, aliases[moduleName] ?: moduleName)
+                            if (module != null && classifyCurrentBlockContext(parameters) == BwslBlockContext.RESOURCES_BODY) {
+                                for (type in describeMembersOfModule(module).filter { it.kind == DeclaredName.Kind.STRUCT || it.kind == DeclaredName.Kind.ENUM }) {
+                                    result.addElement(buildLookupElementFor(type, expectedTypes))
+                                }
+                                return
+                            }
                             val context = ReceiverContext(ast.root, ast.raw, ast.line, ast.column, aliases, parameters.originalFile.text)
                             val members = collectReceiverMembers(parameters.originalFile, previousLeaf.textRange.startOffset, context, result.prefixMatcher.prefix)
                             for (member in members) result.addElement(buildLookupElementFor(member, expectedTypes))

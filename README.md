@@ -125,8 +125,10 @@ unsaved edits.
   constants and loop variables are not reported. *Remove unused declaration*
   deletes a local's statement, unless its initialiser calls something
 - **Unused import**: an `import` or `using` whose module nothing refers to,
-  neither through `Module::` nor by a name it declares. *Remove unused import*
-  deletes the line
+  neither through `Module::` nor by a name it declares, and whose name is not
+  written anywhere else in the file (the compiler records no reference for a
+  `Module.Type` in a `resources` block, so that counts as a use). *Remove unused
+  import* deletes the line
 - **Module used but not imported**: a `Module::` for a module the project (or
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
@@ -361,9 +363,15 @@ is exactly the compiler's:
 - **`using`** makes a module's functions and constants available without a
   qualifier, so they are suggested too
 - **After `import`**, the modules that can be imported: the standard modules
-  (once they have been fetched, see below), the module files in the project and
-  the module paths, and the other modules of the file. After `using`, the
-  modules and aliases the file imports
+  (once they have been fetched, see below), the modules declared in the
+  project's module files and in the module paths, and the other modules of the
+  file. A module file counts under the name of the module it declares, and only
+  when it is named after it (`Golyvec.bwsl`, as bwslc looks for it), so a file's
+  name alone is never offered. After `using`, the modules and aliases the file
+  imports
+- **`Module.` in a `resources` block** offers the types (structs and enums) of
+  the module, as in `render: Golyvec.Render`; a module is written with `::`
+  everywhere else
 - **Ranking by expected type** — a suggestion whose type is what the caret
   expects sorts first: the parameter being filled in (`blend(x, |` wants the
   second parameter's type, for a function, a method, a `Module::` function or
