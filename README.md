@@ -415,6 +415,9 @@ Aliases and imports are read from the text, so they are current.
 - **Module paths** — the directories passed to `bwslc` as `-modules`
 - **Output format** — SPIR-V, all formats, Metal, HLSL, GLSL 450 or GLSL ES /
   WebGL
+- **Emit debug names** — passes `-debug-names` when compiling, so the SPIR-V
+  output keeps the names of variables and functions. Off by default. Only the
+  Compile action uses it: the checks in the editor write no output
 - **Output directory** — defaults to the source file's directory
 
 ## How it behaves

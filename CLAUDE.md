@@ -92,6 +92,9 @@ is wrapped at 80 characters.
   Diagnostics (`BwslExternalAnnotator`) use the same `--stdin --source-file` for a file on disk;
   a copy in the system temp directory (the old way, still used for text with no file) cannot find the
   modules beside the file.
+- The Compile action's command is `buildCompileCommand` (`BwslCompileAction.kt`): output format flag,
+  `-debug-names` when the `emitDebugNames` setting is on, then each `-modules`. The flag only changes what
+  is *written*, so the AST, diagnostics and rename-conflict runs do not pass it.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),

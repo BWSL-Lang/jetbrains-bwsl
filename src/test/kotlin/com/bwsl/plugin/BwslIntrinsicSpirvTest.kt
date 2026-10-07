@@ -62,7 +62,10 @@ class BwslIntrinsicSpirvTest : BwslAstFixtureTestCase() {
         val compiler = resolveCompilerPath() ?: error("no compiler configured")
         val source = "module Probe {\n    f :: () -> float { return $name(); }\n}\n"
         val path = "/probe/Probe.bwsl"
-        if (collectDiagnostics(compiler, path, emptyList(), stdinText = source).any { it.message.contains("'$name'") }) return true
+        // A compiler that reports an unknown function names it too ("Unknown function 'x'"): that is not knowing it.
+        val diagnostics = collectDiagnostics(compiler, path, emptyList(), stdinText = source)
+        if (diagnostics.any { it.message.contains("'$name'") && !it.message.startsWith("Unknown function") }) return true
+        if (diagnostics.any { it.message.startsWith("Unknown function") }) return false
         val ast = compileAst(compiler, path, emptyList(), stdinText = source) ?: return false
         return ast.root.referenceIndex?.references.orEmpty().any { it.to == "builtin:function:$name" }
     }
