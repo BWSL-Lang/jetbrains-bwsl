@@ -120,6 +120,16 @@
             descriptionKey="inlay.parameter.names.description"
             implementationClass="com.bwsl.plugin.BwslParameterNameHintsProvider"/>
 
+        <codeInsight.declarativeInlayProvider
+            language="BWSL"
+            group="TYPES_GROUP"
+            providerId="bwsl.array.lengths"
+            isEnabledByDefault="true"
+            bundle="messages.BwslBundle"
+            nameKey="inlay.array.lengths.name"
+            descriptionKey="inlay.array.lengths.description"
+            implementationClass="com.bwsl.plugin.BwslArrayLengthHintsProvider"/>
+
         <psi.referenceContributor
             language="BWSL"
             implementation="com.bwsl.plugin.references.BwslReferenceContributor"/>

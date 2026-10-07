@@ -70,16 +70,9 @@ is wrapped at 80 characters.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
   parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. Its
-  `apply` also shows the shadowing warnings (`BwslShadowing.kt`): bwslc allows a parameter, local,
-  const or loop variable to reuse a visible name and says nothing (probed), so
-  `collectShadowingDeclarations` collects each such declaration from the raw AST and asks
-  `collectVisibleLocalsAt` (the completion walker, so the two share one notion of scope) what is in
-  scope *just before* it: at its own start for a local, one column before the function for a
-  parameter, one column before a loop variable. The result carries the hash of the text bwslc
-  compiled, and `apply` shows nothing unless the editor text still hashes to it (the compile reads
-  the saved file, so positions are wrong while there are unsaved edits). Module-, pipeline- and
-  pass-level consts are visible throughout their container and are not checked.
+  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. It shows
+  nothing itself (the compiler's own diagnostics, including its notes about shadowed declarations, come
+  from `BwslExternalAnnotator`; the plugin used to detect shadowing itself, until the compiler did).
   **Unsaved text** (`AstCollectedInfo.hasUnsavedChanges`: the document is modified or its hash differs
   from the snapshot) is compiled from stdin instead: `compileEditorText` runs
   `bwslc --stdin --source-file <path> -ast-json`, where `--source-file` is what finds the modules beside
@@ -88,7 +81,7 @@ is wrapped at 80 characters.
   `findRawRootForCompletion` (completion); the saved slot, its recorded inputs and so the project
   index, Find Usages and Rename never see it. A text that does not parse gives no AST and the previous
   live one stays; a compile of the saved text clears it. Because the live AST is of exactly the editor's
-  text, the shadowing warnings are shown from it too (the result's hash is the editor text's).
+  text.
   Diagnostics (`BwslExternalAnnotator`) use the same `--stdin --source-file` for a file on disk;
   a copy in the system temp directory (the old way, still used for text with no file) cannot find the
   modules beside the file.
@@ -300,7 +293,10 @@ is wrapped at 80 characters.
   `collectParameterNameHints` takes each `FUNCTION_CALL` token followed by `(`, the function or
   method its edge resolves to (`collectDeclarationIdsAt`), the parameter symbols it owns, and
   splits the arguments by bracket depth. Only with an AST of the current text
-  (`findInspectionInput`).
+  (`findInspectionInput`). A second provider, `collectArrayLengthHints`, walks the raw AST for
+  declarations of the file with a non-empty `typeInfo.arraySizes`, reads the written type at
+  `typeLine`/`typeColumn` (`float[N]`) and, when a size in it is not a number, shows the resolved
+  sizes after it.
 - Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
   (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
   `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).
@@ -343,9 +339,12 @@ is wrapped at 80 characters.
   name whose return types differ has none); a field from the struct's `fields[].dataType`, a vector
   swizzle by `^(float|int|uint|double)[234]$` (families `xyzw` and `rgba`, never mixed, limited to
   the component count), a method from `methods[].returnType`, `[i]` as element/column/component.
-  Probed facts that shaped it: an array **local's** `declaredType` is just `"array"` (its element
-  type is read from the source at `typeLine`/`typeColumn`, `VisibleLocal.typePosition`), an array
-  **parameter** records no array at all (so no `length` on one), a field has `arraySize`, and
+  Probed facts that shaped it: every declaration (parameter, local, field, and the symbols) has
+  `typeInfo` (`elementType`, `arrayDimensions`, `arrayLength`, `arraySizes`: resolved sizes, also for
+  `float[N]`), and `declaredType`/`dataType` is the *element* type; `VisibleLocal.isArray` reads
+  `typeInfo.arrayDimensions`. A compiler from before that (BWSL#106) gave an array local the
+  `declaredType` `"array"` and a parameter nothing; the code still reads the element type from the
+  source at `typeLine`/`typeColumn` (`VisibleLocal.typePosition`) for the first, and a field has `arraySize`, and
   `stpq` is not a swizzle family. Nothing is guessed: an untypable receiver gives no members. A
   swizzle in progress is extended from `result.prefixMatcher.prefix`. After a dot keywords and type
   names are skipped; the intrinsics stay (method-style calls like `v.normalize()`), so the generic

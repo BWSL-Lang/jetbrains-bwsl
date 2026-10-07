@@ -107,10 +107,9 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - Checks the text in the editor, so **unsaved edits are validated** too
 - Honours the configured **module paths**, and finds the modules **beside the
   file**, so imports resolve as they do when you compile
-- **Weak warning when a declaration shadows another**: a parameter, local,
-  constant or loop variable that reuses the name of one already in scope (a
-  parameter or an enclosing local, a loop variable, or a module-, pipeline- or
-  pass-level constant). bwslc allows shadowing without comment for now [See #103](https://github.com/BWSL-Lang/BWSL/issues/103)
+- The compiler's **notes** are shown as weak warnings, for example when a
+  declaration shadows another one: "Variable 'x' shadows parameter declared at
+  …"
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
@@ -175,8 +174,10 @@ show while the editor holds the text that was compiled.
   is just the parameter's own name gets none, and neither do intrinsics. Shown
   while the editor holds the text that was compiled. Switch off under
   Settings | Editor | Inlay Hints
-- No hints for inferred types (every BWSL declaration names its type) or array
-  lengths of locals (written in the declaration)
+- **Array lengths** after a size written as a constant (`float[SIZE]`: `= 3`;
+  `float[2][SIZE]`: `= 2×3`), for parameters, locals and struct fields, from
+  the size the compiler resolved. A size written as a number says it already
+- No hints for inferred types: every BWSL declaration names its type
 
 ### Navigation (Ctrl+click)
 
@@ -389,8 +390,8 @@ is exactly the compiler's:
 
 Which type a value has comes from the last compile, and the expression before
 the dot is read from the text. A value that is a parenthesised or arithmetic
-expression has no type here, and nothing is guessed. The compiler records no
-array size for a function parameter, so `length` is not offered on one.
+expression has no type here, and nothing is guessed. An array parameter, local
+or field offers `length`, and its elements offer their own members.
 
 These names, and the locals, come from the last compile of the text in the
 editor: a function or local declared since the last save is offered once the
@@ -426,8 +427,8 @@ Aliases and imports are read from the text, so they are current.
   the hints read the compiler's AST for the **saved** file. After you edit a
   file the AST is refreshed in the background; until it has been saved and
   re-checked, those features reflect the last successful compile.
-- Completion and the shadowing warning read the AST of the text **in the
-  editor**, which bwslc compiles from stdin without saving anything.
+- Completion reads the AST of the text **in the editor**, which bwslc compiles
+  from stdin without saving anything.
 - A file that doesn't compile keeps its previous AST, so navigation keeps
   working while you type.
 - Find usages and rename search the project index, and both bring it up to date
@@ -450,16 +451,13 @@ Not implemented yet:
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
-- [ ] Inlay hints for the length of an array parameter (the compiler does not
-      mark array parameters in the AST yet, BWSL#106)
 
 **Navigation and search**
 - [ ] Call hierarchy
 
 **Compiler integration**
 - [ ] Use the editor's unsaved text for navigation, documentation, the
-      inspections and the hints too (completion, the shadowing warning and the
-      diagnostics already do)
+      inspections and the hints too (completion and the diagnostics already do)
 - [ ] Completion while a syntax error is open (needs a partial AST from the
       compiler on parse errors)
 - [ ] Problems tool window entries and compiler output with clickable locations
