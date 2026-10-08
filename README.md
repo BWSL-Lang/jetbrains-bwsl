@@ -125,10 +125,8 @@ unsaved edits.
   constants and loop variables are not reported. *Remove unused declaration*
   deletes a local's statement, unless its initialiser calls something
 - **Unused import**: an `import` or `using` whose module nothing refers to,
-  neither through `Module::` nor by a name it declares, and whose name is not
-  written anywhere else in the file (the compiler records no reference for a
-  `Module.Type` in a `resources` block, so that counts as a use). *Remove unused
-  import* deletes the line
+  neither through `Module::` (or `Module.Type` in a `resources` block) nor by a
+  name it declares. *Remove unused import* deletes the line
 - **Module used but not imported**: a `Module::` for a module the project (or
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
@@ -190,7 +188,7 @@ is exactly the compiler's:
 - function and method calls (unqualified, `recv.f()` and `Mod::f()`), including
   same-named functions in different modules, structs and passes
 - declared types, return types and `Mod::Type` qualifiers, to the struct and the
-  module
+  module; also a resource's `Module.Type` in a `resources` block
 - struct fields through member access
 - `import` and `using` names, and `Mod::` qualifiers, to the module declaration
   — in another file when the module lives there

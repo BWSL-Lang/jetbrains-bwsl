@@ -32,6 +32,8 @@ data class AstNodePos(
     val returnType: String? = null,
     /** Present on parameters and struct fields - the declared type's text (qualified, as written). */
     val dataType: String? = null,
+    /** Present on resources and fragment outputs - the declared type, as the compiler names it (`Mod::Type`, even when written `Mod.Type`). */
+    val typeName: String? = null,
     /** Present on nodes with a body range (FUNCTION, STRUCT_DECL, MODULE, PIPELINE, PASS, ...). */
     val endLine: Int? = null,
     val endColumn: Int? = null,
@@ -52,6 +54,8 @@ data class AstNodePos(
  * measured against *that* file's text, not the compiled file's - hence one of these per file
  * rather than baking the text into [BwslAstIndex].
  */
+private val QUALIFIED_TYPE = Regex("""^[A-Za-z_]\w*(?:\s*(?:::|\.)\s*[A-Za-z_]\w*)*""")
+
 class SourcePositions(private val text: String) {
     private val lineStarts: IntArray = run {
         val starts = ArrayList<Int>()
@@ -91,14 +95,22 @@ class SourcePositions(private val text: String) {
             node.type == "FUNCTION" -> Triple(node.returnTypeLine, node.returnTypeColumn, node.returnType)
             node.declaredType != null -> Triple(node.typeLine, node.typeColumn, node.declaredType)
             node.dataType != null -> Triple(node.typeLine, node.typeColumn, node.dataType)
+            node.typeName != null -> Triple(node.typeLine, node.typeColumn, node.typeName)
             else -> return null
         }
         val tl = line?.takeIf { it != 0 } ?: return null
         val tc = column?.takeIf { it != 0 } ?: return null
         val typeText = text?.takeIf { it.isNotEmpty() } ?: return null
         val start = toOffset(tl, tc) ?: return null
-        return start until (start + typeText.length)
+        // A resource's type name is normalised (`Mod::Type`) whichever way it was written (`Mod.Type`), so its
+        // length is measured in the text; every other node keeps the type as written.
+        val length = if (node.typeName != null) measureWrittenTypeAt(start) ?: typeText.length else typeText.length
+        return start until (start + length)
     }
+
+    /** The length of the (possibly module-qualified, `::` or `.`) type name written at [start], or null when there is none. */
+    private fun measureWrittenTypeAt(start: Int): Int? =
+        QUALIFIED_TYPE.find(text.substring(start.coerceIn(0, text.length)))?.value?.length
 
     /**
      * The character range (0-based, inclusive end) spanned by [node]'s full body, per its
@@ -256,6 +268,7 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
                         returnTypeColumn = obj.get("returnTypeColumn")?.asIntOrNull(),
                         returnType = obj.get("returnType")?.asStringOrNull(),
                         dataType = obj.get("dataType")?.asStringOrNull(),
+                        typeName = obj.get("typeName")?.asStringOrNull(),
                         endLine = obj.get("endLine")?.asIntOrNull(),
                         endColumn = obj.get("endColumn")?.asIntOrNull(),
                         interpolation = obj.get("interpolation")?.asStringOrNull(),

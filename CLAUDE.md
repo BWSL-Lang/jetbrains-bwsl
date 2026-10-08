@@ -272,9 +272,7 @@ is wrapped at 80 characters.
   `constant` symbol with no `owner` (a local) or a `parameter` whose own node is in this file, with no
   incoming edge, or only `write` edges. An unused import: an own `…/import:n`/`…/using:n` node whose
   target module is the owner (through `owner` links) of no edge's target other than other
-  import/using edges, **and whose name is written nowhere else in the file** (the compiler records no edge for
-  `Mod.Type` in a `resources` block: its `RESOURCE_DECL` symbol has `type: "Lib.Item"` but no `type` edge
-  to the struct or the module, so the index alone calls the import unused). A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
+  import/using edges; a `Mod.Type` in a `resources` block counts, since the compiler (from BWSL#120) gives it the same `qualifier` edge as `Mod::Type`. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
 - File Structure and breadcrumbs (`BwslStructure.kt`): token-based on purpose (they must follow text
   being typed, like folding), not AST-driven. `collectOutline` pairs braces and walks each region
@@ -501,6 +499,11 @@ Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF
   into its parent module. `sourceFile` on top-level entries and members names the file each was
   written in (the compiled file as it was passed to bwslc, others as an absolute path), and a
   node's line/column are relative to that file.
+- **Where a declaration's type is written.** `declaredType` + `typeLine`/`typeColumn` on a `VARIABLE_DECL`; `dataType` on
+  parameters, struct fields and `ATTRIBUTE_DECL` (which has no position of its own); `returnType` +
+  `returnTypeLine`/`returnTypeColumn` on a `FUNCTION`; and `typeName` + `typeLine`/`typeColumn` on a
+  `RESOURCE_DECL` and a `PASS/fragment-output`. A resource's `typeName` is normalised to `Mod::Type` whichever
+  way it was written (`Mod.Type`), so `SourcePositions.findTypeRangeOf` measures its length in the text.
 - **Keys.** `type` is the node kind where present; parameters and struct fields use `dataType` for
   their data type. The singular `root` repeats one top-level pipeline; use `roots`.
 

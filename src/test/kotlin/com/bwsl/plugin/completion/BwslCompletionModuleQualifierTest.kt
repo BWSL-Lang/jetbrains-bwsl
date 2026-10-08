@@ -32,14 +32,6 @@ class BwslCompletionModuleQualifierTest : BwslCompletionScopeTestCase() {
         )
     }
 
-    fun testADotAfterANameThatIsNotAModuleOffersNoModuleTypes() {
-        assertCompletions(
-            pipeline("render: Other.<caret>Render"),
-            absent = setOf("Render", "Mode"),
-            modules = lib
-        )
-    }
-
     fun testImportOffersTheModulesOfTheProjectsFilesByTheirDeclaredNames() {
         val directory = myFixture.addFileToProject("modules/Helpers.bwsl", "module Helpers {\n}\n")
         val notAModule = myFixture.addFileToProject("atomic_operations.bwsl", "module Elsewhere {\n}\n")

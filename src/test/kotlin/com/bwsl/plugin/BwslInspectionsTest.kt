@@ -68,7 +68,7 @@ class BwslInspectionsTest : BwslAstFixtureTestCase() {
     }
 
     fun testAModuleWrittenAsAResourceTypeIsNotCalledUnused() {
-        // The compiler records no edge for `Lib.Item` in a resources block, so the index alone says "unused".
+        // `Lib.Item` in a resources block is a use of the module: the compiler gives it a qualifier edge.
         val input = configure(
             "pipeline P {\n    import Lib\n    resources {\n        item: Lib.Item\n    }\n    attributes { position: float4 }\n" +
                 "    pass \"Main\" {\n        use attributes { position }\n        use resources { item }\n        outputs { c: float4 }\n" +
