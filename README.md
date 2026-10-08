@@ -231,6 +231,8 @@ is exactly the compiler's:
   (`output.uv` / `input.uv`, which have no declaration of their own: the
   vertex stage's first assignment stands in for it)
 - Works from the declaration's name or from any use of it
+- With the caret on a name, the editor marks its declaration and every use of it
+  in the file (also a field used bare inside the struct's methods)
 - Finds usages across every BWSL file in the project and in the module paths,
   including files you have never opened. It waits for any file that is not up to
   date before it searches (see [Project index](#project-index))

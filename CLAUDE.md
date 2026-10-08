@@ -161,6 +161,12 @@ is wrapped at 80 characters.
   symbol's `definitions` as its declaration (the place the resolver already sends a reference to):
   that makes it a target, and every `output`/`input` edge to the symbol a usage. Limit: a file that
   does not compile has no known usages.
+  **Highlighting at the caret** (the platform's own pass, `HighlightUsagesHandler` in tests) marks the usages through this
+  search and the *declaration* only if the target is a `PsiNamedElement`: it finds the name by comparing
+  `getName()` with the text, which is why `BwslReferenceElement` and the function-name leaf
+  (`BwslFunctionNameLeaf`, made by `BwslAstFactory` registered as `lang.ast.factory`) are named elements
+  (`setName` throws; Rename edits the text itself). Known gap: `self.field` in a method has no `member` edge in
+  the AST (`self` is `identifierKind: SELF` and nothing resolves), so it is not a usage; a bare `field` is.
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.

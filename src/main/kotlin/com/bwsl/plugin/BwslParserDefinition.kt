@@ -2,14 +2,20 @@ package com.bwsl.plugin
 
 import com.bwsl.plugin.psi.BwslFile
 import com.intellij.extapi.psi.ASTWrapperPsiElement
+import com.intellij.lang.ASTFactory
 import com.intellij.lang.ASTNode
 import com.intellij.lang.ParserDefinition
 import com.intellij.lang.PsiParser
 import com.intellij.lexer.Lexer
 import com.intellij.openapi.project.Project
+import com.intellij.util.IncorrectOperationException
 import com.intellij.psi.FileViewProvider
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.impl.source.tree.LeafElement
+import com.intellij.psi.impl.source.tree.LeafPsiElement
+import com.intellij.psi.tree.IElementType
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.psi.tree.TokenSet
 
@@ -17,9 +23,32 @@ private val FILE        = IFileElementType(BwslLanguage)
 private val COMMENTS    = TokenSet.create(BwslTokenTypes.LINE_COMMENT, BwslTokenTypes.BLOCK_COMMENT)
 private val STRING_LITS = TokenSet.create(BwslTokenTypes.STRING_LIT)
 
-class BwslReferenceElement(node: ASTNode) : ASTWrapperPsiElement(node) {
+/**
+ * A name in the text. It is a [PsiNamedElement] because the declaration a reference resolves to is one of these:
+ * the platform only highlights the declaration site (next to the usages) of a target that has a name, and it
+ * finds where the name is by comparing [getName] with the text.
+ */
+class BwslReferenceElement(node: ASTNode) : ASTWrapperPsiElement(node), PsiNamedElement {
     override fun getReferences(): Array<com.intellij.psi.PsiReference> =
         com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistry.getReferencesFromProviders(this)
+
+    override fun getName(): String = text
+
+    /** A name is changed by Rename (`BwslRenameProcessor`), which edits the text of every usage itself. */
+    override fun setName(name: String): PsiElement = throw IncorrectOperationException("Rename edits the usages itself")
+}
+
+/** The name in a function's declaration (`name :: (...)`): a leaf, so it is a named element of its own, for the same reason. */
+class BwslFunctionNameLeaf(type: IElementType, text: CharSequence) : LeafPsiElement(type, text), PsiNamedElement {
+    override fun getName(): String = text
+
+    override fun setName(name: String): PsiElement = throw IncorrectOperationException("Rename edits the usages itself")
+}
+
+/** Makes the leaf of a function's name a [BwslFunctionNameLeaf]; every other token is the platform's default. */
+class BwslAstFactory : ASTFactory() {
+    override fun createLeaf(type: IElementType, text: CharSequence): LeafElement? =
+        if (type == BwslTokenTypes.FUNCTION_DECLARATION) BwslFunctionNameLeaf(type, text) else null
 }
 
 class BwslParserDefinition : ParserDefinition {
