@@ -56,6 +56,11 @@ is wrapped at 80 characters.
   The names that count as intrinsics are `BwslIntrinsics.NAMES`, the same table the hover, parameter info
   and name completion use (the lexer and the completion contributor each had their own, stale, shorter
   list: no `fma`, but `frac` and `inversesqrt`, which BWSL does not have).
+  The lexer has one state (`getState()` is always 0), so the editor's highlighter restarts at the start of the
+  *token* an edit is in. That is why a `/*` with no `*/` is lexed (`UNCLOSED_CMT` in `BwslLexer.flex`) as one
+  `BLOCK_COMMENT` running to the end of the file: as separate `/` and `*` tokens, typing the closing `*/` far below
+  re-lexed only the tokens next to it and the comment colouring appeared only after the file was reopened.
+  `BwslBlockCommentHighlightingTest` checks the editor's own highlighter after each edit.
 - `BwslParserDefinition.kt` — defines `BwslReferenceElement` (an `ASTWrapperPsiElement` override)
   for the `REFERENCE` composite element type. **Critical**: plain `ASTWrapperPsiElement.getReferences()`
   does NOT delegate to `ReferenceProvidersRegistry` by default — `BwslReferenceElement` overrides

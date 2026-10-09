@@ -35,6 +35,9 @@ NUMBER_LIT   = {HEX_NUM} | {BIN_NUM} | {DEC_NUM}
 STRING_LIT   = \" ( [^\"\\\r\n] | \\ [^\r\n] )* \"
 LINE_CMT     = "//" [^\r\n]*
 BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
+// A comment that is not closed runs to the end of the file, as one token: the editor re-lexes from the start of the
+// token an edit is inside, so typing the closing `*/` later re-colours everything the comment now encloses.
+UNCLOSED_CMT = "/*" ( [^*] | \*+ [^*/] )* \**
 
 
 %%
@@ -45,6 +48,7 @@ BLOCK_CMT    = "/*" ( [^*] | \*+ [^*/] )* \*+ "/"
   {WHITE_SPACE}+  { return TokenType.WHITE_SPACE; }
   {LINE_CMT}      { return BwslTokenTypes.LINE_COMMENT; }
   {BLOCK_CMT}     { return BwslTokenTypes.BLOCK_COMMENT; }
+  {UNCLOSED_CMT}  { return BwslTokenTypes.BLOCK_COMMENT; }
 
   // String literal
   {STRING_LIT}    { return BwslTokenTypes.STRING_LIT; }
