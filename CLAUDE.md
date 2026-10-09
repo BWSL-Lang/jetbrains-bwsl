@@ -165,8 +165,9 @@ is wrapped at 80 characters.
   search and the *declaration* only if the target is a `PsiNamedElement`: it finds the name by comparing
   `getName()` with the text, which is why `BwslReferenceElement` and the function-name leaf
   (`BwslFunctionNameLeaf`, made by `BwslAstFactory` registered as `lang.ast.factory`) are named elements
-  (`setName` throws; Rename edits the text itself). Known gap: `self.field` in a method has no `member` edge in
-  the AST (`self` is `identifierKind: SELF` and nothing resolves), so it is not a usage; a bare `field` is.
+  (`setName` throws; Rename edits the text itself). `self.field` and `self.method()` count since the compiler (BWSL#123) gives them `member`/`call`
+  edges (and `self` a `type` edge to the struct, which the plugin does not follow: `self` is a keyword token
+  with no reference).
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.

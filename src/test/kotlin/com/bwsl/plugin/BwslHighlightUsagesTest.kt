@@ -19,7 +19,7 @@ class BwslHighlightUsagesTest : BasePlatformTestCase() {
                 scaled :: (float k) -> float {
                     float a = intensity * k;
                     intensity = a + K;
-                    return a + color.x;
+                    return a + color.x + self.color.y + self.intensity + self.twice();
                 }
                 twice :: () -> float { return intensity * 2.0 + color.z; }
             }
@@ -70,10 +70,18 @@ class BwslHighlightUsagesTest : BasePlatformTestCase() {
 
         val highlighted = collectHighlightsAt("float a = |intensity * k")
 
-        // The declaration, the three uses in the struct's methods, and `l.intensity` outside it.
+        // The declaration, the bare uses and `self.intensity` in the struct's methods, and `l.intensity` outside it.
         assertEquals(offsetsOf("intensity"), highlighted)
         assertTrue(declaration in highlighted)
-        assertEquals(5, highlighted.size)
+        assertEquals(6, highlighted.size)
+    }
+
+    fun testUsesThroughSelfAreHighlightedToo() {
+        val throughSelf = source.indexOf("self.intensity") + "self.".length
+
+        assertTrue(throughSelf in collectHighlightsAt("float a = |intensity * k"))
+        assertEquals(offsetsOf("color"), collectHighlightsAt("self.|color.y"))
+        assertEquals(offsetsOf("twice"), collectHighlightsAt("self.|twice()"))
     }
 
     fun testAFieldIsHighlightedFromItsDeclarationToo() {
