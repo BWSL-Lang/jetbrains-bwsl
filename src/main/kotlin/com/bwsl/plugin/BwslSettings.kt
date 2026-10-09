@@ -15,6 +15,8 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
         var modulePaths: MutableList<String> = mutableListOf(),
         var outputFormat: String = BwslOutputFormat.SPIRV_ONLY.name,
         var outputDirectory: String = "",
+        /** Whether the compile action passes `-debug-names`, so the SPIR-V keeps the names of variables and functions. */
+        var emitDebugNames: Boolean = false,
         var checkForCompilerUpdates: Boolean = true,
         /** When the newest release was last asked for, in epoch milliseconds. */
         var lastCompilerUpdateCheck: Long = 0,
@@ -42,6 +44,10 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
     var outputDirectory: String
         get() = state.outputDirectory
         set(value) { state.outputDirectory = value }
+
+    var emitDebugNames: Boolean
+        get() = state.emitDebugNames
+        set(value) { state.emitDebugNames = value }
 
     var checkForCompilerUpdates: Boolean
         get() = state.checkForCompilerUpdates

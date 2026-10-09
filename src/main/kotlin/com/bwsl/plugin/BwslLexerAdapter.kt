@@ -5,14 +5,6 @@ import com.intellij.lexer.LexerBase
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
-private val INTRINSIC_NAMES = setOf(
-    "abs", "acos", "all", "any", "asin", "atan", "ceil", "clamp", "cos", "cross",
-    "degrees", "distance", "dot", "exp", "exp2", "floor", "fmod", "frac",
-    "inversesqrt", "length", "lerp", "log", "log2", "max", "min", "mod",
-    "normalize", "pow", "radians", "reflect", "refract", "round", "saturate",
-    "sign", "sin", "smoothstep", "sqrt", "step", "tan", "trunc"
-)
-
 class BwslLexerAdapter : LexerBase() {
     private val flex = FlexAdapter(_BwslLexer(null))
     private val queue = ArrayDeque<Tok>()
@@ -62,7 +54,7 @@ class BwslLexerAdapter : LexerBase() {
                     raw.copy(type = BwslTokenTypes.FUNCTION_DECLARATION)
                 else raw.copy(type = BwslTokenTypes.MODULE_QUALIFIER)
             findNextNonWhitespace(0)?.type == BwslTokenTypes.LPAREN ->
-                raw.copy(type = if (name in INTRINSIC_NAMES && (!hasReceiver || name == "length"))
+                raw.copy(type = if (name in BwslIntrinsics.NAMES && (!hasReceiver || name == "length"))
                                     BwslTokenTypes.INTRINSIC_CALL
                                 else BwslTokenTypes.FUNCTION_CALL)
             else -> raw

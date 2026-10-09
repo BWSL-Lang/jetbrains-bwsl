@@ -84,3 +84,61 @@ class BwslParameterNameHintsProvider : InlayHintsProvider {
         }
     }
 }
+
+/** The resolved length of an array, to show at [offset] after the size written there. */
+data class ArrayLengthHint(val offset: Int, val text: String)
+
+private val ARRAY_TYPE = Regex("""^[\w:]+((?:\s*\[[^\]]*])+)""")
+private val PLAIN_SIZE = Regex("""\[\s*\d+\s*]""")
+
+/**
+ * For each parameter, local and struct field of an array type whose size is not written as a number (`float[N]`
+ * with a constant `N`), the length the compiler resolved it to, from the declaration's `typeInfo.arraySizes`
+ * (`= 3`, or `= 2×3` for two dimensions). A size written as a number says it already. Null when no AST of the
+ * current text is cached.
+ */
+internal fun collectArrayLengthHints(file: PsiFile): List<ArrayLengthHint>? {
+    val input = findInspectionInput(file) ?: return null
+    val raw = BwslAstCache.findRawRoot(file.virtualFile?.path ?: return null) ?: return null
+    val positions = SourcePositions(input.text)
+    val hints = ArrayList<ArrayLengthHint>()
+    fun visit(element: com.google.gson.JsonElement) {
+        when {
+            element.isJsonArray -> element.asJsonArray.forEach { visit(it) }
+            element.isJsonObject -> {
+                val o = element.asJsonObject
+                val sizes = o.getObjectOrNull("typeInfo")?.get("arraySizes")?.takeIf { it.isJsonArray }?.asJsonArray
+                val id = o.getStringOrNull("id")
+                val line = o.getIntOrNull("typeLine")
+                val column = o.getIntOrNull("typeColumn")
+                if (sizes != null && sizes.size() > 0 && id != null && id in input.index.nodesById && line != null && column != null) {
+                    val start = positions.toOffset(line, column)
+                    val written = start?.let { ARRAY_TYPE.find(input.text.substring(it.coerceIn(0, input.text.length))) }
+                    val brackets = written?.groupValues?.get(1)
+                    if (start != null && written != null && brackets != null && PLAIN_SIZE.findAll(brackets).count() < sizes.size()) {
+                        hints += ArrayLengthHint(start + written.value.length, "= " + sizes.joinToString("×") { it.asString })
+                    }
+                }
+                for ((_, value) in o.entrySet()) visit(value)
+            }
+        }
+    }
+    visit(raw)
+    return hints.distinctBy { it.offset }
+}
+
+/** The resolved length of an array whose size is written as a constant (Settings | Editor | Inlay Hints). */
+class BwslArrayLengthHintsProvider : InlayHintsProvider {
+    override fun createCollector(file: PsiFile, editor: Editor): InlayHintsCollector? {
+        if (file.language != BwslLanguage) return null
+        val hints = collectArrayLengthHints(file) ?: return null
+        return object : SharedBypassCollector {
+            override fun collectFromElement(element: PsiElement, sink: InlayTreeSink) {
+                if (element !is PsiFile) return
+                for (hint in hints) {
+                    sink.addPresentation(InlineInlayPosition(hint.offset, true), hintFormat = HintFormat.default) { text(hint.text) }
+                }
+            }
+        }
+    }
+}

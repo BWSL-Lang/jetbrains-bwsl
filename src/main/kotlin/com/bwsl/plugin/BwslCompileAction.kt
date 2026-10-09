@@ -51,9 +51,7 @@ class BwslCompileAction : AnAction() {
 
         object : Task.Backgroundable(project, "Compiling ${virtualFile.name}", false) {
             override fun run(indicator: ProgressIndicator) {
-                val cmd = mutableListOf(settings.compilerPath, virtualFile.path)
-                format.flag?.let { cmd += it }
-                modulePaths.forEach { cmd += listOf("-modules", it) }
+                val cmd = buildCompileCommand(settings.compilerPath, virtualFile.path, format, settings.emitDebugNames, modulePaths)
 
                 val process = try {
                     ProcessBuilder(cmd)
@@ -94,4 +92,23 @@ class BwslCompileAction : AnAction() {
                 .notify(project)
         }
     }
+}
+
+/**
+ * The command that compiles [file] for the Compile action: the chosen output [format], `-debug-names` when
+ * [emitDebugNames] is set (it only changes what is written, so the checks that read an AST or diagnostics
+ * leave it out), and each module path.
+ */
+internal fun buildCompileCommand(
+    compilerPath: String,
+    file: String,
+    format: BwslOutputFormat,
+    emitDebugNames: Boolean,
+    modulePaths: List<String>
+): List<String> {
+    val command = mutableListOf(compilerPath, file)
+    format.flag?.let { command += it }
+    if (emitDebugNames) command += "-debug-names"
+    modulePaths.forEach { command += listOf("-modules", it) }
+    return command
 }

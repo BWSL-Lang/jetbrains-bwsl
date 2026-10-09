@@ -30,10 +30,19 @@ internal fun resolveCompilerPath(): String? {
  * does not compile). Throws [IOException] when bwslc could not be run or timed out, which says
  * nothing about the file.
  */
-internal fun compileAst(compilerPath: String, filePath: String, modulePaths: List<String>): CompiledAst? {
+internal fun compileAst(
+    compilerPath: String,
+    filePath: String,
+    modulePaths: List<String>,
+    stdinText: String? = null
+): CompiledAst? {
     val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
-    val process = ProcessBuilder(listOf(compilerPath, filePath, "-ast-json") + moduleArgs).start()
-    process.outputStream.close()
+    val input = if (stdinText == null) listOf(filePath) else listOf("--stdin", "--source-file", filePath)
+    val process = ProcessBuilder(listOf(compilerPath) + input + "-ast-json" + moduleArgs).start()
+    // The text is written while the process runs, for the same reason the output is read that way.
+    CompletableFuture.runAsync {
+        process.outputStream.use { if (stdinText != null) it.write(stdinText.toByteArray(Charsets.UTF_8)) }
+    }
     // Both streams are read while the process runs: a file with many errors fills the error pipe, and
     // a process blocked on writing it never ends, so reading one stream to its end first would wait forever.
     val stdout = CompletableFuture.supplyAsync { process.inputStream.readBytes() }
@@ -65,14 +74,42 @@ internal fun compileAst(compilerPath: String, filePath: String, modulePaths: Lis
 }
 
 /**
- * Runs `bwslc <filePath> -errors-json -no-validate -check` and returns its diagnostics. `-check`
- * keeps bwslc from writing output files. Throws [IOException] when bwslc could not be run or timed out.
+ * Compiles [text] as if it were saved in [filePath], for the editor's unsaved changes: bwslc reads it from
+ * stdin (`--stdin`) and uses [filePath] (`--source-file`) to find the modules beside it, so nothing is
+ * written to disk. Returns null when bwslc produced no AST. Throws [IOException] when bwslc could not be run.
  */
-internal fun collectDiagnostics(compilerPath: String, filePath: String, modulePaths: List<String>): List<Diagnostic> {
+internal fun compileEditorText(compilerPath: String, filePath: String, text: String, modulePaths: List<String>): CompiledAst? =
+    compileAst(compilerPath, filePath, modulePaths, stdinText = text)
+
+/**
+ * Compiles the editor's [text] of [filePath] and keeps the AST for completion ([BwslAstCache.updateLive]).
+ * When bwslc produces none (the text does not parse) the previous one stays. Returns whether one was kept.
+ */
+internal fun compileAndCacheLive(compilerPath: String, filePath: String, text: String, modulePaths: List<String>): Boolean {
+    val compiled = compileEditorText(compilerPath, filePath, text, modulePaths) ?: return false
+    BwslAstCache.updateLive(filePath, compiled.root, compiled.rawJson)
+    return true
+}
+
+/**
+ * Runs `bwslc <filePath> -errors-json -no-validate -check` and returns its diagnostics. `-check`
+ * keeps bwslc from writing output files. With [stdinText] the text is checked as if it were the content
+ * of [filePath] (`--stdin --source-file`), so the modules beside that file are found. Throws [IOException] when bwslc could not be run or timed out.
+ */
+internal fun collectDiagnostics(
+    compilerPath: String,
+    filePath: String,
+    modulePaths: List<String>,
+    stdinText: String? = null
+): List<Diagnostic> {
     val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
-    val process = ProcessBuilder(listOf(compilerPath, filePath, "-errors-json", "-no-validate", "-check") + moduleArgs)
+    val input = if (stdinText == null) listOf(filePath) else listOf("--stdin", "--source-file", filePath)
+    val process = ProcessBuilder(listOf(compilerPath) + input + listOf("-errors-json", "-no-validate", "-check") + moduleArgs)
         .redirectErrorStream(true)
         .start()
+    CompletableFuture.runAsync {
+        process.outputStream.use { if (stdinText != null) it.write(stdinText.toByteArray(Charsets.UTF_8)) }
+    }
     val output = process.inputStream.bufferedReader().readText()
     if (!process.waitFor(15, TimeUnit.SECONDS)) {
         process.destroy()

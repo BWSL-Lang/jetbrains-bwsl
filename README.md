@@ -105,12 +105,11 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **Errors and warnings in the editor**, from `bwslc`'s JSON diagnostics, with
   the compiler's source locations
 - Checks the text in the editor, so **unsaved edits are validated** too
-- Honours the configured **module paths**, so imports resolve as they do when
-  you compile
-- **Weak warning when a declaration shadows another**: a parameter, local,
-  constant or loop variable that reuses the name of one already in scope (a
-  parameter or an enclosing local, a loop variable, or a module-, pipeline- or
-  pass-level constant). bwslc allows shadowing without comment for now [See #103](https://github.com/BWSL-Lang/BWSL/issues/103)
+- Honours the configured **module paths**, and finds the modules **beside the
+  file**, so imports resolve as they do when you compile
+- The compiler's **notes** are shown as weak warnings, for example when a
+  declaration shadows another one: "Variable 'x' shadows parameter declared at
+  …"
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
@@ -126,8 +125,8 @@ unsaved edits.
   constants and loop variables are not reported. *Remove unused declaration*
   deletes a local's statement, unless its initialiser calls something
 - **Unused import**: an `import` or `using` whose module nothing refers to,
-  neither through `Module::` nor by a name it declares. *Remove unused import*
-  deletes the line
+  neither through `Module::` (or `Module.Type` in a `resources` block) nor by a
+  name it declares. *Remove unused import* deletes the line
 - **Module used but not imported**: a `Module::` for a module the project (or
   the standard library, once fetched) knows but the file does not import.
   *Import 'Module'* adds the line
@@ -175,8 +174,10 @@ show while the editor holds the text that was compiled.
   is just the parameter's own name gets none, and neither do intrinsics. Shown
   while the editor holds the text that was compiled. Switch off under
   Settings | Editor | Inlay Hints
-- No hints for inferred types (every BWSL declaration names its type) or array
-  lengths of locals (written in the declaration)
+- **Array lengths** after a size written as a constant (`float[SIZE]`: `= 3`;
+  `float[2][SIZE]`: `= 2×3`), for parameters, locals and struct fields, from
+  the size the compiler resolved. A size written as a number says it already
+- No hints for inferred types: every BWSL declaration names its type
 
 ### Navigation (Ctrl+click)
 
@@ -187,7 +188,7 @@ is exactly the compiler's:
 - function and method calls (unqualified, `recv.f()` and `Mod::f()`), including
   same-named functions in different modules, structs and passes
 - declared types, return types and `Mod::Type` qualifiers, to the struct and the
-  module
+  module; also a resource's `Module.Type` in a `resources` block
 - struct fields through member access
 - `import` and `using` names, and `Mod::` qualifiers, to the module declaration
   — in another file when the module lives there
@@ -195,6 +196,22 @@ is exactly the compiler's:
 - fragment `output.x` to its entry in the pass's `outputs { … }` block, and
   `input.x` to the vertex stage's `output.x` assignment
 - uses of a constant, including ones the compiler folded into a literal
+- **Intrinsics** (and the `discard` keyword) to their page in the official
+  documentation, opened in the browser. `fmod` and the barriers have no page
+  yet, so nothing happens on them, nor on the `length()` of an array
+- **Keywords** to the page that explains them: `module`, `submodule`, `import`,
+  `using`, `as` and `extends` to Modules; `pipeline`, `vertex` and `fragment` to
+  The Pipeline; `pass` to The Pass; `pass_block` to Pass Blocks; `attributes {`
+  and `use` to Vertex Attributes, and `attributes.x`, `input.x`, `output.x`,
+  `inputs` and `outputs` to Shader I/O; `resources`, the buffer, sampler and
+  access keywords to Resources; `variants`, `constraint`, `rules`, `require` and
+  `conflict` to Shader Variants; the loop keywords (`for`, `foreach`, `while`,
+  `loop`, `until`, `by`, `in`, `skip`, `break`, `continue`) to Loops, and `eval`
+  to Eval; `struct` and `self` to Structs; `enum` to Enums; `compute` to Compute
+  Shaders; `return` to Functions; `const` to the Variables and Constants section
+  of the Language overview; `if`, `else`, `switch`, `case` and `default` to its
+  Control Flow section. Keywords without a page of their own (the type names,
+  ...) do nothing
 - **the compiler's standard modules** (`Math`, `Color`, ...), which are
   embedded in `bwslc` and have no file on disk. The compiler names each one's
   source on GitHub, pinned to its release tag (or `master` for a development
@@ -293,7 +310,18 @@ is exactly the compiler's:
   standard module once its source has been fetched. A blank line or an
   ordinary `//` comment between the comment and the declaration means it is not
   about it
-- **Intrinsics** — signature and description
+- **Intrinsics** — the signature, and the description from the **official
+  documentation** (`https://www.bwsl.dev/docs/intrinsics/<name>`): its one-line
+  summary and first paragraph, with a link to the page. The page is fetched in
+  the background the first time an intrinsic is hovered and kept for a week in
+  the IDE's system directory, so the first hover shows the built-in one-line
+  description. Also the **SPIR-V instruction** the intrinsic is emitted as
+  (`GLSL.std.450 FMix` for `lerp`, `OpFMod` for `mod`), linked to the Khronos
+  specification (a `GLSL.std.450` instruction is found in its page by name, in a
+  browser that supports text fragments). Where the backend picks by type, every
+  candidate is listed (`clamp`: `FClamp / SClamp / UClamp`). An intrinsic the
+  compiler lowers to several instructions, or whose table names none, shows no
+  SPIR-V line
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
   vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
   types the compiler inferred
@@ -333,9 +361,15 @@ is exactly the compiler's:
 - **`using`** makes a module's functions and constants available without a
   qualifier, so they are suggested too
 - **After `import`**, the modules that can be imported: the standard modules
-  (once they have been fetched, see below), the module files in the project and
-  the module paths, and the other modules of the file. After `using`, the
-  modules and aliases the file imports
+  (once they have been fetched, see below), the modules declared in the
+  project's module files and in the module paths, and the other modules of the
+  file. A module file counts under the name of the module it declares, and only
+  when it is named after it (`Golyvec.bwsl`, as bwslc looks for it), so a file's
+  name alone is never offered. After `using`, the modules and aliases the file
+  imports
+- **`Module.` in a `resources` block** offers the types (structs and enums) of
+  the module, as in `render: Golyvec.Render`; a module is written with `::`
+  everywhere else
 - **Ranking by expected type** — a suggestion whose type is what the caret
   expects sorts first: the parameter being filled in (`blend(x, |` wants the
   second parameter's type, for a function, a method, a `Module::` function or
@@ -362,11 +396,14 @@ is exactly the compiler's:
 
 Which type a value has comes from the last compile, and the expression before
 the dot is read from the text. A value that is a parenthesised or arithmetic
-expression has no type here, and nothing is guessed. The compiler records no
-array size for a function parameter, so `length` is not offered on one.
+expression has no type here, and nothing is guessed. An array parameter, local
+or field offers `length`, and its elements offer their own members.
 
-These names come from the last compile of the saved file, like the locals: a
-function typed since then is offered once the file has been saved and compiled.
+These names, and the locals, come from the last compile of the text in the
+editor: a function or local declared since the last save is offered once the
+file has been re-checked (a moment after you stop typing). A text that does not
+parse has no AST, so while a syntax error is open the last good compile is
+used, and a declaration typed after it is not offered until the error is fixed.
 Aliases and imports are read from the text, so they are current.
 
 ### Settings
@@ -385,14 +422,19 @@ Aliases and imports are read from the text, so they are current.
 - **Module paths** — the directories passed to `bwslc` as `-modules`
 - **Output format** — SPIR-V, all formats, Metal, HLSL, GLSL 450 or GLSL ES /
   WebGL
+- **Emit debug names** — passes `-debug-names` when compiling, so the SPIR-V
+  output keeps the names of variables and functions. Off by default. Only the
+  Compile action uses it: the checks in the editor write no output
 - **Output directory** — defaults to the source file's directory
 
 ## How it behaves
 
-- Navigation, find usages, documentation, parameter info and the locals in
-  completion read the compiler's AST for the **saved** file. After you edit a
+- Navigation, find usages, documentation, parameter info, the inspections and
+  the hints read the compiler's AST for the **saved** file. After you edit a
   file the AST is refreshed in the background; until it has been saved and
   re-checked, those features reflect the last successful compile.
+- Completion reads the AST of the text **in the editor**, which bwslc compiles
+  from stdin without saving anything.
 - A file that doesn't compile keeps its previous AST, so navigation keeps
   working while you type.
 - Find usages and rename search the project index, and both bring it up to date
@@ -415,20 +457,15 @@ Not implemented yet:
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
-- [ ] Inlay hints for the length of an array parameter (the compiler does not
-      mark array parameters in the AST yet, BWSL#106)
-
-**Completion**
-- [ ] Completion that sees code typed since the last save
 
 **Navigation and search**
 - [ ] Call hierarchy
-- [ ] Ctrl+click on intrinsics, with their documentation
 
 **Compiler integration**
-- [ ] Validate and analyse the editor's unsaved text for navigation and
-      completion (today only diagnostics do; `bwslc` has a `-stdin` mode worth
-      evaluating)
+- [ ] Use the editor's unsaved text for navigation, documentation, the
+      inspections and the hints too (completion and the diagnostics already do)
+- [ ] Completion while a syntax error is open (needs a partial AST from the
+      compiler on parse errors)
 - [ ] Problems tool window entries and compiler output with clickable locations
 - [ ] Run configurations and compile-on-save
 - [ ] Per-project compiler path (module paths can already be set per project in

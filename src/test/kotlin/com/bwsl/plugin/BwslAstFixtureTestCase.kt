@@ -11,6 +11,8 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
 
     private lateinit var originalCompilerPath: String
     private lateinit var originalFetchText: (String) -> String?
+    private lateinit var originalIntrinsicFetch: (String) -> String?
+    private lateinit var originalIntrinsicRoot: java.nio.file.Path
 
     /** Points the plugin at the real bwslc, for the features that run it themselves (the project index, rename's conflict check). */
     override fun setUp() {
@@ -20,6 +22,12 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
         // Compiling a file that uses a standard module starts a download of its sources in the background:
         // a test never reaches the network (and a stray download must not land in another test's cache).
         originalFetchText = BwslStdlibSources.fetchText
+        // The same for the intrinsic documentation: a hover asks the site for a page in the background.
+        originalIntrinsicFetch = BwslIntrinsicDocs.fetchText
+        originalIntrinsicRoot = BwslIntrinsicDocs.cacheRoot
+        BwslIntrinsicDocs.fetchText = { null }
+        BwslIntrinsicDocs.cacheRoot = java.nio.file.Files.createTempDirectory("bwsl_intrinsic_docs_")
+        BwslIntrinsicDocs.reset()
         BwslStdlibSources.fetchText = { null }
         originalCompilerPath = BwslSettings.getInstance().compilerPath
         BwslSettings.getInstance().compilerPath = System.getProperty("bwslc.path")
@@ -29,6 +37,10 @@ abstract class BwslAstFixtureTestCase : BasePlatformTestCase() {
     override fun tearDown() {
         try {
             BwslStdlibSources.fetchText = originalFetchText
+            BwslIntrinsicDocs.cacheRoot.toFile().deleteRecursively()
+            BwslIntrinsicDocs.cacheRoot = originalIntrinsicRoot
+            BwslIntrinsicDocs.fetchText = originalIntrinsicFetch
+            BwslIntrinsicDocs.reset()
             BwslSettings.getInstance().compilerPath = originalCompilerPath
         } finally {
             super.tearDown()

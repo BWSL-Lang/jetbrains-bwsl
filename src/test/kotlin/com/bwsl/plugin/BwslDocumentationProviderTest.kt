@@ -339,4 +339,32 @@ class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
         assertTrue("Expected the qualified name, got: $doc", doc!!.contains("Common::helper()"))
         assertTrue("Expected the signature, got: $doc", doc.contains("float helper(float a, float b)"))
     }
+
+    private val lerpPage = "<html><head><meta name=\"description\" content=\"Blends two values.\"/></head><body>" +
+        "<div class=\"prose docs-prose\"><p>The <code>lerp</code> function blends <code>a</code> and <code>b</code>.</p></div></body></html>"
+
+    private fun lerpCallDoc(): String {
+        myFixture.configureByText("test.bwsl", "module M {\n    f :: (float a, float b) -> float {\n        return le<caret>rp(a, b, 0.5);\n    }\n}")
+        return generateDocAt(myFixture.caretOffset)!!
+    }
+
+    fun testAnIntrinsicShowsWhatTheOfficialDocumentationSaysOnceItIsFetched() {
+        BwslIntrinsicDocs.fetchText = { lerpPage }
+        BwslIntrinsicDocs.fetchNow("lerp")
+
+        val doc = lerpCallDoc()
+
+        assertTrue(doc, doc.contains("Blends two values."))
+        assertTrue(doc, doc.contains("The <code>lerp</code> function blends"))
+        assertTrue(doc, doc.contains("href=\"https://www.bwsl.dev/docs/intrinsics/lerp\""))
+        assertTrue("the SPIR-V line stays", doc.contains("GLSL.std.450 FMix"))
+        assertFalse("the built-in line is replaced", doc.contains("Linear interpolation"))
+    }
+
+    fun testAnIntrinsicShowsTheBuiltInLineUntilTheDocumentationHasBeenFetched() {
+        val doc = lerpCallDoc()
+
+        assertTrue(doc, doc.contains("Linear interpolation"))
+        assertFalse(doc, doc.contains("bwsl.dev"))
+    }
 }

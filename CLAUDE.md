@@ -2,6 +2,24 @@
 
 JetBrains IDE plugin (Kotlin, IntelliJ Platform SDK) for the BWSL shader language.
 
+## Ecosystem
+
+This plugin is one of three repositories, all under the BWSL-Lang GitHub organisation:
+
+- **Compiler** (`bwslc`): https://github.com/BWSL-Lang/BWSL. Local clone at `C:\Users\lundis\BWSL\BWSL`, built to
+  `build\bwslc.exe`. The language itself, the intrinsic table (`src/core/bwsl_stdlib.h`), the standard
+  modules (`modules/`), the AST schema (`docs/ast-json.md`) and the compiler's own tests live there. Compiler bugs and gaps found from the
+  plugin are filed as issues on it (written standalone, with complete examples, without reference to
+  this repo's implementation).
+- **Documentation** (https://www.bwsl.dev/docs): source at https://github.com/BWSL-Lang/bwsl-docs, no local
+  clone. The plugin links to its pages and reads intrinsic summaries from them (see "Intrinsic
+  documentation" below).
+- **This plugin**: https://github.com/BWSL-Lang/jetbrains-bwsl.
+
+Work on any of them is possible when it is needed, but **always check with the user first** before changing
+or filing anything in the compiler or docs repository (a branch, a commit, a push, an issue or a pull
+request); the plugin repository is where work happens by default.
+
 ## Build / test
 
 ```powershell
@@ -35,6 +53,9 @@ is wrapped at 80 characters.
 - `BwslLexerAdapter.kt` — flex-generated lexer adapter. Tracks `prevSignificantType` to detect a
   `.` (DOT) receiver before `identifier(`, distinguishing `INTRINSIC_CALL` vs `FUNCTION_CALL`
   (e.g. `values.length()` stays `INTRINSIC_CALL`, `values.cos()` becomes `FUNCTION_CALL`).
+  The names that count as intrinsics are `BwslIntrinsics.NAMES`, the same table the hover, parameter info
+  and name completion use (the lexer and the completion contributor each had their own, stale, shorter
+  list: no `fma`, but `frac` and `inversesqrt`, which BWSL does not have).
 - `BwslParserDefinition.kt` — defines `BwslReferenceElement` (an `ASTWrapperPsiElement` override)
   for the `REFERENCE` composite element type. **Critical**: plain `ASTWrapperPsiElement.getReferences()`
   does NOT delegate to `ReferenceProvidersRegistry` by default — `BwslReferenceElement` overrides
@@ -49,16 +70,24 @@ is wrapped at 80 characters.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
   parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. Its
-  `apply` also shows the shadowing warnings (`BwslShadowing.kt`): bwslc allows a parameter, local,
-  const or loop variable to reuse a visible name and says nothing (probed), so
-  `collectShadowingDeclarations` collects each such declaration from the raw AST and asks
-  `collectVisibleLocalsAt` (the completion walker, so the two share one notion of scope) what is in
-  scope *just before* it: at its own start for a local, one column before the function for a
-  parameter, one column before a loop variable. The result carries the hash of the text bwslc
-  compiled, and `apply` shows nothing unless the editor text still hashes to it (the compile reads
-  the saved file, so positions are wrong while there are unsaved edits). Module-, pipeline- and
-  pass-level consts are visible throughout their container and are not checked.
+  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. It shows
+  nothing itself (the compiler's own diagnostics, including its notes about shadowed declarations, come
+  from `BwslExternalAnnotator`; the plugin used to detect shadowing itself, until the compiler did).
+  **Unsaved text** (`AstCollectedInfo.hasUnsavedChanges`: the document is modified or its hash differs
+  from the snapshot) is compiled from stdin instead: `compileEditorText` runs
+  `bwslc --stdin --source-file <path> -ast-json`, where `--source-file` is what finds the modules beside
+  the file, so nothing is written to disk and the AST's `sourceFile` is the real path. The result goes to
+  `BwslAstCache.updateLive`, a second slot per file read only through `findRootForCompletion`/
+  `findRawRootForCompletion` (completion); the saved slot, its recorded inputs and so the project
+  index, Find Usages and Rename never see it. A text that does not parse gives no AST and the previous
+  live one stays; a compile of the saved text clears it. Because the live AST is of exactly the editor's
+  text.
+  Diagnostics (`BwslExternalAnnotator`) use the same `--stdin --source-file` for a file on disk;
+  a copy in the system temp directory (the old way, still used for text with no file) cannot find the
+  modules beside the file.
+- The Compile action's command is `buildCompileCommand` (`BwslCompileAction.kt`): output format flag,
+  `-debug-names` when the `emitDebugNames` setting is on, then each `-modules`. The flag only changes what
+  is *written*, so the AST, diagnostics and rename-conflict runs do not pass it.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
@@ -231,14 +260,19 @@ is wrapped at 80 characters.
   runs the parentheses handler, commits, then `findImportInsertion` (token-based, so right for text
   newer than the last compile) inserts `import Module` after the last import of the enclosing
   top-level `{}` with that import's indent, or first in the block. A module imported under an alias
-  counts as imported.
+  counts as imported. `import <caret>` (`collectImportableModuleNames`) takes module *names* from the ASTs of the
+  indexed files (`collectOwnModules`), only where the file is named after the module (bwslc finds
+  `<Module>.bwsl`; case-insensitively where the file system is), never from file names: a project's
+  unrelated `.bwsl` files (test resources, say) used to be offered by name. `Mod.` after a module name in a
+  `resources {}` block offers its structs and enums: BWSL writes a module with `.` only there (a `.` in a
+  statement is a syntax error), `::` everywhere else.
 - Inspections (`BwslInspections.kt`: three `LocalInspectionTool`s, registered in plugin.xml with
   descriptions under `inspectionDescriptions/`) read the cached AST through `findInspectionInput`,
   which returns null unless the file's text hashes to what was compiled. Unused: a `variable`/
   `constant` symbol with no `owner` (a local) or a `parameter` whose own node is in this file, with no
   incoming edge, or only `write` edges. An unused import: an own `…/import:n`/`…/using:n` node whose
   target module is the owner (through `owner` links) of no edge's target other than other
-  import/using edges. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
+  import/using edges; a `Mod.Type` in a `resources` block counts, since the compiler (from BWSL#120) gives it the same `qualifier` edge as `Mod::Type`. A missing import: a positioned `IDENTIFIER` followed by `::` with no outgoing
   edge whose name is a module some cached AST knows. Fixes work on tokens.
 - File Structure and breadcrumbs (`BwslStructure.kt`): token-based on purpose (they must follow text
   being typed, like folding), not AST-driven. `collectOutline` pairs braces and walks each region
@@ -264,7 +298,10 @@ is wrapped at 80 characters.
   `collectParameterNameHints` takes each `FUNCTION_CALL` token followed by `(`, the function or
   method its edge resolves to (`collectDeclarationIdsAt`), the parameter symbols it owns, and
   splits the arguments by bracket depth. Only with an AST of the current text
-  (`findInspectionInput`).
+  (`findInspectionInput`). A second provider, `collectArrayLengthHints`, walks the raw AST for
+  declarations of the file with a non-empty `typeInfo.arraySizes`, reads the written type at
+  `typeLine`/`typeColumn` (`float[N]`) and, when a size in it is not a number, shows the resolved
+  sizes after it.
 - Extend Selection (`BwslSelection.kt`, an `ExtendWordSelectionHandlerBase`) and Smart Enter
   (`BwslSmartEnter.kt`, a `SmartEnterProcessor`, which lives in
   `com.intellij.codeInsight.editorActions.smartEnter`, registered as `lang.smartEnterProcessor`).
@@ -307,9 +344,12 @@ is wrapped at 80 characters.
   name whose return types differ has none); a field from the struct's `fields[].dataType`, a vector
   swizzle by `^(float|int|uint|double)[234]$` (families `xyzw` and `rgba`, never mixed, limited to
   the component count), a method from `methods[].returnType`, `[i]` as element/column/component.
-  Probed facts that shaped it: an array **local's** `declaredType` is just `"array"` (its element
-  type is read from the source at `typeLine`/`typeColumn`, `VisibleLocal.typePosition`), an array
-  **parameter** records no array at all (so no `length` on one), a field has `arraySize`, and
+  Probed facts that shaped it: every declaration (parameter, local, field, and the symbols) has
+  `typeInfo` (`elementType`, `arrayDimensions`, `arrayLength`, `arraySizes`: resolved sizes, also for
+  `float[N]`), and `declaredType`/`dataType` is the *element* type; `VisibleLocal.isArray` reads
+  `typeInfo.arrayDimensions`. A compiler from before that (BWSL#106) gave an array local the
+  `declaredType` `"array"` and a parameter nothing; the code still reads the element type from the
+  source at `typeLine`/`typeColumn` (`VisibleLocal.typePosition`) for the first, and a field has `arraySize`, and
   `stpq` is not a swizzle family. Nothing is guessed: an untypable receiver gives no members. A
   swizzle in progress is extended from `result.prefixMatcher.prefix`. After a dot keywords and type
   names are skipped; the intrinsics stay (method-style calls like `v.normalize()`), so the generic
@@ -334,6 +374,43 @@ is wrapped at 80 characters.
 - Tests never use the network: `BwslAstFixtureTestCase` stubs `BwslStdlibSources.fetchText` (a
   compile of a file that uses a standard module starts a background download, which would otherwise
   reach GitHub and could land in another test's cache directory).
+- Intrinsic documentation (`BwslIntrinsicDocs.kt`, `BwslIntrinsicNavigation.kt`). The official page of an
+  intrinsic is `https://www.bwsl.dev/docs/intrinsics/<name>` (server-rendered HTML, no raw markdown
+  or API). `parseDocPage` takes the page's `<meta name="description">` as the summary and the first
+  `<p>` of `div.prose.docs-prose` as the intro (only `code`/`em`/`strong` kept); it is fragile to a site
+  redesign and then yields null, so the hover falls back to the built-in line. `findDoc` reads the disk
+  cache (`<system>/bwsl/intrinsic-docs/<name>.json`, a week) and starts one background fetch per name
+  per session when there is no fresh copy; it answers null until the copy is there. `UNDOCUMENTED`
+  (`fmod`, `barrier`, `memoryBarrier`, `storageBarrier`) lists the table's intrinsics with no page,
+  and `discard` (a keyword here) has one; `BwslDocumentationSiteTest` compares that with the site's
+  listing page. Ctrl+click is a
+  `gotoDeclarationHandler` returning a `FakePsiElement` (`BwslDocumentationTarget`) whose `navigate`
+  calls `BwslBrowser.open` (replaced in tests); the `.` before an array's `length()` is found by
+  climbing to the first ancestor with a previous sibling, since the token is wrapped twice. The fixture
+  base class stubs the fetch and the cache directory.
+  Keywords go to the language pages (`BwslKeywordDocs.kt`: `KEYWORD_PAGES` by token type, so a keyword
+  inside a string or comment is not one; `attributes` is told apart by the token after it, `{` or `.`,
+  and `input`/`output`, plain identifiers to the lexer, count only before a `.`). Which keyword goes
+  to which page is a judgement (the site has no keyword index): `vertex`/`fragment` to the pipeline page,
+  `constraint`/`rules`/`require`/`conflict` to shader variants, the resource qualifiers to resources.
+  Tests that read the site (`BwslDocumentationSiteTest`: the intrinsic listing, every keyword page) are
+  JUnit 5, because a JUnit 3 `TestCase` (every platform fixture test) reports a failed `Assume` as a
+  failure, not a skip; they are skipped when the site cannot be reached.
+- Intrinsic SPIR-V mapping (`BwslIntrinsicSpirv.kt`). `SPIRV_INSTRUCTIONS` maps an intrinsic to the
+  instructions in the compiler's table (`SPV_MAP(core op, GLSLstd450 op)` in `src/core/bwsl_stdlib.h`,
+  plus its comments for type-dependent variants and the wave ops, whose op is only a number there). A
+  name with an `Op` prefix is core (the spec page has an anchor per instruction); any other is
+  `GLSL.std.450` (that page has no per-instruction anchors, so the link is a text fragment, `#:~:text=Name`,
+  checked offline against the page: the name's first whole-word match is its definition for all but
+  `RoundEven`, `ModfStruct`, `FrexpStruct` and `Degrees`, which get a suffix of the words after the name). Left out: rows
+  with both ops `NONE` (`rcp`, `log10`, `isfinite`, ...) and the `*_offset` sampling variants, whose
+  op the table does not say. The mapping is a snapshot of that table: **tests cannot read the compiler's
+  source** (they only have the compiler binary), so `BwslIntrinsicSpirvTest` checks what a binary can
+  tell - every name in `BwslIntrinsics` is known to the compiler under test (called with no arguments:
+  either its arity error names it, or the reference index resolves the call to `builtin:function:<name>`;
+  an unknown name does neither) and every mapped name is in the table. It cannot catch an intrinsic the
+  compiler gained or a changed instruction; when the compiler's table changes, redo the mapping from
+  `src/core/bwsl_stdlib.h` by hand.
 - Doc comments (`BwslDocComments.kt`). `findDocCommentAbove(file, nameOffset)` reads the text, not
   the AST: from the name's token it goes back to the first token of that line (the declaration's
   start, so `const float PI` and `struct Point` work), then collects the comments directly above
@@ -374,8 +451,9 @@ is wrapped at 80 characters.
   the *raw* cached AST down to the position (only into containers whose range holds it) rather than
   asking the reference index: it answers "what could be typed here", not "what does this name
   refer to". A name counts once it is declared and only while its block is open; module-, pipeline-
-  and pass-level consts count throughout. The AST is from the last successful compile of the saved
-  file, so a local typed since then is not offered until the file is saved and re-annotated.
+  and pass-level consts count throughout. The AST is the live one (see the annotator above),
+  from the last successful compile of the editor's text, so a local typed since then is offered once the
+  annotator has run, but not while a syntax error is open (no AST, so the previous one stays).
 
 ## The AST and reference index (what the plugin relies on)
 
@@ -421,6 +499,11 @@ Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF
   into its parent module. `sourceFile` on top-level entries and members names the file each was
   written in (the compiled file as it was passed to bwslc, others as an absolute path), and a
   node's line/column are relative to that file.
+- **Where a declaration's type is written.** `declaredType` + `typeLine`/`typeColumn` on a `VARIABLE_DECL`; `dataType` on
+  parameters, struct fields and `ATTRIBUTE_DECL` (which has no position of its own); `returnType` +
+  `returnTypeLine`/`returnTypeColumn` on a `FUNCTION`; and `typeName` + `typeLine`/`typeColumn` on a
+  `RESOURCE_DECL` and a `PASS/fragment-output`. A resource's `typeName` is normalised to `Mod::Type` whichever
+  way it was written (`Mod.Type`), so `SourcePositions.findTypeRangeOf` measures its length in the text.
 - **Keys.** `type` is the node kind where present; parameters and struct fields use `dataType` for
   their data type. The singular `root` repeats one top-level pipeline; use `roots`.
 

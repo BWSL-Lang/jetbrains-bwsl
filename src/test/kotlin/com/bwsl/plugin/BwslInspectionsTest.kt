@@ -67,6 +67,17 @@ class BwslInspectionsTest : BwslAstFixtureTestCase() {
         assertEquals(listOf("Extra"), collectUnusedImports(input).map { it.module })
     }
 
+    fun testAModuleWrittenAsAResourceTypeIsNotCalledUnused() {
+        // `Lib.Item` in a resources block is a use of the module: the compiler gives it a qualifier edge.
+        val input = configure(
+            "pipeline P {\n    import Lib\n    resources {\n        item: Lib.Item\n    }\n    attributes { position: float4 }\n" +
+                "    pass \"Main\" {\n        use attributes { position }\n        use resources { item }\n        outputs { c: float4 }\n" +
+                "        vertex { output.pos = attributes.position; }\n        fragment { output.c = float4(resources.item.w); }\n    }\n}"
+        )
+
+        assertTrue(collectUnusedImports(input).isEmpty())
+    }
+
     fun testAUsingThatOnlyBringsInNamesIsUsedWhenOneIsCalled() {
         val input = configure(
             "module M {\n    import Lib\n    using Lib\n    f :: (float x) -> float { return helper(x); }\n}"

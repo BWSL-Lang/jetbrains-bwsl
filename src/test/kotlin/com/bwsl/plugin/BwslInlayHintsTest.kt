@@ -44,6 +44,32 @@ class BwslInlayHintsTest : BwslAstFixtureTestCase() {
         assertTrue(hints.isEmpty())
     }
 
+    private val arrays = "module M {\n    const int N = 3;\n    struct S {\n        float[N] w;\n    }\n" +
+        "    f :: (float[N] values, float[2][N] grid, float[4] fixed) -> float {\n        float[N] local;\n        float[4] lit;\n        return values[0];\n    }\n}"
+
+    /** For each hint, the type as written before it, then the hint, in source order. */
+    private fun collectArrayHints(source: String): List<String> {
+        val text = configureAndCache(source)
+        val written = Regex("""[\w:]+(\[[^\]]*])+$""")
+        return collectArrayLengthHints(myFixture.file)!!.sortedBy { it.offset }.map { hint ->
+            "${written.find(text.substring(0, hint.offset))!!.value} ${hint.text}"
+        }
+    }
+
+    fun testASizeWrittenAsAConstantShowsWhatItResolvesTo() {
+        // The struct field, the two parameters and the local; `float[4]` already says 4.
+        assertEquals(listOf("float[N] = 3", "float[N] = 3", "float[2][N] = 2×3", "float[N] = 3"), collectArrayHints(arrays))
+    }
+
+    fun testNoLengthIsShownOnceTheTextHasChanged() {
+        configureAndCache(arrays)
+        assertNotNull(collectArrayLengthHints(myFixture.file))
+
+        myFixture.type("\n")
+
+        assertNull(collectArrayLengthHints(myFixture.file))
+    }
+
     fun testNothingIsShownOnceTheTextHasChanged() {
         configureAndCache("module M {\n    g :: (float a) -> float { return a; }\n    f :: () -> float { return g(1.0); }\n}")
         assertNotNull(collectParameterNameHints(myFixture.file))

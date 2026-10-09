@@ -200,6 +200,12 @@ object BwslAstCache {
     private val compiledInputs = ConcurrentHashMap<String, Map<String, Int>>()
     private val uncompilableInputs = ConcurrentHashMap<String, Map<String, Int>>()
 
+    // The AST of the text in the editor, when that has changes that are not saved. Completion reads it
+    // in preference to the saved file's; everything that works across files (the project index, Find
+    // Usages, Rename) reads only what was compiled from saved text.
+    private val liveRoots = ConcurrentHashMap<String, AstRoot>()
+    private val liveRawRoots = ConcurrentHashMap<String, com.google.gson.JsonObject>()
+
     /**
      * [rawJson] is the same bwslc -ast-json payload as [root], parsed generically. It's needed
      * because the typed [AstRoot] model doesn't (and can't practically) mirror every node type -
@@ -221,6 +227,25 @@ object BwslAstCache {
         uncompilableInputs.remove(filePath)
     }
 
+    /** Keeps the AST bwslc built from the editor's unsaved text of [filePath]. */
+    fun updateLive(filePath: String, root: AstRoot, rawJson: com.google.gson.JsonObject) {
+        liveRoots[filePath] = root
+        liveRawRoots[filePath] = rawJson
+    }
+
+    /** Forgets the AST of unsaved text for [filePath]: the file is saved, or the text is the saved text again. */
+    fun clearLive(filePath: String) {
+        liveRoots.remove(filePath)
+        liveRawRoots.remove(filePath)
+    }
+
+    /** The AST of the editor's unsaved text if there is one, else the saved file's. */
+    fun findRootForCompletion(filePath: String): AstRoot? = liveRoots[filePath] ?: roots[filePath]
+
+    /** The raw JSON of [findRootForCompletion]. */
+    fun findRawRootForCompletion(filePath: String): com.google.gson.JsonObject? =
+        if (liveRoots.containsKey(filePath)) liveRawRoots[filePath] else rawRoots[filePath]
+
     /** Records that bwslc produced no AST for [filePath] when its candidate inputs were [inputs]. */
     fun recordUncompilable(filePath: String, inputs: Map<String, Int>) {
         uncompilableInputs[filePath] = inputs
@@ -240,6 +265,8 @@ object BwslAstCache {
         rawRoots.clear()
         compiledInputs.clear()
         uncompilableInputs.clear()
+        liveRoots.clear()
+        liveRawRoots.clear()
     }
 
     /** The path of every file that has a cached AST. */

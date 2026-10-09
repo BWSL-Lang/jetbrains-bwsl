@@ -3,11 +3,11 @@ package com.bwsl.plugin
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 
-/** A parameter, local variable, constant or loop variable in scope at some position. */
 /**
- * [isArray] is known for locals only: the AST records no array size for a parameter. For an array local the
- * AST's type is just `array`; [typePosition], the 1-based line and column where its declared type is
- * written, says where to read the element type from.
+ * A parameter, local variable, constant or loop variable in scope at some position. [isArray] says it is an
+ * array of [type] (the element type). A compiler from before it described arrays gave an array local the type
+ * `array`; [typePosition], the 1-based line and column where its declared type is written, says where to read
+ * the element type from then.
  */
 data class VisibleLocal(
     val name: String,
@@ -73,7 +73,9 @@ private class LocalsWalker(
         when (type) {
             "FUNCTION" -> o.get("parameters")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { p ->
                 val param = p.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
-                param.getStringOrNull("name")?.let { add(it, param.getStringOrNull("dataType"), VisibleLocal.Kind.PARAMETER) }
+                param.getStringOrNull("name")?.let {
+                    add(it, param.getStringOrNull("dataType"), VisibleLocal.Kind.PARAMETER, isArray = isArrayDeclaration(param))
+                }
             }
 
             "VARIABLE_DECL" -> {
@@ -84,7 +86,7 @@ private class LocalsWalker(
                         VisibleLocal.Kind.CONSTANT else VisibleLocal.Kind.VARIABLE
                     o.getStringOrNull("name")?.let {
                         val typePosition = o.getIntOrNull("typeLine")?.let { l -> o.getIntOrNull("typeColumn")?.let { c -> l to c } }
-                        add(it, o.getStringOrNull("declaredType"), kind, (o.getIntOrNull("arrayDimensions") ?: 0) > 0, typePosition)
+                        add(it, o.getStringOrNull("declaredType"), kind, isArrayDeclaration(o), typePosition)
                     }
                 }
                 return
@@ -100,6 +102,10 @@ private class LocalsWalker(
         val childrenInBlock = inBlock || type == "BLOCK"
         for ((_, value) in o.entrySet()) visit(value, childrenInBlock)
     }
+
+    /** Whether a declaration is of an array type: its `typeInfo`, or the older `arrayDimensions` of a local. */
+    private fun isArrayDeclaration(o: JsonObject): Boolean =
+        (o.getObjectOrNull("typeInfo")?.getIntOrNull("arrayDimensions") ?: o.getIntOrNull("arrayDimensions") ?: 0) > 0
 
     private fun add(name: String, type: String?, kind: VisibleLocal.Kind, isArray: Boolean = false, typePosition: Pair<Int, Int>? = null) {
         out[name] = VisibleLocal(name, type?.takeIf { it.isNotBlank() }, kind, isArray, typePosition)

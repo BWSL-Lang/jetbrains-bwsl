@@ -86,6 +86,10 @@ class BwslSettingsConfigurable : Configurable {
             row("Output format:") {
                 cell(formatCombo!!)
             }
+            row {
+                checkBox("Emit debug names in the SPIR-V output (-debug-names)")
+                    .bindSelected(settings::emitDebugNames)
+            }
             row("Output directory:") {
                 @Suppress("UnstableApiUsage")
                 textFieldWithBrowseButton(

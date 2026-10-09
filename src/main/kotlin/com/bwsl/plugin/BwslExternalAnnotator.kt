@@ -26,17 +26,29 @@ data class CompilerOutput(
 )
 
 /** The editor text to check, and the directories bwslc searches for the modules it imports. */
-data class DiagnosticsRequest(val fileContent: String, val modulePaths: List<String> = emptyList())
+data class DiagnosticsRequest(
+    val fileContent: String,
+    val modulePaths: List<String> = emptyList(),
+    /** The file the text belongs to, so the modules beside it are found; null for text with no file. */
+    val filePath: String? = null
+)
 
 class BwslExternalAnnotator : ExternalAnnotator<DiagnosticsRequest, List<Diagnostic>>() {
 
     override fun collectInformation(file: PsiFile): DiagnosticsRequest? {
         if (resolveCompilerPath() == null) return null
-        return DiagnosticsRequest(file.text, collectModulePaths(file.project))
+        return DiagnosticsRequest(file.text, collectModulePaths(file.project), file.virtualFile?.takeIf { it.isInLocalFileSystem }?.path)
     }
 
     override fun doAnnotate(request: DiagnosticsRequest): List<Diagnostic> {
         val compilerPath = resolveCompilerPath() ?: return emptyList()
+        request.filePath?.let { path ->
+            return try {
+                collectDiagnostics(compilerPath, path, request.modulePaths, stdinText = request.fileContent)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
         val tempFile = Files.createTempFile("bwsl_", ".bwsl").toFile()
         try {
             tempFile.writeText(request.fileContent)

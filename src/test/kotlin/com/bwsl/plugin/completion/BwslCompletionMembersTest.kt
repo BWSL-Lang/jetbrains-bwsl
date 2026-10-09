@@ -131,6 +131,39 @@ class BwslCompletionMembersTest : BwslCompletionScopeTestCase() {
         assertFalse("an element is not an array, got: $typeTexts", typeTexts.contains("int"))
     }
 
+    private fun moduleWithArrayParameters(body: String): String = """
+        module M {
+            struct Light {
+                float3 color;
+                float intensity;
+            }
+
+            f :: (float[3] values, Light[2] lights, Light single) -> float {
+                $body
+                return 0.0;
+            }
+        }
+    """.trimIndent()
+
+    fun testAnArrayParameterHasLengthAsAMember() {
+        val typeTexts = collectLengthTypeTexts(moduleWithArrayParameters("int n = values.<caret>length();"))
+
+        assertTrue("the array's own length, got: $typeTexts", typeTexts.contains("int"))
+    }
+
+    fun testTheElementsOfAnArrayParameterHaveTheirOwnMembers() {
+        val source = moduleWithArrayParameters("float x = lights[1].<caret>intensity;")
+        assertCompletions(source, present = setOf("color", "intensity"))
+
+        assertFalse("an element is not an array, got: ${collectLengthTypeTexts(source)}", collectLengthTypeTexts(source).contains("int"))
+    }
+
+    fun testAParameterThatIsNotAnArrayHasNoArrayLength() {
+        val typeTexts = collectLengthTypeTexts(moduleWithArrayParameters("int n = single.<caret>length();"))
+
+        assertFalse("got: $typeTexts", typeTexts.contains("int"))
+    }
+
     fun testAnArrayFieldHasLengthAsAMember() {
         val typeTexts = collectLengthTypeTexts(module("float n = float(l.weights.<caret>length());"))
 

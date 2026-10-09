@@ -68,6 +68,23 @@ class BwslLexerFunctionCallTest {
         }
     }
 
+    @Test
+    fun testEveryIntrinsicOfTheTableIsAnIntrinsicCall() {
+        val notIntrinsic = BwslIntrinsics.NAMES.sorted().filter { name ->
+            val source = "module M { f :: () -> float { return $name(1.0); } }"
+            val lexer = BwslLexerAdapter()
+            lexer.start(source, 0, source.length, 0)
+            var type: IElementType? = null
+            while (lexer.tokenType != null) {
+                if (source.substring(lexer.tokenStart, lexer.tokenEnd) == name) type = lexer.tokenType
+                lexer.advance()
+            }
+            type != BwslTokenTypes.INTRINSIC_CALL
+        }
+
+        assertEquals(emptyList<String>(), notIntrinsic) { "intrinsics the lexer takes for ordinary function calls" }
+    }
+
     private data class Token(val line: Int, val text: String, val type: IElementType)
 
     private fun tokenizeResource(path: String): List<Token> {
