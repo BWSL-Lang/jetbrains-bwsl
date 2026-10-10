@@ -54,11 +54,14 @@ fun readProjectConfig(project: Project): BwslProjectConfig {
 }
 
 /** The directories bwslc searches for modules: the IDE settings' module paths, then the project's `bwsl.json` ones. */
-fun collectModulePaths(project: Project): List<String> {
+fun collectModulePaths(project: Project): List<String> = collectModulePaths(project, BwslSettings.getInstance().modulePaths)
+
+/** The IDE setting's [settingPaths] plus the module paths of the project's `bwsl.json`, without duplicates. */
+fun collectModulePaths(project: Project, settingPaths: List<String>): List<String> {
     val basePath = project.basePath
     val fromConfig = if (basePath == null) emptyList()
     else readProjectConfig(project).modulePaths.map { File(basePath).resolve(it).path }
-    return (BwslSettings.getInstance().modulePaths + fromConfig).distinctBy { normalizePathKey(it) }
+    return (settingPaths + fromConfig).distinctBy { normalizePathKey(it) }
 }
 
 /** [path] in a form that compares equal for the same file: forward slashes, and lower case on a case-insensitive file system. */
@@ -81,7 +84,7 @@ fun isExcludedBy(config: BwslProjectConfig, basePath: String, filePath: String):
  * each module path (bwslc looks for `<Module>.bwsl` in those directories only, not below them) -
  * minus the ones `bwsl.json` excludes. Find Usages and Rename search exactly these.
  */
-internal fun collectIndexedFiles(project: Project): List<VirtualFile> = ReadAction.compute<List<VirtualFile>, RuntimeException> {
+internal fun collectIndexedFiles(project: Project): List<VirtualFile> = ReadAction.computeBlocking<List<VirtualFile>, RuntimeException> {
     val config = readProjectConfig(project)
     val basePath = project.basePath
     val files = LinkedHashMap<String, VirtualFile>()

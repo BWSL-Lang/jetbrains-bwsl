@@ -22,6 +22,22 @@ class BwslCompileCommandTest {
     }
 
     @Test
+    fun testBindingsAreAddedOnlyForGlesWhenTheSettingIsOn() {
+        assertEquals(listOf("bwslc", "a.bwsl", "-gles", "-bindings"), buildCompileCommand("bwslc", "a.bwsl", BwslOutputFormat.GLES, false, emptyList(), true))
+        assertFalse("-bindings" in buildCompileCommand("bwslc", "a.bwsl", BwslOutputFormat.GLES, false, emptyList(), false))
+        assertFalse("-bindings" in buildCompileCommand("bwslc", "a.bwsl", BwslOutputFormat.METAL, false, emptyList(), true))
+        assertTrue(BwslSettings.State().emitBindings)
+    }
+
+    @Test
+    fun testThePreviewIsTheCommandLineWithAPlaceholderFile() {
+        assertEquals(
+            "bwslc <file>.bwsl -gles -debug-names -bindings -modules \"/my mods\"",
+            buildCompilePreview("", BwslOutputFormat.GLES, true, listOf("/my mods"), true)
+        )
+    }
+
+    @Test
     fun testTheSettingIsOffByDefault() {
         assertFalse(BwslSettings.State().emitDebugNames)
     }

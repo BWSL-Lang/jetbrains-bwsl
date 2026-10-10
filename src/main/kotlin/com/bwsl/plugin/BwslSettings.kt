@@ -17,6 +17,8 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
         var outputDirectory: String = "",
         /** Whether the compile action passes `-debug-names`, so the SPIR-V keeps the names of variables and functions. */
         var emitDebugNames: Boolean = false,
+        /** Whether the compile action passes `-bindings` with the GLSL ES target, which writes the resolved resource bindings. */
+        var emitBindings: Boolean = true,
         var checkForCompilerUpdates: Boolean = true,
         /** When the newest release was last asked for, in epoch milliseconds. */
         var lastCompilerUpdateCheck: Long = 0,
@@ -48,6 +50,10 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
     var emitDebugNames: Boolean
         get() = state.emitDebugNames
         set(value) { state.emitDebugNames = value }
+
+    var emitBindings: Boolean
+        get() = state.emitBindings
+        set(value) { state.emitBindings = value }
 
     var checkForCompilerUpdates: Boolean
         get() = state.checkForCompilerUpdates

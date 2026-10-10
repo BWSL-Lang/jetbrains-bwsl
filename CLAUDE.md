@@ -91,7 +91,8 @@ is wrapped at 80 characters.
   a copy in the system temp directory (the old way, still used for text with no file) cannot find the
   modules beside the file.
 - The Compile action's command is `buildCompileCommand` (`BwslCompileAction.kt`): output format flag,
-  `-debug-names` when the `emitDebugNames` setting is on, then each `-modules`. The flag only changes what
+  `-debug-names` when the `emitDebugNames` setting is on, `-bindings` when `emitBindings` (on by default) is
+  on and the format is GLSL ES, then each `-modules`. The flag only changes what
   is *written*, so the AST, diagnostics and rename-conflict runs do not pass it.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only

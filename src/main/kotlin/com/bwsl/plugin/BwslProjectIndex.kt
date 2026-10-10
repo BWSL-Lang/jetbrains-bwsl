@@ -153,7 +153,7 @@ class BwslProjectIndex(private val project: Project) : Disposable {
 
     private fun compileProjectFile(compilerPath: String, file: VirtualFile, modulePaths: List<String>) {
         try {
-            val candidateInputs = ReadAction.compute<Map<String, Int>, RuntimeException> { snapshotCandidateInputs(file, modulePaths) }
+            val candidateInputs = ReadAction.computeBlocking<Map<String, Int>, RuntimeException> { snapshotCandidateInputs(file, modulePaths) }
             compileAndCache(compilerPath, file.path, modulePaths, candidateInputs)
         } catch (e: Exception) {
             log.warn("bwslc -ast-json failed for ${file.path}", e)

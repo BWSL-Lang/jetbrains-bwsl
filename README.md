@@ -431,6 +431,10 @@ Aliases and imports are read from the text, so they are current.
 - **Emit debug names** — passes `-debug-names` when compiling, so the SPIR-V
   output keeps the names of variables and functions. Off by default. Only the
   Compile action uses it: the checks in the editor write no output
+- **Write resource bindings** — passes `-bindings` with the GLSL ES / WebGL
+  format, so the resolved resource bindings are written too. On by default
+- **Command preview** — the compiler command the Compile action would run with
+  the settings as they stand in the page, before they are applied
 - **Output directory** — defaults to the source file's directory
 
 ## How it behaves
