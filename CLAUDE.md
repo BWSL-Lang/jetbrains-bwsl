@@ -224,6 +224,12 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Build output (`BwslBuildOutput.kt`). The Compile action runs `runCompilerProcess` (stdout and stderr merged
+  and read concurrently; a failed start or a timeout is reported in the `CompilerRun`, never thrown) and
+  `BwslBuildConsole` (project service) prints the working directory, `formatCommandLine` of the command, the
+  output and the exit code to the console of the "BWSL Build" tool window; a failure reveals the window and its
+  notification has a "Show build output" action. Only the Compile action is logged, not the editor's own AST and
+  diagnostic runs.
 - Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
   its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
   does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for

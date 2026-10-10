@@ -24,6 +24,9 @@
 
         <notificationGroup id="BWSL Compiler" displayType="BALLOON" isLogByDefault="true"/>
 
+        <toolWindow id="BWSL Build" anchor="bottom" canCloseContents="false"
+                    factoryClass="com.bwsl.plugin.BwslBuildToolWindowFactory"/>
+
         <applicationService
             serviceImplementation="com.bwsl.plugin.BwslSettings"/>
 

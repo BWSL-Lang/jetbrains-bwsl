@@ -113,6 +113,10 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
+- The **BWSL Build** tool window shows, for each compile, the working
+  directory, the exact command line (paste it into a shell to reproduce a
+  failure) and everything the compiler printed. A failed compile opens it, and
+  the error notification has a **Show build output** action
 
 ### Inspections and quick fixes
 
