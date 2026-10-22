@@ -74,8 +74,10 @@ is wrapped at 80 characters.
   an edge in the reference index, so they need no special handling.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
-  parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. It shows
+  parses the JSON (handles UTF-16 BOM output) once (`parseAstJson`, `BwslAstJson.kt`) into a raw `JsonObject`
+  whose strings (names, types, ids of up to 64 characters) are shared through a weak interner and whose small
+  integers are `Int`s, then the typed `AstRoot` from that tree (the payloads are mostly repeated strings and small
+  numbers: Gson's own tree took ten times the JSON's size, this one half of that), and stores both in `BwslAstCache` together with the files the AST was built from. It shows
   nothing itself (the compiler's own diagnostics, including its notes about shadowed declarations, come
   from `BwslExternalAnnotator`; the plugin used to detect shadowing itself, until the compiler did).
   **Unsaved text** (`AstCollectedInfo.hasUnsavedChanges`: the document is modified or its hash differs

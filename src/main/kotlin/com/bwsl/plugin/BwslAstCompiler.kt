@@ -63,14 +63,13 @@ internal fun compileAst(
     // Detect encoding: UTF-16 LE output starts with BOM bytes FF FE
     val hasUtf16Bom = rawBytes.size >= 2 && rawBytes[0] == 0xFF.toByte() && rawBytes[1] == 0xFE.toByte()
     val json = if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)
-    val root = Gson().fromJson(json, AstRoot::class.java)
-    if (root == null) {
+    val compiled = parseAstJson(json)
+    if (compiled == null) {
         log.warn("bwslc -ast-json returned invalid JSON for $filePath: ${json.take(200)}")
         return null
     }
-    val rawJson = Gson().fromJson(json, JsonObject::class.java)
-    log.warn("bwslc -ast-json parsed for $filePath: modules=${root.modules.size} pipelines=${root.pipelines.size}")
-    return CompiledAst(root, rawJson)
+    log.warn("bwslc -ast-json parsed for $filePath: modules=${compiled.root.modules.size} pipelines=${compiled.root.pipelines.size}")
+    return compiled
 }
 
 /**
