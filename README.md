@@ -122,9 +122,9 @@ That means the compiler has to be configured (see [Setup](#setup)).
 
 ### Inspections and quick fixes
 
-Read from the compiler's reference index of the last compile, so they show
-while the editor holds the text that was compiled and are off while there are
-unsaved edits.
+Read from the compiler's reference index of the last compile, in the files that
+are open in an editor, so they show while the editor holds the text that was
+compiled and are off while there are unsaved edits.
 
 - **Unused parameter, variable or constant** (greyed out): nothing reads it. A
   name that is only assigned says so. Module-, pipeline- and pass-level

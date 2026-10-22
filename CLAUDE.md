@@ -122,8 +122,16 @@ is wrapped at 80 characters.
   plus the config's, and every compile, diagnostic run and the Compile action use it.
 - `BwslAstCache.kt` — data classes mirroring the `bwslc -ast-json` schema (`AstRoot`, `AstModule`,
   `AstStruct`, `AstFunction`, `AstStatement`, `AstBlock`, `AstSymbol`, `AstReference`,
-  `AstReferenceIndex`, ...) plus a cache keyed by file path, storing both the typed root and the
-  raw JSON tree.
+  `AstReferenceIndex`, ...) plus a cache keyed by file path, storing the typed root, `IndexedNodes` (the
+  id -> position maps of `BwslAstIndex`, with only the *declarations* of what other files wrote, not an imported
+  module's statements or locals), `ModuleMembers` (the members of every module entry, for the import
+  suggestions) and, **only for a file open in an editor**, the raw JSON tree (`keepRaw`, decided by
+  `isOpenInEditor` in `compileAndCache`; `BwslEditorCloseListener` drops it when the last editor closes). The
+  raw tree is ten times the size of the JSON, and for an indexed project it once filled the heap, so nothing
+  that works across files may read it: Find Usages, Go to Symbol, the resolver (`buildAstIndex`) and the
+  import suggestions read the other two. Completion, the inspections and the inlay hints read the raw tree, so
+  they work in open files only (a batch inspection of closed files finds nothing). The singular `root` is
+  removed from the tree when it is read: it repeats a pipeline that `pipelines` has.
 - `BwslAstIndex.kt` — a generic id → position index built by walking the *raw* JSON tree (not the
   typed model, which can't practically mirror every node type), plus lookups over the compiler's
   own `referenceIndex` (`symbolsById`/`refsByFrom`/`refsByTo`). `findNameRangeOf` is just a node's
@@ -275,7 +283,7 @@ is wrapped at 80 characters.
   trigger accepts every name token (`FUNCTION_CALL`, `MODULE_NAME`, ...), not only `IDENTIFIER`, so
   it also works inside an existing `Mod::name(...)`.
 - Auto-import (`BwslImports.kt`, the contributor). `collectImportableNames` takes the members of
-  **every module entry in every cached AST** (own or imported), minus the modules the file imports
+  **every module entry in every cached AST** (`BwslAstCache.findModuleMembers`, kept for every file) (own or imported), minus the modules the file imports
   (read from the tokens) and the one the caret is in, deduplicated; so it works for project module
   files and module paths as soon as the index has compiled them. The standard modules have no file to
   compile (compiling a copy of `math.bwsl` fails: it redeclares the embedded `Math`), so

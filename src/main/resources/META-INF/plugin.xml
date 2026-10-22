@@ -230,6 +230,8 @@
     </extensions>
 
     <applicationListeners>
+        <listener class="com.bwsl.plugin.BwslEditorCloseListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
         <listener class="com.bwsl.plugin.BwslFileChangeListener"
                   topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>

@@ -5,7 +5,9 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonSyntaxException
 import com.google.gson.JsonObject
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.IOException
@@ -158,6 +160,12 @@ internal fun collectStringFields(rawJson: JsonObject, name: String): Set<String>
     return found
 }
 
+/** Whether [filePath] is open in an editor of any open project. */
+internal fun isOpenInEditor(filePath: String): Boolean = runCatching {
+    val file = LocalFileSystem.getInstance().findFileByPath(filePath) ?: return@runCatching false
+    ProjectManager.getInstance().openProjects.any { FileEditorManager.getInstance(it).isFileOpen(file) }
+}.getOrDefault(true)
+
 /**
  * Compiles [filePath] and caches the AST together with the files it was built from, picked out of
  * [candidateInputs] (the snapshot taken before the compile) by which files the payload names. When
@@ -179,7 +187,7 @@ internal fun compileAndCache(
     val ownKey = normalizePathKey(filePath)
     val dependencyKeys = collectSourceFiles(compiled.rawJson).map { normalizePathKey(it) }.toSet()
     val inputs = candidateInputs.filterKeys { it == ownKey || it in dependencyKeys }
-    BwslAstCache.update(filePath, compiled.root, compiled.rawJson, inputs)
+    BwslAstCache.update(filePath, compiled.root, compiled.rawJson, inputs, keepRaw = isOpenInEditor(filePath))
     // Standard modules are embedded in the compiler; fetch their sources so navigation can open them.
     BwslStdlibSources.downloadInBackground(collectStringFields(compiled.rawJson, "sourceUrl"))
     return true

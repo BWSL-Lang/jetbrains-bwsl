@@ -145,59 +145,25 @@ class SourcePositions(private val text: String) {
  * That this index's positions are right is verified by BwslAstIndexTest against real bwslc output;
  * treat that test as the source of truth over this file's doc comments if they ever disagree.
  */
-class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
-    /** Nodes written by the compiled file itself. */
-    val nodesById: Map<String, AstNodePos>
+class BwslAstIndex(root: AstRoot, nodes: IndexedNodes, sourceText: String) {
+    /** Reads the nodes out of [rawJson], the payload [root] was built from. */
+    constructor(root: AstRoot, rawJson: JsonObject, sourceText: String) : this(root, buildIndexedNodes(root, rawJson), sourceText)
 
-    /** Nodes written in another file - positions are relative to their [AstNodePos.sourceFile]. */
-    val externalNodesById: Map<String, AstNodePos>
+    /** Nodes written by the compiled file itself. */
+    val nodesById: Map<String, AstNodePos> = nodes.nodesById
+
+    /** Nodes written in another file - positions are relative to their [AstNodePos.sourceFile]. Only declarations are kept (see [IndexedNodes]). */
+    val externalNodesById: Map<String, AstNodePos> = nodes.externalNodesById
 
     val symbolsById: Map<String, AstSymbol>
     val refsByFrom: Map<String, List<AstReference>>
     val refsByTo: Map<String, List<AstReference>>
 
     /** ASSIGNMENT id -> the id of its target expression (a MEMBER_ACCESS for `output.x = ...`). */
-    private val assignmentTargets: Map<String, String>
+    private val assignmentTargets: Map<String, String> = nodes.assignmentTargets
     private val own = SourcePositions(sourceText)
 
     init {
-        val rootIds = root.roots.toSet()
-        val nodes = LinkedHashMap<String, AstNodePos>()
-        val external = LinkedHashMap<String, AstNodePos>()
-        val targets = HashMap<String, String>()
-
-        for ((key, value) in rawJson.entrySet()) {
-            when (key) {
-                // referenceIndex.symbols reuses the same id namespace as AST nodes (e.g. a module's
-                // symbol entry is also "id": "MODULE:0") but carries no line/column - walking into
-                // it would silently overwrite the real AST node's position with that bare stub.
-                // "root" repeats one of the entries below (the last top-level pipeline), so walking it
-                // would index that pipeline's nodes twice; "roots" is the full list.
-                "referenceIndex", "root" -> {}
-                "modules", "pipelines" -> {
-                    if (!value.isJsonArray) continue
-                    for (entry in value.asJsonArray) {
-                        val obj = entry.takeIf { it.isJsonObject }?.asJsonObject ?: continue
-                        val bucket = LinkedHashMap<String, AstNodePos>()
-                        collectNodes(entry, bucket, targets, file = null, url = null)
-                        if (obj.get("id")?.asStringOrNull() in rootIds) {
-                            val entryFile = obj.get("sourceFile")?.asStringOrNull()
-                            for ((id, node) in bucket) {
-                                if (node.sourceFile == null || node.sourceFile == entryFile) nodes[id] = node
-                                else external[id] = node
-                            }
-                        } else {
-                            external.putAll(bucket)
-                        }
-                    }
-                }
-                else -> collectNodes(value, nodes, targets, file = null, url = null)
-            }
-        }
-        nodesById = nodes
-        externalNodesById = external
-        assignmentTargets = targets
-
         val refIndex = root.referenceIndex
         symbolsById = refIndex?.symbols?.associateBy { it.id } ?: emptyMap()
         refsByFrom = refIndex?.references?.groupBy { it.from } ?: emptyMap()
@@ -235,57 +201,118 @@ class BwslAstIndex(root: AstRoot, rawJson: JsonObject, sourceText: String) {
     fun findTypedDeclarationAtOffset(offset: Int): AstNodePos? =
         nodesById.values
             .firstOrNull { node -> findTypeRangeOf(node)?.let { offset in it } == true }
+}
 
-    private fun collectNodes(
-        element: JsonElement,
-        into: MutableMap<String, AstNodePos>,
-        assignmentTargets: MutableMap<String, String>,
-        file: String?,
-        url: String?
-    ) {
-        when {
-            element.isJsonObject -> {
-                val obj = element.asJsonObject
-                val objFile = obj.get("sourceFile")?.asStringOrNull() ?: file
-                val objUrl = obj.get("sourceUrl")?.asStringOrNull() ?: url
-                val id = obj.get("id")?.asStringOrNull()
-                if (!id.isNullOrEmpty()) {
-                    val kind = obj.get("type")?.asStringOrNull() ?: ""
-                    into[id] = AstNodePos(
-                        id = id,
-                        type = kind,
-                        line = obj.get("line")?.asIntOrNull() ?: 0,
-                        column = obj.get("column")?.asIntOrNull() ?: 0,
-                        name = obj.get("name")?.asStringOrNull(),
-                        member = obj.get("member")?.asStringOrNull(),
-                        writtenName = obj.get("writtenName")?.asStringOrNull(),
-                        nameLine = obj.get("nameLine")?.asIntOrNull(),
-                        nameColumn = obj.get("nameColumn")?.asIntOrNull(),
-                        typeLine = obj.get("typeLine")?.asIntOrNull(),
-                        typeColumn = obj.get("typeColumn")?.asIntOrNull(),
-                        declaredType = obj.get("declaredType")?.asStringOrNull(),
-                        returnTypeLine = obj.get("returnTypeLine")?.asIntOrNull(),
-                        returnTypeColumn = obj.get("returnTypeColumn")?.asIntOrNull(),
-                        returnType = obj.get("returnType")?.asStringOrNull(),
-                        dataType = obj.get("dataType")?.asStringOrNull(),
-                        typeName = obj.get("typeName")?.asStringOrNull(),
-                        endLine = obj.get("endLine")?.asIntOrNull(),
-                        endColumn = obj.get("endColumn")?.asIntOrNull(),
-                        interpolation = obj.get("interpolation")?.asStringOrNull(),
-                        sourceFile = objFile,
-                        sourceUrl = objUrl
-                    )
-                    if (kind == "ASSIGNMENT") {
-                        obj.get("target")?.takeIf { it.isJsonObject }?.asJsonObject
-                            ?.get("id")?.asStringOrNull()?.let { assignmentTargets[id] = it }
+/**
+ * What [BwslAstIndex] reads out of the raw payload of a compile: the id -> position maps of its nodes. These
+ * are kept for every cached file, since Find Usages, Go to Symbol and the resolver need them for files that
+ * are not open, while the raw tree they come from (ten times the size of the JSON) is kept only for open ones.
+ *
+ * [externalNodesById] holds only the declarations of what other files wrote, the nodes a symbol of the reference
+ * index stands for (a function, its parameters, a struct, a field, a constant ...), not a local: nothing looks an imported module's
+ * statements or expressions up, and they are most of what an imported module is.
+ */
+class IndexedNodes(
+    val nodesById: Map<String, AstNodePos>,
+    val externalNodesById: Map<String, AstNodePos>,
+    val assignmentTargets: Map<String, String>
+)
+
+/** The [IndexedNodes] of [rawJson], the payload [root] was built from. */
+fun buildIndexedNodes(root: AstRoot, rawJson: JsonObject): IndexedNodes {
+    val rootIds = root.roots.toSet()
+    val nodes = LinkedHashMap<String, AstNodePos>()
+    val external = LinkedHashMap<String, AstNodePos>()
+    val targets = HashMap<String, String>()
+
+    for ((key, value) in rawJson.entrySet()) {
+        when (key) {
+            // referenceIndex.symbols reuses the same id namespace as AST nodes (e.g. a module's
+            // symbol entry is also "id": "MODULE:0") but carries no line/column - walking into
+            // it would silently overwrite the real AST node's position with that bare stub.
+            // "root" repeats one of the entries below (the last top-level pipeline), so walking it
+            // would index that pipeline's nodes twice; "roots" is the full list.
+            "referenceIndex", "root" -> {}
+            "modules", "pipelines" -> {
+                if (!value.isJsonArray) continue
+                for (entry in value.asJsonArray) {
+                    val obj = entry.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+                    val bucket = LinkedHashMap<String, AstNodePos>()
+                    collectNodes(entry, bucket, targets, file = null, url = null)
+                    if (obj.get("id")?.asStringOrNull() in rootIds) {
+                        val entryFile = obj.get("sourceFile")?.asStringOrNull()
+                        for ((id, node) in bucket) {
+                            if (node.sourceFile == null || node.sourceFile == entryFile) nodes[id] = node
+                            else external[id] = node
+                        }
+                    } else {
+                        external.putAll(bucket)
                     }
                 }
-                for ((_, value) in obj.entrySet()) collectNodes(value, into, assignmentTargets, objFile, objUrl)
             }
-            element.isJsonArray -> {
-                for (item in element.asJsonArray) collectNodes(item, into, assignmentTargets, file, url)
-            }
-            else -> {}
+            else -> collectNodes(value, nodes, targets, file = null, url = null)
         }
+    }
+    val declared = HashSet<String>()
+    for (symbol in root.referenceIndex?.symbols.orEmpty()) {
+        // The locals of a function written in another file are of no interest to this one.
+        if (symbol.kind == "variable" || symbol.kind == "loop-iterator") continue
+        declared += symbol.id
+        if (symbol.declaration.isNotEmpty()) declared += symbol.declaration
+    }
+    external.keys.retainAll(declared)
+    return IndexedNodes(nodes, external, targets)
+}
+
+private fun collectNodes(
+    element: JsonElement,
+    into: MutableMap<String, AstNodePos>,
+    assignmentTargets: MutableMap<String, String>,
+    file: String?,
+    url: String?
+) {
+    when {
+        element.isJsonObject -> {
+            val obj = element.asJsonObject
+            val objFile = obj.get("sourceFile")?.asStringOrNull() ?: file
+            val objUrl = obj.get("sourceUrl")?.asStringOrNull() ?: url
+            val id = obj.get("id")?.asStringOrNull()
+            if (!id.isNullOrEmpty()) {
+                val kind = obj.get("type")?.asStringOrNull() ?: ""
+                into[id] = AstNodePos(
+                    id = id,
+                    type = kind,
+                    line = obj.get("line")?.asIntOrNull() ?: 0,
+                    column = obj.get("column")?.asIntOrNull() ?: 0,
+                    name = obj.get("name")?.asStringOrNull(),
+                    member = obj.get("member")?.asStringOrNull(),
+                    writtenName = obj.get("writtenName")?.asStringOrNull(),
+                    nameLine = obj.get("nameLine")?.asIntOrNull(),
+                    nameColumn = obj.get("nameColumn")?.asIntOrNull(),
+                    typeLine = obj.get("typeLine")?.asIntOrNull(),
+                    typeColumn = obj.get("typeColumn")?.asIntOrNull(),
+                    declaredType = obj.get("declaredType")?.asStringOrNull(),
+                    returnTypeLine = obj.get("returnTypeLine")?.asIntOrNull(),
+                    returnTypeColumn = obj.get("returnTypeColumn")?.asIntOrNull(),
+                    returnType = obj.get("returnType")?.asStringOrNull(),
+                    dataType = obj.get("dataType")?.asStringOrNull(),
+                    typeName = obj.get("typeName")?.asStringOrNull(),
+                    endLine = obj.get("endLine")?.asIntOrNull(),
+                    endColumn = obj.get("endColumn")?.asIntOrNull(),
+                    interpolation = obj.get("interpolation")?.asStringOrNull(),
+                    sourceFile = objFile,
+                    sourceUrl = objUrl
+                )
+                if (kind == "ASSIGNMENT") {
+                    obj.get("target")?.takeIf { it.isJsonObject }?.asJsonObject
+                        ?.get("id")?.asStringOrNull()?.let { assignmentTargets[id] = it }
+                }
+            }
+            for ((_, value) in obj.entrySet()) collectNodes(value, into, assignmentTargets, objFile, objUrl)
+        }
+        element.isJsonArray -> {
+            for (item in element.asJsonArray) collectNodes(item, into, assignmentTargets, file, url)
+        }
+        else -> {}
     }
 }

@@ -25,6 +25,9 @@ import java.io.StringReader
  */
 internal fun parseAstJson(json: String): CompiledAst? {
     val raw = readSharedJson(json) as? JsonObject ?: return null
+    // "root" repeats the last top-level pipeline, which "pipelines" has already (the typed model has no field for it,
+    // and what walks the tree skips it); "roots" lists the entries that are the compiled file's own.
+    raw.remove("root")
     val root = Gson().fromJson(raw, AstRoot::class.java) ?: return null
     return CompiledAst(root, raw)
 }

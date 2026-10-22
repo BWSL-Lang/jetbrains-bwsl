@@ -8,6 +8,22 @@ private const val PROBE_MODULE_PREFIX = "BwslProbe"
 /** A member of a module the file does not import, which can be written as `Module::name` once it is imported. */
 data class ImportableName(val module: String, val name: DeclaredName)
 
+/** The members of one module entry of a payload, as [collectModuleMembers] reads them. */
+data class ModuleMembers(val module: String, val members: List<DeclaredName>)
+
+/**
+ * The members of every module entry in [rawJson] (the modules of the compiled file and the ones it imports), kept
+ * with the cached AST so that the names to import can be offered without the raw tree. The same module in
+ * every file that imports it is one instance.
+ */
+fun collectModuleMembers(rawJson: JsonObject): List<ModuleMembers> =
+    rawJson.getObjectsOrEmpty("modules").mapNotNull { module ->
+        val name = module.getStringOrNull("name") ?: return@mapNotNull null
+        sharedModuleMembers.intern(ModuleMembers(name, describeMembersOfModule(module)))
+    }
+
+private val sharedModuleMembers = com.google.common.collect.Interners.newWeakInterner<ModuleMembers>()
+
 /** Text to put into a file: [text] at [offset]. */
 data class TextInsertion(val offset: Int, val text: String)
 
@@ -21,12 +37,9 @@ data class TextInsertion(val offset: Int, val text: String)
 fun collectImportableNames(excludedModules: Set<String>): List<ImportableName> {
     val found = LinkedHashSet<ImportableName>()
     for (path in BwslAstCache.collectPaths().sorted()) {
-        val root = BwslAstCache.findRoot(path) ?: continue
-        val raw = BwslAstCache.findRawRoot(path) ?: continue
-        for (module in raw.getObjectsOrEmpty("modules")) {
-            val name = module.getStringOrNull("name") ?: continue
-            if (name in excludedModules || name.startsWith(PROBE_MODULE_PREFIX)) continue
-            for (member in describeMembersOfModule(module)) found += ImportableName(name, member)
+        for (module in BwslAstCache.findModuleMembers(path).orEmpty()) {
+            if (module.module in excludedModules || module.module.startsWith(PROBE_MODULE_PREFIX)) continue
+            for (member in module.members) found += ImportableName(module.module, member)
         }
     }
     return found.toList()
