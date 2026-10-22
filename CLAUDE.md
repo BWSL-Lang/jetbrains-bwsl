@@ -99,7 +99,12 @@ is wrapped at 80 characters.
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
   so each file is its own compile. `collectIndexedFiles` is the set: the project's BWSL files plus the
   files *directly inside* each module path (bwslc looks for `<Module>.bwsl` beside the compiled file
-  and in each `-modules` directory, not in their subdirectories), minus `bwsl.json`'s `exclude`.
+  and in each `-modules` directory, not in their subdirectories), minus `bwsl.json`'s `exclude`, and
+  minus the files that cannot be part of a reference across files: with no `module`/`submodule` and no
+  `import`/`using` token (`isCrossFileFile`, read from the tokens and remembered per modification stamp) a file
+  declares nothing another file can name and names nothing in another. A file open in an editor stays in the set,
+  because Find Usages and Rename on a name in it search that file. (A compiler repo's `tests` and `build`
+  directories, with 2,450 `.bwsl` files of which 209 have such a token, once filled the heap.)
   The `BwslProjectIndex` project service compiles the stale ones (up to four at a time) at startup
   (`BwslProjectIndexStartup`) and, debounced, whenever `BwslFileChangeListener` sees a `.bwsl` file or
   `bwsl.json` change. Only files on the local disk are compiled (bwslc needs a real path).

@@ -245,8 +245,12 @@ is exactly the compiler's:
 
 ### Project index
 
-- When a project opens, the plugin compiles every BWSL file in the project and
-  in the module paths, so the compiler's view covers all of them
+- When a project opens, the plugin compiles the BWSL files in the project and
+  in the module paths that can take part in something across files: those that
+  declare a `module` or `submodule`, or have an `import` or `using`. A file
+  with none of these (a stand-alone pipeline) has nothing another file can
+  refer to and refers to nothing in another file, so it is compiled only while
+  it is open in an editor
 - After that it only recompiles what a change affects. Each file's result
   records the files it was built from: itself and the modules it imports.
   Whenever a `.bwsl` file or `bwsl.json` changes, the plugin checks those
