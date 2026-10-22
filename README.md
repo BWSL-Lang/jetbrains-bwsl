@@ -70,6 +70,8 @@ That means the compiler has to be configured (see [Setup](#setup)).
   in `name :: (...)`. It never moves a token to another line or changes one,
   so the program means what it meant; this is checked against all 1,045 files
   in the compiler's own repository
+- A `@bounds(...)` clause is written without spaces around its operators
+  (`>=0`, `x>0`, `-10<y<0`) and is formatted that way
 - Understands braceless bodies: a statement under `if (...)`, `else`, `for`,
   `loop` and the like is indented one level, and an `else` lines up with the
   `if` it belongs to. A body on the same line as its header stays there
@@ -346,6 +348,8 @@ is exactly the compiler's:
   `attributes`/`resources`/`variants`/`pass` in a pipeline,
   `vertex`/`fragment`/`compute` in a pass, statements in function and stage
   bodies
+- **Decorators** after an `@`: `bounds` (with its parentheses), `flat`,
+  `noperspective`, `branch` and `flatten`
 - **Types** and **intrinsics**, in the places they are valid
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type

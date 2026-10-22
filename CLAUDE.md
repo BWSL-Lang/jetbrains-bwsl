@@ -215,7 +215,10 @@ is wrapped at 80 characters.
   line, ends at its `;` or closing `}`, and an `else` after it attaches to the `if` just ended
   (walk outwards, stopping there), which is what puts `else` at its `if`'s level. `spacingBetween`
   has a rule only where the meaning is unambiguous and returns null (leave as is) otherwise: `<`/
-  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. `getChildAttributes`
+  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. Inside the parentheses of an `@bounds(...)` clause (`Leaf.isInsideBoundsClause`) there are no spaces around
+  an operator: it is no expression, and the compiler's docs write `>=0`, `x>0`, `-10<y<0`. `-ast-json` carries no bounds
+  yet, so `@bounds` support is token-based only (the lexer reads `@name` as one DECORATOR; the contributor completes the
+  decorator names, `bounds` with its parentheses). `getChildAttributes`
   (from `indentForNewLine`) is what Enter uses; `BwslTypedHandler` re-indents a typed `}`. Two
   things bit during development and are load-bearing: **block ranges must be read once when the
   model is built** (the formatter edits the tree as it goes, so a node's own range drifts), and the
