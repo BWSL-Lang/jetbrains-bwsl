@@ -410,7 +410,7 @@ is wrapped at 80 characters.
   redesign and then yields null, so the hover falls back to the built-in line. `findDoc` reads the disk
   cache (`<system>/bwsl/intrinsic-docs/<name>.json`, a week) and starts one background fetch per name
   per session when there is no fresh copy; it answers null until the copy is there. `UNDOCUMENTED`
-  (`fmod`, `barrier`, `memoryBarrier`, `storageBarrier`) lists the table's intrinsics with no page,
+  lists the table's intrinsics with no page (none now: the site has one for every intrinsic),
   and `discard` (a keyword here) has one; `BwslDocumentationSiteTest` compares that with the site's
   listing page. Ctrl+click is a
   `gotoDeclarationHandler` returning a `FakePsiElement` (`BwslDocumentationTarget`) whose `navigate`

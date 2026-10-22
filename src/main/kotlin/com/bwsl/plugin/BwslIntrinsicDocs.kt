@@ -32,7 +32,7 @@ object BwslIntrinsicDocs {
      * Intrinsics of the compiler's table that have no page on the site (checked against its listing by
      * `BwslIntrinsicDocsTest`). `discard` is the opposite: a keyword here, a page there, see [isDocumented].
      */
-    internal val UNDOCUMENTED: Set<String> = setOf("fmod", "barrier", "memoryBarrier", "storageBarrier")
+    internal val UNDOCUMENTED: Set<String> = emptySet()
 
     internal var cacheRoot: Path = Path.of(PathManager.getSystemPath(), "bwsl", "intrinsic-docs")
 

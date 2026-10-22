@@ -36,8 +36,8 @@ class BwslIntrinsicNavigationTest : BasePlatformTestCase() {
         assertEquals("https://www.bwsl.dev/docs/intrinsics/lerp", target.url)
     }
 
-    fun testAnIntrinsicWithoutAPageHasNoTarget() {
-        for (name in listOf("fmod", "memoryBarrier")) {
+    fun testANameThatIsNoIntrinsicHasNoTarget() {
+        for (name in listOf("notAnIntrinsic", "alsoNot")) {
             assertNull(name, findTarget(body("${name.take(2)}<caret>${name.drop(2)}(a, b)")))
         }
     }
