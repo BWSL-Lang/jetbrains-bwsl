@@ -67,11 +67,12 @@ class BwslIntrinsicDocsTest : BasePlatformTestCase() {
         assertEquals("asked once, not on every lookup", 1, fetched.size)
     }
 
-    fun testAnIntrinsicWithoutAPageIsNeverAskedFor() {
-        for (name in listOf("fmod", "barrier", "notAnIntrinsic")) assertNull(BwslIntrinsicDocs.findDoc(name))
+    fun testANameThatIsNoIntrinsicIsNeverAskedFor() {
+        for (name in listOf("notAnIntrinsic", "alsoNot")) assertNull(BwslIntrinsicDocs.findDoc(name))
 
         assertTrue(fetched.isEmpty())
-        assertFalse(BwslIntrinsicDocs.isDocumented("storageBarrier"))
+        assertFalse(BwslIntrinsicDocs.isDocumented("notAnIntrinsic"))
+        assertTrue(BwslIntrinsicDocs.isDocumented("storageBarrier"))
         assertTrue(BwslIntrinsicDocs.isDocumented("discard"))
         assertTrue(BwslIntrinsicDocs.isDocumented("fma"))
     }

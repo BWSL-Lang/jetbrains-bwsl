@@ -196,7 +196,11 @@ data class AstRoot(
 
 object BwslAstCache {
     private val roots = ConcurrentHashMap<String, AstRoot>()
+    // The raw tree is ten times the size of the JSON it was read from, so it is kept only for the files open in an
+    // editor (see [update]); everything the other files need from it is in [indexedNodes] and [moduleMembers].
     private val rawRoots = ConcurrentHashMap<String, com.google.gson.JsonObject>()
+    private val indexedNodes = ConcurrentHashMap<String, IndexedNodes>()
+    private val moduleMembers = ConcurrentHashMap<String, List<ModuleMembers>>()
     private val compiledInputs = ConcurrentHashMap<String, Map<String, Int>>()
     private val uncompilableInputs = ConcurrentHashMap<String, Map<String, Int>>()
 
@@ -214,15 +218,26 @@ object BwslAstCache {
      * [inputs] are the files the AST was built from - the compiled file and every file it imported
      * from - as [normalizePathKey] -> [hashText] of the text bwslc read, so [findCompiledInputs]
      * can tell whether any of them has changed since.
+     *
+     * The raw tree is kept only when [keepRaw] says the file is open (for completion, the inspections and the
+     * hints, which read it); what the other features need from it is read out now.
      */
     fun update(
         filePath: String,
         root: AstRoot,
         rawJson: com.google.gson.JsonObject? = null,
-        inputs: Map<String, Int>? = null
+        inputs: Map<String, Int>? = null,
+        keepRaw: Boolean = true
     ) {
         roots[filePath] = root
-        if (rawJson != null) rawRoots[filePath] = rawJson else rawRoots.remove(filePath)
+        if (rawJson != null) {
+            indexedNodes[filePath] = buildIndexedNodes(root, rawJson)
+            moduleMembers[filePath] = collectModuleMembers(rawJson)
+        } else {
+            indexedNodes.remove(filePath)
+            moduleMembers.remove(filePath)
+        }
+        if (rawJson != null && keepRaw) rawRoots[filePath] = rawJson else rawRoots.remove(filePath)
         if (inputs != null) compiledInputs[filePath] = inputs else compiledInputs.remove(filePath)
         uncompilableInputs.remove(filePath)
     }
@@ -246,6 +261,19 @@ object BwslAstCache {
     fun findRawRootForCompletion(filePath: String): com.google.gson.JsonObject? =
         if (liveRoots.containsKey(filePath)) liveRawRoots[filePath] else rawRoots[filePath]
 
+    /** Lets go of the raw tree of [filePath], which is no longer open: what the other features need stays. */
+    fun dropRaw(filePath: String) {
+        rawRoots.remove(filePath)
+        liveRoots.remove(filePath)
+        liveRawRoots.remove(filePath)
+    }
+
+    /** The id -> position maps of the cached AST of [filePath], also when its raw tree is not kept. */
+    fun findIndexedNodes(filePath: String): IndexedNodes? = indexedNodes[filePath]
+
+    /** The members of every module entry of the cached AST of [filePath], also when its raw tree is not kept. */
+    fun findModuleMembers(filePath: String): List<ModuleMembers>? = moduleMembers[filePath]
+
     /** Records that bwslc produced no AST for [filePath] when its candidate inputs were [inputs]. */
     fun recordUncompilable(filePath: String, inputs: Map<String, Int>) {
         uncompilableInputs[filePath] = inputs
@@ -263,6 +291,8 @@ object BwslAstCache {
     internal fun clear() {
         roots.clear()
         rawRoots.clear()
+        indexedNodes.clear()
+        moduleMembers.clear()
         compiledInputs.clear()
         uncompilableInputs.clear()
         liveRoots.clear()

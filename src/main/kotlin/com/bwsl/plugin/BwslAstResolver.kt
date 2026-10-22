@@ -20,13 +20,13 @@ fun resolveSymbolAt(file: PsiFile, index: BwslAstIndex, offset: Int): List<PsiEl
 
 /**
  * Builds the [BwslAstIndex] for [file] from what [BwslAstCache] has cached for it, or null when no
- * AST (or no raw JSON) is cached. Callers must not fall back to lexical resolution in that case.
+ * AST is cached. Callers must not fall back to lexical resolution in that case.
  */
 fun buildAstIndex(file: PsiFile): BwslAstIndex? {
     val path = file.virtualFile?.path ?: return null
     val root = BwslAstCache.findRoot(path) ?: return null
-    val rawRoot = BwslAstCache.findRawRoot(path) ?: return null
-    return BwslAstIndex(root, rawRoot, file.text)
+    val nodes = BwslAstCache.findIndexedNodes(path) ?: return null
+    return BwslAstIndex(root, nodes, file.text)
 }
 
 /**

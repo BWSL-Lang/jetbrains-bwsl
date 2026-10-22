@@ -228,4 +228,47 @@ class BwslProjectIndexTest : BwslAstFixtureTestCase() {
 
         assertFalse(hasCurrentAst(file, filesByKey))
     }
+
+    private val pipelineWithoutImport = """
+        pipeline Alone {
+            attributes { position: float4 }
+            pass "Main" {
+                vertex { output.pos = attributes.position; }
+                fragment { output.color = float4(1.0); }
+            }
+        }
+    """.trimIndent() + "\n"
+
+    fun testAFileWithNoModuleAndNoImportIsLeftOutOfTheIndex() {
+        writeCommonAndUser()
+        writeModuleFile("Alone", pipelineWithoutImport)
+
+        assertEquals(setOf("Common.bwsl", "User.bwsl"), collectNamesToCompile())
+    }
+
+    fun testAPipelineThatImportsAModuleIsIndexed() {
+        writeCommonAndUser()
+        writeModuleFile("Shader", pipelineWithoutImport.replace("pipeline Alone {", "pipeline Shader {\n    import Common"))
+
+        assertTrue(collectNamesToCompile().contains("Shader.bwsl"))
+    }
+
+    fun testAFileOpenInTheEditorIsIndexedEvenWithNoModuleAndNoImport() {
+        val alone = writeModuleFile("Alone", pipelineWithoutImport)
+        assertFalse(collectNamesToCompile().contains("Alone.bwsl"))
+
+        myFixture.configureFromExistingVirtualFile(alone)
+
+        assertTrue(collectNamesToCompile().contains("Alone.bwsl"))
+    }
+
+    fun testTheKeywordsThatMakeAFileCrossFileAreNotFoundInCommentsOrStrings() {
+        assertTrue(hasCrossFileKeyword("module M { }"))
+        assertTrue(hasCrossFileKeyword("submodule S extends M { }"))
+        assertTrue(hasCrossFileKeyword("pipeline P { import M }"))
+        assertTrue(hasCrossFileKeyword("pipeline P { using M }"))
+        assertFalse(hasCrossFileKeyword("// module import using\npipeline P { }"))
+        assertFalse(hasCrossFileKeyword("/* import M */ pipeline P { }"))
+        assertFalse(hasCrossFileKeyword("pipeline P { pass \"import\" { } }"))
+    }
 }

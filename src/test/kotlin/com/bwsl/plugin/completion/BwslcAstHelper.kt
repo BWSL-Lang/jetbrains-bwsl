@@ -23,9 +23,7 @@ object BwslcAstHelper {
         ?: error("System property 'bwslc.path' is not set (expected to be provided by the 'test' Gradle task)")
 
     fun parse(source: String, modules: Map<String, String> = emptyMap()): AstRoot {
-        val json = runBwslc(source, modules)
-        return Gson().fromJson(json, AstRoot::class.java)
-            ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
+        return compile(source, modules).root
     }
 
     /** Builds the [BwslAstIndex] for [source] from real bwslc output; positions are measured against [source]. */
@@ -41,10 +39,17 @@ object BwslcAstHelper {
 
     /** The same bwslc -ast-json output as [parse], parsed generically instead of into the typed model. */
     fun parseRaw(source: String, modules: Map<String, String> = emptyMap()): JsonObject {
-        val json = runBwslc(source, modules)
-        return Gson().fromJson(json, JsonObject::class.java)
-            ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
+        return compile(source, modules).rawJson
     }
+
+    /** What bwslc printed for [source], read the way the plugin reads it. */
+    fun compile(source: String, modules: Map<String, String> = emptyMap()): CompiledAst {
+        val json = compileToJson(source, modules)
+        return parseAstJson(json) ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
+    }
+
+    /** The text bwslc printed for [source]. */
+    fun compileToJson(source: String, modules: Map<String, String> = emptyMap()): String = runBwslc(source, modules)
 
     /**
      * Parses [source] with real bwslc and populates [BwslAstCache] for [filePath] with both the
@@ -53,12 +58,8 @@ object BwslcAstHelper {
      * (including [com.bwsl.plugin.references.BwslAstReference], which needs both).
      */
     fun parseAndCache(source: String, filePath: String, modules: Map<String, String> = emptyMap()) {
-        val json = runBwslc(source, modules)
-        val root = Gson().fromJson(json, AstRoot::class.java)
-            ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
-        val raw = Gson().fromJson(json, JsonObject::class.java)
-            ?: error("bwslc -ast-json returned invalid JSON: ${json.take(200)}")
-        BwslAstCache.update(filePath, root, raw, mapOf(normalizePathKey(filePath) to BwslAstCache.hashText(source)))
+        val compiled = compile(source, modules)
+        BwslAstCache.update(filePath, compiled.root, compiled.rawJson, mapOf(normalizePathKey(filePath) to BwslAstCache.hashText(source)))
     }
 
     private val modulesRoot: File by lazy {

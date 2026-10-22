@@ -39,7 +39,7 @@ internal fun findSymbolDeclaredBy(index: BwslAstIndex, node: AstNodePos): AstSym
 internal fun collectPayloadFiles(project: Project): List<PsiFile> {
     val manager = PsiManager.getInstance(project)
     return collectIndexedFiles(project)
-        .filter { BwslAstCache.findRoot(it.path) != null && BwslAstCache.findRawRoot(it.path) != null }
+        .filter { BwslAstCache.findRoot(it.path) != null && BwslAstCache.findIndexedNodes(it.path) != null }
         .mapNotNull { manager.findFile(it) }
 }
 

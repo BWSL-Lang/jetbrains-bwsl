@@ -70,6 +70,8 @@ That means the compiler has to be configured (see [Setup](#setup)).
   in `name :: (...)`. It never moves a token to another line or changes one,
   so the program means what it meant; this is checked against all 1,045 files
   in the compiler's own repository
+- A `@bounds(...)` clause is written without spaces around its operators
+  (`>=0`, `x>0`, `-10<y<0`) and is formatted that way
 - Understands braceless bodies: a statement under `if (...)`, `else`, `for`,
   `loop` and the like is indented one level, and an `else` lines up with the
   `if` it belongs to. A body on the same line as its header stays there
@@ -113,12 +115,16 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **Compile BWSL File** action (editor context menu, project view, **Tools**
   menu) for files that contain a pipeline, with a configurable output format and
   directory
+- The **BWSL Build** tool window shows, for each compile, the working
+  directory, the exact command line (paste it into a shell to reproduce a
+  failure) and everything the compiler printed. A failed compile opens it, and
+  the error notification has a **Show build output** action
 
 ### Inspections and quick fixes
 
-Read from the compiler's reference index of the last compile, so they show
-while the editor holds the text that was compiled and are off while there are
-unsaved edits.
+Read from the compiler's reference index of the last compile, in the files that
+are open in an editor, so they show while the editor holds the text that was
+compiled and are off while there are unsaved edits.
 
 - **Unused parameter, variable or constant** (greyed out): nothing reads it. A
   name that is only assigned says so. Module-, pipeline- and pass-level
@@ -231,14 +237,20 @@ is exactly the compiler's:
   (`output.uv` / `input.uv`, which have no declaration of their own: the
   vertex stage's first assignment stands in for it)
 - Works from the declaration's name or from any use of it
+- With the caret on a name, the editor marks its declaration and every use of it
+  in the file (also a field used bare inside the struct's methods)
 - Finds usages across every BWSL file in the project and in the module paths,
   including files you have never opened. It waits for any file that is not up to
   date before it searches (see [Project index](#project-index))
 
 ### Project index
 
-- When a project opens, the plugin compiles every BWSL file in the project and
-  in the module paths, so the compiler's view covers all of them
+- When a project opens, the plugin compiles the BWSL files in the project and
+  in the module paths that can take part in something across files: those that
+  declare a `module` or `submodule`, or have an `import` or `using`. A file
+  with none of these (a stand-alone pipeline) has nothing another file can
+  refer to and refers to nothing in another file, so it is compiled only while
+  it is open in an editor
 - After that it only recompiles what a change affects. Each file's result
   records the files it was built from: itself and the modules it imports.
   Whenever a `.bwsl` file or `bwsl.json` changes, the plugin checks those
@@ -340,6 +352,8 @@ is exactly the compiler's:
   `attributes`/`resources`/`variants`/`pass` in a pipeline,
   `vertex`/`fragment`/`compute` in a pass, statements in function and stage
   bodies
+- **Decorators** after an `@`: `bounds` (with its parentheses), `flat`,
+  `noperspective`, `branch` and `flatten`
 - **Types** and **intrinsics**, in the places they are valid
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type
@@ -425,6 +439,10 @@ Aliases and imports are read from the text, so they are current.
 - **Emit debug names** — passes `-debug-names` when compiling, so the SPIR-V
   output keeps the names of variables and functions. Off by default. Only the
   Compile action uses it: the checks in the editor write no output
+- **Write resource bindings** — passes `-bindings` with the GLSL ES / WebGL
+  format, so the resolved resource bindings are written too. On by default
+- **Command preview** — the compiler command the Compile action would run with
+  the settings as they stand in the page, before they are applied
 - **Output directory** — defaults to the source file's directory
 
 ## How it behaves

@@ -75,6 +75,15 @@ private val NAME_TOKENS = TokenSet.create(
 
 private val INTRINSIC_NAMES = BwslIntrinsics.NAMES.sorted()
 
+/** The decorators the compiler knows, with where each is written. */
+private val DECORATORS = listOf(
+    "bounds" to "range of a value: @bounds(>=0, <=1)",
+    "flat" to "no interpolation",
+    "noperspective" to "no perspective correction",
+    "branch" to "before an if: a real branch",
+    "flatten" to "before an if: evaluate both sides"
+)
+
 /**
  * Determines the [BwslBlockContext] surrounding the completion position via the cached bwslc AST.
  * Falls back to [BwslBlockContext.STATEMENT_BODY] (i.e. no restrictions) when no AST is cached,
@@ -245,6 +254,28 @@ private fun collectImportableModuleNames(parameters: CompletionParameters): List
 
 class BwslCompletionContributor : CompletionContributor() {
     init {
+        // After an `@`: the decorator names (the lexer reads `@name` as one token, so this is the one being typed).
+        extend(
+            CompletionType.BASIC,
+            PlatformPatterns.psiElement().withElementType(BwslTokenTypes.DECORATOR),
+            object : CompletionProvider<CompletionParameters>() {
+                override fun addCompletions(parameters: CompletionParameters, context: ProcessingContext, result: CompletionResultSet) {
+                    for ((name, description) in DECORATORS) {
+                        val element = LookupElementBuilder.create(name).bold().withTypeText(description, true)
+                        result.addElement(
+                            if (name != "bounds") element else element.withInsertHandler { insertion, _ ->
+                                val tail = insertion.tailOffset
+                                if (insertion.document.charsSequence.getOrNull(tail) != '(') {
+                                    insertion.document.insertString(tail, "()")
+                                }
+                                insertion.editor.caretModel.moveToOffset(tail + 1)
+                            }
+                        )
+                    }
+                }
+            }
+        )
+
         // Smart completion (Ctrl+Shift+Space): only the values whose type is what the caret expects. When
         // nothing is expected (or it cannot be told) every value with a known type is offered, so it is never empty for no reason.
         extend(

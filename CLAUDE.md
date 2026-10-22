@@ -56,6 +56,11 @@ is wrapped at 80 characters.
   The names that count as intrinsics are `BwslIntrinsics.NAMES`, the same table the hover, parameter info
   and name completion use (the lexer and the completion contributor each had their own, stale, shorter
   list: no `fma`, but `frac` and `inversesqrt`, which BWSL does not have).
+  The lexer has one state (`getState()` is always 0), so the editor's highlighter restarts at the start of the
+  *token* an edit is in. That is why a `/*` with no `*/` is lexed (`UNCLOSED_CMT` in `BwslLexer.flex`) as one
+  `BLOCK_COMMENT` running to the end of the file: as separate `/` and `*` tokens, typing the closing `*/` far below
+  re-lexed only the tokens next to it and the comment colouring appeared only after the file was reopened.
+  `BwslBlockCommentHighlightingTest` checks the editor's own highlighter after each edit.
 - `BwslParserDefinition.kt` — defines `BwslReferenceElement` (an `ASTWrapperPsiElement` override)
   for the `REFERENCE` composite element type. **Critical**: plain `ASTWrapperPsiElement.getReferences()`
   does NOT delegate to `ReferenceProvidersRegistry` by default — `BwslReferenceElement` overrides
@@ -69,8 +74,10 @@ is wrapped at 80 characters.
   an edge in the reference index, so they need no special handling.
 - `BwslAstAnnotator.kt` — an `ExternalAnnotator` that compiles the edited file with
   `compileAndCache` (`BwslAstCompiler.kt`), which runs `bwslc <file> -ast-json -modules <paths...>`,
-  parses the JSON (handles UTF-16 BOM output) into both the typed `AstRoot` and a raw `JsonObject`
-  via Gson, and stores both in `BwslAstCache` together with the files the AST was built from. It shows
+  parses the JSON (handles UTF-16 BOM output) once (`parseAstJson`, `BwslAstJson.kt`) into a raw `JsonObject`
+  whose strings (names, types, ids of up to 64 characters) are shared through a weak interner and whose small
+  integers are `Int`s, then the typed `AstRoot` from that tree (the payloads are mostly repeated strings and small
+  numbers: Gson's own tree took ten times the JSON's size, this one half of that), and stores both in `BwslAstCache` together with the files the AST was built from. It shows
   nothing itself (the compiler's own diagnostics, including its notes about shadowed declarations, come
   from `BwslExternalAnnotator`; the plugin used to detect shadowing itself, until the compiler did).
   **Unsaved text** (`AstCollectedInfo.hasUnsavedChanges`: the document is modified or its hash differs
@@ -86,14 +93,20 @@ is wrapped at 80 characters.
   a copy in the system temp directory (the old way, still used for text with no file) cannot find the
   modules beside the file.
 - The Compile action's command is `buildCompileCommand` (`BwslCompileAction.kt`): output format flag,
-  `-debug-names` when the `emitDebugNames` setting is on, then each `-modules`. The flag only changes what
+  `-debug-names` when the `emitDebugNames` setting is on, `-bindings` when `emitBindings` (on by default) is
+  on and the format is GLSL ES, then each `-modules`. The flag only changes what
   is *written*, so the AST, diagnostics and rename-conflict runs do not pass it.
 - **Project index** (`BwslProjectIndex.kt`, `BwslProjectConfig.kt`, `BwslAstCompiler.kt`). The
   features that search across files (Find Usages, Rename) need an AST for every BWSL file, not only
   the ones opened. `-ast-json` takes exactly one input file (batch and directory inputs are refused),
   so each file is its own compile. `collectIndexedFiles` is the set: the project's BWSL files plus the
   files *directly inside* each module path (bwslc looks for `<Module>.bwsl` beside the compiled file
-  and in each `-modules` directory, not in their subdirectories), minus `bwsl.json`'s `exclude`.
+  and in each `-modules` directory, not in their subdirectories), minus `bwsl.json`'s `exclude`, and
+  minus the files that cannot be part of a reference across files: with no `module`/`submodule` and no
+  `import`/`using` token (`isCrossFileFile`, read from the tokens and remembered per modification stamp) a file
+  declares nothing another file can name and names nothing in another. A file open in an editor stays in the set,
+  because Find Usages and Rename on a name in it search that file. (A compiler repo's `tests` and `build`
+  directories, with 2,450 `.bwsl` files of which 209 have such a token, once filled the heap.)
   The `BwslProjectIndex` project service compiles the stale ones (up to four at a time) at startup
   (`BwslProjectIndexStartup`) and, debounced, whenever `BwslFileChangeListener` sees a `.bwsl` file or
   `bwsl.json` change. Only files on the local disk are compiled (bwslc needs a real path).
@@ -109,8 +122,16 @@ is wrapped at 80 characters.
   plus the config's, and every compile, diagnostic run and the Compile action use it.
 - `BwslAstCache.kt` — data classes mirroring the `bwslc -ast-json` schema (`AstRoot`, `AstModule`,
   `AstStruct`, `AstFunction`, `AstStatement`, `AstBlock`, `AstSymbol`, `AstReference`,
-  `AstReferenceIndex`, ...) plus a cache keyed by file path, storing both the typed root and the
-  raw JSON tree.
+  `AstReferenceIndex`, ...) plus a cache keyed by file path, storing the typed root, `IndexedNodes` (the
+  id -> position maps of `BwslAstIndex`, with only the *declarations* of what other files wrote, not an imported
+  module's statements or locals), `ModuleMembers` (the members of every module entry, for the import
+  suggestions) and, **only for a file open in an editor**, the raw JSON tree (`keepRaw`, decided by
+  `isOpenInEditor` in `compileAndCache`; `BwslEditorCloseListener` drops it when the last editor closes). The
+  raw tree is ten times the size of the JSON, and for an indexed project it once filled the heap, so nothing
+  that works across files may read it: Find Usages, Go to Symbol, the resolver (`buildAstIndex`) and the
+  import suggestions read the other two. Completion, the inspections and the inlay hints read the raw tree, so
+  they work in open files only (a batch inspection of closed files finds nothing). The singular `root` is
+  removed from the tree when it is read: it repeats a pipeline that `pipelines` has.
 - `BwslAstIndex.kt` — a generic id → position index built by walking the *raw* JSON tree (not the
   typed model, which can't practically mirror every node type), plus lookups over the compiler's
   own `referenceIndex` (`symbolsById`/`refsByFrom`/`refsByTo`). `findNameRangeOf` is just a node's
@@ -161,6 +182,13 @@ is wrapped at 80 characters.
   symbol's `definitions` as its declaration (the place the resolver already sends a reference to):
   that makes it a target, and every `output`/`input` edge to the symbol a usage. Limit: a file that
   does not compile has no known usages.
+  **Highlighting at the caret** (the platform's own pass, `HighlightUsagesHandler` in tests) marks the usages through this
+  search and the *declaration* only if the target is a `PsiNamedElement`: it finds the name by comparing
+  `getName()` with the text, which is why `BwslReferenceElement` and the function-name leaf
+  (`BwslFunctionNameLeaf`, made by `BwslAstFactory` registered as `lang.ast.factory`) are named elements
+  (`setName` throws; Rename edits the text itself). `self.field` and `self.method()` count since the compiler (BWSL#123) gives them `member`/`call`
+  edges (and `self` a `type` edge to the struct, which the plugin does not follow: `self` is a keyword token
+  with no reference).
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.
@@ -202,7 +230,10 @@ is wrapped at 80 characters.
   line, ends at its `;` or closing `}`, and an `else` after it attaches to the `if` just ended
   (walk outwards, stopping there), which is what puts `else` at its `if`'s level. `spacingBetween`
   has a rule only where the meaning is unambiguous and returns null (leave as is) otherwise: `<`/
-  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. `getChildAttributes`
+  `>` (comparison or generic), `:`, `?`, `^` (xor or pointer) and signs. Inside the parentheses of an `@bounds(...)` clause (`Leaf.isInsideBoundsClause`) there are no spaces around
+  an operator: it is no expression, and the compiler's docs write `>=0`, `x>0`, `-10<y<0`. `-ast-json` carries no bounds
+  yet, so `@bounds` support is token-based only (the lexer reads `@name` as one DECORATOR; the contributor completes the
+  decorator names, `bounds` with its parentheses). `getChildAttributes`
   (from `indentForNewLine`) is what Enter uses; `BwslTypedHandler` re-indents a typed `}`. Two
   things bit during development and are load-bearing: **block ranges must be read once when the
   model is built** (the formatter edits the tree as it goes, so a node's own range drifts), and the
@@ -212,6 +243,12 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Build output (`BwslBuildOutput.kt`). The Compile action runs `runCompilerProcess` (stdout and stderr merged
+  and read concurrently; a failed start or a timeout is reported in the `CompilerRun`, never thrown) and
+  `BwslBuildConsole` (project service) prints the working directory, `formatCommandLine` of the command, the
+  output and the exit code to the console of the "BWSL Build" tool window; a failure reveals the window and its
+  notification has a "Show build output" action. Only the Compile action is logged, not the editor's own AST and
+  diagnostic runs.
 - Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
   its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
   does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for
@@ -246,7 +283,7 @@ is wrapped at 80 characters.
   trigger accepts every name token (`FUNCTION_CALL`, `MODULE_NAME`, ...), not only `IDENTIFIER`, so
   it also works inside an existing `Mod::name(...)`.
 - Auto-import (`BwslImports.kt`, the contributor). `collectImportableNames` takes the members of
-  **every module entry in every cached AST** (own or imported), minus the modules the file imports
+  **every module entry in every cached AST** (`BwslAstCache.findModuleMembers`, kept for every file) (own or imported), minus the modules the file imports
   (read from the tokens) and the one the caret is in, deduplicated; so it works for project module
   files and module paths as soon as the index has compiled them. The standard modules have no file to
   compile (compiling a copy of `math.bwsl` fails: it redeclares the embedded `Math`), so
@@ -381,7 +418,7 @@ is wrapped at 80 characters.
   redesign and then yields null, so the hover falls back to the built-in line. `findDoc` reads the disk
   cache (`<system>/bwsl/intrinsic-docs/<name>.json`, a week) and starts one background fetch per name
   per session when there is no fresh copy; it answers null until the copy is there. `UNDOCUMENTED`
-  (`fmod`, `barrier`, `memoryBarrier`, `storageBarrier`) lists the table's intrinsics with no page,
+  lists the table's intrinsics with no page (none now: the site has one for every intrinsic),
   and `discard` (a keyword here) has one; `BwslDocumentationSiteTest` compares that with the site's
   listing page. Ctrl+click is a
   `gotoDeclarationHandler` returning a `FakePsiElement` (`BwslDocumentationTarget`) whose `navigate`

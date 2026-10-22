@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -54,11 +55,14 @@ fun readProjectConfig(project: Project): BwslProjectConfig {
 }
 
 /** The directories bwslc searches for modules: the IDE settings' module paths, then the project's `bwsl.json` ones. */
-fun collectModulePaths(project: Project): List<String> {
+fun collectModulePaths(project: Project): List<String> = collectModulePaths(project, BwslSettings.getInstance().modulePaths)
+
+/** The IDE setting's [settingPaths] plus the module paths of the project's `bwsl.json`, without duplicates. */
+fun collectModulePaths(project: Project, settingPaths: List<String>): List<String> {
     val basePath = project.basePath
     val fromConfig = if (basePath == null) emptyList()
     else readProjectConfig(project).modulePaths.map { File(basePath).resolve(it).path }
-    return (BwslSettings.getInstance().modulePaths + fromConfig).distinctBy { normalizePathKey(it) }
+    return (settingPaths + fromConfig).distinctBy { normalizePathKey(it) }
 }
 
 /** [path] in a form that compares equal for the same file: forward slashes, and lower case on a case-insensitive file system. */
@@ -77,11 +81,15 @@ fun isExcludedBy(config: BwslProjectConfig, basePath: String, filePath: String):
 }
 
 /**
- * Every BWSL file the compiler can be asked about: the project's own, and the files directly inside
+ * Every BWSL file the cross-file features need an AST of: the project's own, and the files directly inside
  * each module path (bwslc looks for `<Module>.bwsl` in those directories only, not below them) -
- * minus the ones `bwsl.json` excludes. Find Usages and Rename search exactly these.
+ * minus the ones `bwsl.json` excludes, and minus the files that cannot take part in anything across files:
+ * one that neither declares a module nor imports or uses one (see [isCrossFileFile]) has no declaration
+ * another file can refer to and refers to none in another file, so it is only of interest to itself, and a
+ * file open in an editor is compiled for that. A file that is open stays in the set, since Find Usages and
+ * Rename on a name in it search the file itself. Find Usages and Rename search exactly these.
  */
-internal fun collectIndexedFiles(project: Project): List<VirtualFile> = ReadAction.compute<List<VirtualFile>, RuntimeException> {
+internal fun collectIndexedFiles(project: Project): List<VirtualFile> = ReadAction.computeBlocking<List<VirtualFile>, RuntimeException> {
     val config = readProjectConfig(project)
     val basePath = project.basePath
     val files = LinkedHashMap<String, VirtualFile>()
@@ -94,5 +102,36 @@ internal fun collectIndexedFiles(project: Project): List<VirtualFile> = ReadActi
             if (!file.isDirectory && file.extension == "bwsl") files[normalizePathKey(file.path)] = file
         }
     }
-    files.values.filter { basePath == null || !isExcludedBy(config, basePath, it.path) }
+    val open = FileEditorManager.getInstance(project).openFiles.mapTo(HashSet()) { normalizePathKey(it.path) }
+    files.values.filter {
+        (basePath == null || !isExcludedBy(config, basePath, it.path)) &&
+            (normalizePathKey(it.path) in open || isCrossFileFile(it))
+    }
+}
+
+private val crossFileFiles = ConcurrentHashMap<String, Pair<Long, Boolean>>()
+
+/**
+ * Whether the saved text of [file] declares a module or submodule, or has an `import` or `using`: the only ways
+ * a BWSL file can be part of a reference from or to another file. Read from the tokens, so it needs no
+ * compile, and remembered until the file changes.
+ */
+internal fun isCrossFileFile(file: VirtualFile): Boolean {
+    val cached = crossFileFiles[file.path]
+    if (cached != null && cached.first == file.modificationStamp) return cached.second
+    val result = hasCrossFileKeyword(String(file.contentsToByteArray(), file.charset))
+    crossFileFiles[file.path] = file.modificationStamp to result
+    return result
+}
+
+/** Whether [text] has a `module`, `submodule`, `import` or `using` keyword (not in a comment or a string). */
+internal fun hasCrossFileKeyword(text: String): Boolean {
+    val lexer = BwslLexerAdapter()
+    lexer.start(text, 0, text.length, 0)
+    while (true) {
+        val type = lexer.tokenType ?: return false
+        if (type == BwslTokenTypes.KW_MODULE || type == BwslTokenTypes.KW_SUBMODULE ||
+            type == BwslTokenTypes.KW_IMPORT || type == BwslTokenTypes.KW_USING) return true
+        lexer.advance()
+    }
 }

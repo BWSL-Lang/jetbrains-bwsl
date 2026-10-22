@@ -65,6 +65,26 @@ internal class Leaf(
      */
     val isBinaryArithmetic: Boolean
         get() = type in ARITHMETIC && previousSignificant?.type in OPERAND_ENDS
+
+    /**
+     * Whether this token is inside the parentheses of an `@bounds(...)` clause, which is written without
+     * spaces around its operators (`>=0`, `x>0`, `-10<y<0`): a clause is no expression, so the operator rules
+     * for `<`, `>`, `-` do not apply to it.
+     */
+    val isInsideBoundsClause: Boolean
+        get() {
+            var depth = 0
+            var leaf = previousSignificant
+            while (leaf != null) {
+                when (leaf.type) {
+                    BwslTokenTypes.RPAREN -> depth++
+                    BwslTokenTypes.LPAREN -> if (depth == 0) return leaf.previousSignificant?.let { it.type == BwslTokenTypes.DECORATOR && it.node.text == "@bounds" } == true else depth--
+                    BwslTokenTypes.SEMI, BwslTokenTypes.LBRACE, BwslTokenTypes.RBRACE -> return false
+                }
+                leaf = leaf.previousSignificant
+            }
+            return false
+        }
 }
 
 /** Every token of [file] in order, whitespace left out, and the composites around some of them looked through. */
@@ -418,6 +438,8 @@ internal fun spacingBetween(
         return one
     }
 
+    if (a == BwslTokenTypes.DECORATOR && b == BwslTokenTypes.LPAREN) return none
+    if (second.isInsideBoundsClause) return none
     if (a in SPACED_OPERATORS || b in SPACED_OPERATORS) return one
     if (first.isBinaryArithmetic || second.isBinaryArithmetic) return one
 

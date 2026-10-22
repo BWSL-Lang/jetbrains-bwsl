@@ -24,6 +24,9 @@
 
         <notificationGroup id="BWSL Compiler" displayType="BALLOON" isLogByDefault="true"/>
 
+        <toolWindow id="BWSL Build" anchor="bottom" canCloseContents="false"
+                    factoryClass="com.bwsl.plugin.BwslBuildToolWindowFactory"/>
+
         <applicationService
             serviceImplementation="com.bwsl.plugin.BwslSettings"/>
 
@@ -42,6 +45,10 @@
 
         <fileIconProvider
             implementation="com.bwsl.plugin.BwslFileIconProvider"/>
+
+        <lang.ast.factory
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslAstFactory"/>
 
         <lang.parserDefinition
             language="BWSL"
@@ -223,6 +230,8 @@
     </extensions>
 
     <applicationListeners>
+        <listener class="com.bwsl.plugin.BwslEditorCloseListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
         <listener class="com.bwsl.plugin.BwslFileChangeListener"
                   topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>

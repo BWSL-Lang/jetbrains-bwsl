@@ -52,11 +52,11 @@ fun collectProjectSymbols(project: Project): List<BwslSymbolEntry> {
     val entries = ArrayList<BwslSymbolEntry>()
     for (file in FileTypeIndex.getFiles(BwslFileType, GlobalSearchScope.projectScope(project))) {
         val root = BwslAstCache.findRoot(file.path) ?: continue
-        val raw = BwslAstCache.findRawRoot(file.path) ?: continue
+        val nodes = BwslAstCache.findIndexedNodes(file.path) ?: continue
         val compiled = BwslAstCache.findCompiledInputs(file.path)?.get(normalizePathKey(file.path)) ?: continue
         val text = FileDocumentManager.getInstance().getDocument(file)?.text ?: continue
         if (BwslAstCache.hashText(text) != compiled) continue
-        val index = BwslAstIndex(root, raw, text)
+        val index = BwslAstIndex(root, nodes, text)
         val positions = SourcePositions(text)
         for (symbol in index.symbolsById.values) {
             val kind = KINDS[symbol.kind] ?: continue
