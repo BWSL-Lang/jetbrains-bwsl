@@ -19,6 +19,8 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
         var emitDebugNames: Boolean = false,
         /** Whether the compile action passes `-bindings` with the GLSL ES target, which writes the resolved resource bindings. */
         var emitBindings: Boolean = true,
+        /** What a compiler download fetches: a [BwslCompilerChannel] name, the latest release by default. */
+        var compilerChannel: String = BwslCompilerChannel.RELEASE.name,
         var checkForCompilerUpdates: Boolean = true,
         /** When the newest release was last asked for, in epoch milliseconds. */
         var lastCompilerUpdateCheck: Long = 0,
@@ -54,6 +56,10 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
     var emitBindings: Boolean
         get() = state.emitBindings
         set(value) { state.emitBindings = value }
+
+    var compilerChannel: BwslCompilerChannel
+        get() = BwslCompilerChannel.findByName(state.compilerChannel) ?: BwslCompilerChannel.RELEASE
+        set(value) { state.compilerChannel = value.name }
 
     var checkForCompilerUpdates: Boolean
         get() = state.checkForCompilerUpdates

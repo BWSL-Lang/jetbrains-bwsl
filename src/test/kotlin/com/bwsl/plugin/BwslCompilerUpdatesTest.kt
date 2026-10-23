@@ -37,7 +37,8 @@ class BwslCompilerUpdatesTest : BasePlatformTestCase() {
         val version = readCompilerVersion(path)
 
         assertNotNull("bwslc -h prints its version", version)
-        assertTrue("a version, got: $version", version!!.matches(Regex("\\d+\\.\\d+\\.\\d+.*")))
+        // A release (0.9.0), a local build (0.0.0-dev) or the published dev build (dev-20261022-6e6e612).
+        assertTrue("a version, got: $version", version!!.matches(Regex("\\d+\\.\\d+\\.\\d+.*|dev-\\d{8}-[0-9a-f]+")))
     }
 
     fun testACompilerThatCannotBeRunHasNoVersion() {
@@ -56,6 +57,7 @@ class BwslCompilerUpdatesTest : BasePlatformTestCase() {
 
     fun testADevelopmentBuildOrAnythingThatIsNotAVersionIsNeverOutOfDate() {
         assertFalse(isNewerVersion("0.0.0-dev", "v0.9.0"))
+        assertFalse(isNewerVersion("dev-20261022-6e6e612", "v0.9.0"))
         assertFalse(isNewerVersion("0.0.0", "v0.9.0"))
         assertFalse(isNewerVersion("0.9.0-rc1", "v0.9.0"))
         assertFalse(isNewerVersion("0.8.0", "latest"))
@@ -107,6 +109,7 @@ class BwslCompilerUpdatesTest : BasePlatformTestCase() {
     fun testWhatIsSaidWhenNothingIsNewer() {
         assertTrue(describeNoUpdate("0.9.0").contains("0.9.0 is the latest release"))
         assertTrue(describeNoUpdate("0.0.0-dev").contains("development build"))
+        assertTrue(describeNoUpdate("dev-20261022-6e6e612").contains("development build"))
         assertTrue(describeNoUpdate(null).contains("could not be read"))
     }
 

@@ -251,7 +251,8 @@ is wrapped at 80 characters.
   diagnostic runs.
 - Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
   its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
-  does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for
+  does not exist). A development build says `0.0.0-dev` (the published dev build `dev-<date>-<commit>`,
+  e.g. `dev-20261022-6e6e612`), and `parseReleaseVersion` returns null for
   that, a pre-release or anything non-numeric, so such a compiler is never "out of date".
   `BwslCompilerDownloader.findLatestReleaseTag` reads GitHub's `releases/latest`; `decideUpdate`
   offers a newer tag unless it is the one in `skippedCompilerVersion`. The check runs in the
@@ -259,6 +260,12 @@ is wrapped at 80 characters.
   (`checkForCompilerUpdates`), and **Tools → Check for BWSL Compiler Update** asks at once and also
   offers a skipped version. **Update** downloads to the plugin's install path and sets it as the
   compiler path. The version reader and tag lookup are injectable for tests.
+  `compilerChannel` (a `BwslCompilerChannel`, the settings page's **Download** combo) picks what
+  **Download…** fetches: the latest release through the `releases/latest` API (release asset names
+  end in the version), or the dev build at its stable URL
+  `releases/download/dev/bwslc-<platform>-<arch>[.exe]`. With the dev channel there is no release
+  update check. The Gradle `fetchBwslCompiler` task, which supplies the tests' compiler (also in
+  CI), takes the dev build unless `-PbwslcChannel=release`.
 - Standard-library sources (`BwslStdlibSources.kt`). The compiler embeds its standard modules: the
   AST gives them `sourceFile` `stdlib://modules/<file>.bwsl` and a `sourceUrl`
   (`https://github.com/<owner>/<repo>/blob/<ref>/modules/<file>`, `<ref>` the release tag, or

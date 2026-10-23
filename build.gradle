@@ -74,6 +74,13 @@ sourceSets {
     }
 }
 
+// A Kotlin warning (a deprecated API above all) fails the build: nothing reads the compiler's warnings in a green run.
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors = true
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     dependsOn generateLexer
 }
@@ -82,6 +89,9 @@ compileKotlin {
     dependsOn generateLexer
 }
 
+// The compiler the tests run against: the newest dev build of the compiler's master branch, which
+// the compiler repository publishes at stable URLs. -PbwslcChannel=release takes the latest release
+// instead; -Pbwslc=<path> uses a local compiler and skips the download.
 tasks.register('fetchBwslCompiler', JavaExec) {
     def osName = System.getProperty('os.name').toLowerCase()
     def extension = osName.contains('win') ? '.exe' : ''
@@ -93,7 +103,7 @@ tasks.register('fetchBwslCompiler', JavaExec) {
 
     classpath = sourceSets.main.runtimeClasspath + configurations.compileClasspath
     mainClass = 'com.bwsl.plugin.BwslCompilerDownloaderKt'
-    args = [outputFile.absolutePath]
+    args = [outputFile.absolutePath, findProperty('bwslcChannel') ?: 'dev']
 }
 
 test {
