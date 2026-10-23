@@ -23,12 +23,11 @@ request); the plugin repository is where work happens by default.
 ## Build / test
 
 ```powershell
-$env:JAVA_HOME = [Environment]::GetEnvironmentVariable("JAVA_HOME","User")
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ./gradlew.bat test --no-configuration-cache --rerun-tasks
 ```
-JAVA_HOME (`C:\Users\lundis\.jdks\corretto-21.0.9`) is set persistently at User level but is **not**
-inherited by fresh shell sessions started by tools — always export it first.
+The IDE runs on Java 25, and so does the build: `build.gradle` asks Gradle for a Java 25 toolchain (found in `~/.jdks`)
+for compiling and testing, and `JAVA_HOME` (the JetBrains Runtime 25) runs Gradle itself. Run the command as it is,
+without setting `JAVA_HOME` first.
 
 **Deprecated and internal API.** Any Kotlin warning (a deprecated API first among them) fails `compileKotlin`
 (`allWarningsAsErrors`), so a green `test` has none. What the Kotlin compiler cannot see - a platform method the plugin

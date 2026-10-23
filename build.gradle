@@ -9,6 +9,13 @@ plugins {
     id 'org.jetbrains.intellij.platform.grammarkit' version '2.19.0'
 }
 
+// The IDE runs on Java 25, so the plugin is compiled, tested and run on it.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
 group = 'com.bwsl.jetbrains_plugin'
 version = providers.gradleProperty('pluginVersion').get()
 
