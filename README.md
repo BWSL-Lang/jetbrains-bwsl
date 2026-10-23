@@ -553,8 +553,9 @@ file to test.
 
 `--rerun-tasks` is required: without it Gradle often skips the tests. The tests
 run the real `bwslc` compiler. By default Gradle downloads the latest dev
-build into `build/bwslc` (once; delete it to get a newer one), as CI does;
-`-PbwslcChannel=release` takes the latest release instead. To use your own
+build into `build/bwslc/dev` (once; delete it to get a newer one), as CI does;
+`-PbwslcChannel=release` takes the latest release instead, into
+`build/bwslc/release`. To use your own
 build, set `bwslc=<path to bwslc>` in the gitignored `local.properties` (for
 example `bwslc=C:/path/to/bwslc.exe`).
 

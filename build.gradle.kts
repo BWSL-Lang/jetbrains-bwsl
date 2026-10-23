@@ -122,12 +122,16 @@ tasks.compileKotlin {
 }
 
 val bwslcFileName = "bwslc" + if (System.getProperty("os.name").lowercase().contains("win")) ".exe" else ""
+val bwslcChannel = (findProperty("bwslcChannel") ?: "dev").toString()
+// One directory per channel: a compiler already downloaded is kept (the task skips when it exists), so a dev build
+// must not stand in for a release one.
+val bwslcFile = layout.buildDirectory.dir("bwslc/$bwslcChannel").get().asFile.resolve(bwslcFileName)
 
 // The compiler the tests run against: the newest dev build of the compiler's master branch, which
 // the compiler repository publishes at stable URLs. -PbwslcChannel=release takes the latest release
 // instead; -Pbwslc=<path> uses a local compiler and skips the download.
 val fetchBwslCompiler = tasks.register<JavaExec>("fetchBwslCompiler") {
-    val outputFile = layout.buildDirectory.dir("bwslc").get().asFile.resolve(bwslcFileName)
+    val outputFile = bwslcFile
 
     dependsOn("classes")
     outputs.file(outputFile)
@@ -135,7 +139,7 @@ val fetchBwslCompiler = tasks.register<JavaExec>("fetchBwslCompiler") {
 
     classpath = sourceSets.main.get().runtimeClasspath + configurations.compileClasspath.get()
     mainClass = "com.bwsl.plugin.BwslCompilerDownloaderKt"
-    args = listOf(outputFile.absolutePath, (findProperty("bwslcChannel") ?: "dev").toString())
+    args = listOf(outputFile.absolutePath, bwslcChannel)
 }
 
 tasks.test {
@@ -144,7 +148,7 @@ tasks.test {
         systemProperty("bwslc.path", overridePath)
     } else {
         dependsOn(fetchBwslCompiler)
-        systemProperty("bwslc.path", layout.buildDirectory.dir("bwslc").get().asFile.resolve(bwslcFileName).absolutePath)
+        systemProperty("bwslc.path", bwslcFile.absolutePath)
     }
     useJUnitPlatform()
     testLogging {
