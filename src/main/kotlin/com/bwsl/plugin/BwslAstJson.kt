@@ -8,6 +8,7 @@ import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
 import com.google.gson.JsonSyntaxException
+import com.google.gson.Strictness
 import com.google.gson.internal.LazilyParsedNumber
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonToken
@@ -46,7 +47,7 @@ private const val MAX_SHARED_LENGTH = 64
 internal fun readSharedJson(json: String): JsonElement? {
     if (json.isBlank()) return null
     val reader = JsonReader(StringReader(json))
-    reader.isLenient = true
+    reader.strictness = Strictness.LENIENT
     try {
         return readElement(reader)
     } catch (e: IOException) {
