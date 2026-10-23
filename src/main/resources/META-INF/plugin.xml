@@ -14,9 +14,8 @@
 
     <idea-version since-build="262"/>
 
-    <depends>com.intellij.modules.platform</depends>
-
     <dependencies>
+        <plugin id="com.intellij.modules.platform"/>
         <module name="intellij.spellchecker"/>
     </dependencies>
 
