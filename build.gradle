@@ -1,4 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 
 plugins {
     id 'java'
@@ -34,6 +36,7 @@ dependencies {
         testBundledPlugin('tanvd.grazi')
         testFramework(TestFrameworkType.JUnit5.INSTANCE)
         testFramework(TestFrameworkType.Platform.INSTANCE)
+        pluginVerifier()
     }
 
     testCompileOnly 'org.junit.jupiter:junit-jupiter-api:6.1.3'
@@ -48,6 +51,28 @@ intellijPlatform {
             sinceBuild = '262'
         }
         changeNotes = 'Initial version'
+    }
+    // The Plugin Verifier checks the plugin against the IDEs its build range covers. It takes minutes, so `check` does not
+    // run it: only CI does (`check verifyPlugin`). Its default failure levels (compatibility problems, internal and
+    // override-only API) plus the deprecated API, which it does not fail on by default, and a plugin that is invalid, has a
+    // missing dependency or a descriptor warning.
+    //noinspection GroovyAssignabilityCheck
+    pluginVerification {
+        failureLevel = [
+            VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
+            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
+            VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES,
+            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
+            VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
+            VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
+            VerifyPluginTask.FailureLevel.PLUGIN_STRUCTURE_WARNINGS,
+            // The rest, which do not fail it:
+            // VerifyPluginTask.FailureLevel.COMPATIBILITY_WARNINGS,
+            // VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
+            // VerifyPluginTask.FailureLevel.NON_EXTENDABLE_API_USAGES,
+            // VerifyPluginTask.FailureLevel.NOT_DYNAMIC
+        ]
     }
     //noinspection GroovyAssignabilityCheck
     publishing {
@@ -78,6 +103,9 @@ sourceSets {
 kotlin {
     compilerOptions {
         allWarningsAsErrors = true
+        // Kotlin otherwise copies the default methods of the platform's interfaces into every class that implements one, and
+        // the Plugin Verifier then reports the deprecated ones among them as overridden.
+        jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
     }
 }
 

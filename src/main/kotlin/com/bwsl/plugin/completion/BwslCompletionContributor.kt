@@ -389,7 +389,7 @@ class BwslCompletionContributor : CompletionContributor() {
                     // After a `.`: what the value before it has - a struct's fields and methods, a vector's
                     // swizzles, an array's length - when its type can be worked out.
                     val isAfterDot = previousLeaf?.elementType == BwslTokenTypes.DOT
-                    if (isAfterDot && previousLeaf != null) {
+                    if (isAfterDot) {
                         findCompletionAst(parameters)?.let { ast ->
                             val aliases = collectImportDeclarationsOf(parameters.originalFile)
                                 .mapNotNull { import -> import.alias?.let { it to import.module } }.toMap()

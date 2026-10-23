@@ -30,6 +30,16 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 JAVA_HOME (`C:\Users\lundis\.jdks\corretto-21.0.9`) is set persistently at User level but is **not**
 inherited by fresh shell sessions started by tools — always export it first.
 
+**Deprecated and internal API.** Any Kotlin warning (a deprecated API first among them) fails `compileKotlin`
+(`allWarningsAsErrors`), so a green `test` has none. What the Kotlin compiler cannot see - a platform method the plugin
+overrides or calls that is deprecated, scheduled for removal, internal or override-only in the IDE the plugin is built
+for - is found by the Plugin Verifier (`verifyPlugin`, against the IDEs the plugin's build range covers; it fails on the
+default levels - compatibility problems, internal and override-only API - and on deprecated and scheduled-for-removal
+API (which the plugin does not fail on by itself), an invalid plugin, a missing dependency and a descriptor warning; the IDE download and the analysis take minutes). **Do not run it locally**: `check` does not, to stay quick, and CI runs
+`check verifyPlugin` on every PR, which is where those findings are caught. Kotlin must compile with
+`jvmDefault = NO_COMPATIBILITY`, or it copies the platform interfaces' deprecated default methods into the plugin's
+classes and the verifier reports them as overridden.
+
 **`--rerun-tasks` is required, not optional.** Gradle's up-to-date checks are unreliable in this
 project (most likely the IntelliJ Platform Gradle Plugin's sandbox-install step not correctly
 tracking its inputs) - without `--rerun-tasks`, `./gradlew test` frequently reports `BUILD
