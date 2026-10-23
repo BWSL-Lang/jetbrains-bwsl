@@ -12,7 +12,7 @@
         Adds a context button to compile the current file.
     </description>
 
-    <idea-version since-build="241"/>
+    <idea-version since-build="262"/>
 
     <depends>com.intellij.modules.platform</depends>
 
