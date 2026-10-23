@@ -25,7 +25,7 @@ request); the plugin repository is where work happens by default.
 ```powershell
 ./gradlew.bat test --no-configuration-cache --rerun-tasks
 ```
-The IDE runs on Java 25, and so does the build: `build.gradle` asks Gradle for a Java 25 toolchain (found in `~/.jdks`)
+The IDE runs on Java 25, and so does the build: `build.gradle.kts` asks Gradle for a Java 25 toolchain (found in `~/.jdks`)
 for compiling and testing, and `JAVA_HOME` (the JetBrains Runtime 25) runs Gradle itself. Run the command as it is,
 without setting `JAVA_HOME` first.
 

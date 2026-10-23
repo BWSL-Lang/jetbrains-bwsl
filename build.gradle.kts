@@ -1,12 +1,13 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+import java.util.Properties
 
 plugins {
-    id 'java'
-    id 'org.jetbrains.kotlin.jvm' version '2.4.21'
-    id 'org.jetbrains.intellij.platform' version '2.19.0'
-    id 'org.jetbrains.intellij.platform.grammarkit' version '2.19.0'
+    java
+    id("org.jetbrains.kotlin.jvm") version "2.4.21"
+    id("org.jetbrains.intellij.platform") version "2.19.0"
+    id("org.jetbrains.intellij.platform.grammarkit") version "2.19.0"
 }
 
 // The IDE runs on Java 25, so the plugin is compiled, tested and run on it.
@@ -16,15 +17,15 @@ java {
     }
 }
 
-group = 'com.bwsl.jetbrains_plugin'
-version = providers.gradleProperty('pluginVersion').get()
+group = "com.bwsl.jetbrains_plugin"
+version = providers.gradleProperty("pluginVersion").get()
 
 // Local, gitignored overrides for gradle.properties (e.g. bwslc=C:/path/to/bwslc.exe)
-def localPropertiesFile = rootProject.file('local.properties')
+val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
-    def localProperties = new Properties()
-    localPropertiesFile.withInputStream { localProperties.load(it) }
-    localProperties.each { key, value -> project.ext.set(key as String, value) }
+    val localProperties = Properties()
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+    localProperties.forEach { key, value -> extra.set(key as String, value) }
 }
 
 repositories {
@@ -36,36 +37,33 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdea('2026.2')
-        bundledPlugin('intellij.libraries.misc.plugin')
-        bundledModule('intellij.spellchecker')
+        intellijIdea("2026.2")
+        bundledPlugin("intellij.libraries.misc.plugin")
+        bundledModule("intellij.spellchecker")
         // The typo inspection lives in the Natural Languages plugin (bundled in the IDEs); only the tests need it.
-        testBundledPlugin('tanvd.grazi')
-        testFramework(TestFrameworkType.JUnit5.INSTANCE)
-        testFramework(TestFrameworkType.Platform.INSTANCE)
+        testBundledPlugin("tanvd.grazi")
+        testFramework(TestFrameworkType.JUnit5)
+        testFramework(TestFrameworkType.Platform)
         pluginVerifier()
     }
 
-    testCompileOnly 'org.junit.jupiter:junit-jupiter-api:6.1.3'
-    testImplementation 'junit:junit:4.13.2'
+    testCompileOnly("org.junit.jupiter:junit-jupiter-api:6.1.3")
+    testImplementation("junit:junit:4.13.2")
 }
 
-
 intellijPlatform {
-    //noinspection GroovyAssignabilityCheck
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = '262'
+            sinceBuild = "262"
         }
-        changeNotes = 'Initial version'
+        changeNotes = "Initial version"
     }
     // The Plugin Verifier checks the plugin against the IDEs its build range covers. It takes minutes, so `check` does not
     // run it: only CI does (`check verifyPlugin`). Its default failure levels (compatibility problems, internal and
     // override-only API) plus the deprecated API, which it does not fail on by default, and a plugin that is invalid, has a
     // missing dependency or a descriptor warning.
-    //noinspection GroovyAssignabilityCheck
     pluginVerification {
-        failureLevel = [
+        failureLevel = listOf(
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
             VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
@@ -78,12 +76,11 @@ intellijPlatform {
             // VerifyPluginTask.FailureLevel.COMPATIBILITY_WARNINGS,
             // VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
             // VerifyPluginTask.FailureLevel.NON_EXTENDABLE_API_USAGES,
-            // VerifyPluginTask.FailureLevel.NOT_DYNAMIC
-        ]
+            // VerifyPluginTask.FailureLevel.NOT_DYNAMIC,
+        )
     }
-    //noinspection GroovyAssignabilityCheck
     publishing {
-        channels = [providers.gradleProperty('pluginChannels').getOrElse('alpha')]
+        channels = listOf(providers.gradleProperty("pluginChannels").getOrElse("alpha"))
         // token can be given in two ways:
         // export ORG_GRADLE_PROJECT_intellijPlatformPublishingToken='YOUR_TOKEN'
         // gradle flag -PintellijPlatformPublishingToken=YOUR_TOKEN
@@ -91,17 +88,17 @@ intellijPlatform {
     }
 }
 
-generateLexer {
-    sourceFile = file('src/main/resources/BwslLexer.flex')
-    targetOutputDir = layout.projectDirectory.dir('generated/com/bwsl/plugin')
-    pathToClass = 'generated/com/bwsl/plugin/_BwslLexer.java'
+tasks.generateLexer {
+    sourceFile = file("src/main/resources/BwslLexer.flex")
+    // The lexer is written under its package, generated/com/bwsl/plugin/_BwslLexer.java.
+    targetRootOutputDir = layout.projectDirectory.dir("generated")
     purgeOldFiles = true
 }
 
 sourceSets {
     main {
         java {
-            srcDir 'generated'
+            srcDir("generated")
         }
     }
 }
@@ -116,40 +113,38 @@ kotlin {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    dependsOn generateLexer
+tasks.withType<JavaCompile>().configureEach {
+    dependsOn(tasks.generateLexer)
 }
 
-compileKotlin {
-    dependsOn generateLexer
+tasks.compileKotlin {
+    dependsOn(tasks.generateLexer)
 }
+
+val bwslcFileName = "bwslc" + if (System.getProperty("os.name").lowercase().contains("win")) ".exe" else ""
 
 // The compiler the tests run against: the newest dev build of the compiler's master branch, which
 // the compiler repository publishes at stable URLs. -PbwslcChannel=release takes the latest release
 // instead; -Pbwslc=<path> uses a local compiler and skips the download.
-tasks.register('fetchBwslCompiler', JavaExec) {
-    def osName = System.getProperty('os.name').toLowerCase()
-    def extension = osName.contains('win') ? '.exe' : ''
-    def outputFile = new File(layout.buildDirectory.dir('bwslc').get().asFile, "bwslc$extension")
+val fetchBwslCompiler = tasks.register<JavaExec>("fetchBwslCompiler") {
+    val outputFile = layout.buildDirectory.dir("bwslc").get().asFile.resolve(bwslcFileName)
 
-    dependsOn 'classes'
+    dependsOn("classes")
     outputs.file(outputFile)
     onlyIf { !outputFile.exists() }
 
-    classpath = sourceSets.main.runtimeClasspath + configurations.compileClasspath
-    mainClass = 'com.bwsl.plugin.BwslCompilerDownloaderKt'
-    args = [outputFile.absolutePath, findProperty('bwslcChannel') ?: 'dev']
+    classpath = sourceSets.main.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass = "com.bwsl.plugin.BwslCompilerDownloaderKt"
+    args = listOf(outputFile.absolutePath, (findProperty("bwslcChannel") ?: "dev").toString())
 }
 
-test {
-    def osName = System.getProperty('os.name').toLowerCase()
-    def extension = osName.contains('win') ? '.exe' : ''
-    def overridePath = findProperty('bwslc')
-    if (overridePath) {
-        systemProperty 'bwslc.path', overridePath
+tasks.test {
+    val overridePath = findProperty("bwslc")
+    if (overridePath != null) {
+        systemProperty("bwslc.path", overridePath)
     } else {
-        dependsOn fetchBwslCompiler
-        systemProperty 'bwslc.path', new File(layout.buildDirectory.dir('bwslc').get().asFile, "bwslc${extension}").absolutePath
+        dependsOn(fetchBwslCompiler)
+        systemProperty("bwslc.path", layout.buildDirectory.dir("bwslc").get().asFile.resolve(bwslcFileName).absolutePath)
     }
     useJUnitPlatform()
     testLogging {
@@ -160,9 +155,9 @@ test {
     // immutable transform cache, so it must not be written to directly (newer Gradle versions
     // detect the tampering and refuse to reuse the cache entry, breaking subsequent builds).
     // idea.log.config.file lets us point the platform at our copy instead.
-    systemProperty 'idea.log.config.file', layout.projectDirectory.file('src/test/resources/test-log.properties').asFile.absolutePath
+    systemProperty("idea.log.config.file", layout.projectDirectory.file("src/test/resources/test-log.properties").asFile.absolutePath)
 }
 
-buildSearchableOptions {
+tasks.buildSearchableOptions {
     enabled = false
 }
