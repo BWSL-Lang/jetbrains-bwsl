@@ -424,15 +424,19 @@ Aliases and imports are read from the text, so they are current.
 
 **Settings → BWSL**
 
-- **Compiler path**, with a **Download Latest…** button that fetches the right
-  `bwslc` for your OS and architecture from the BWSL GitHub releases
+- **Compiler path** — the `bwslc` the plugin runs
+- **Download** — **Latest release** or **Latest dev build**, and a
+  **Download…** button that fetches that `bwslc` for your OS and architecture
+  from GitHub and makes it the compiler path. The dev build is the newest build
+  of the compiler's master branch
 - **Check for a newer compiler release on startup** — on by default. When a
   project opens (at most once a day, in the background) the plugin asks GitHub
   for the newest `bwslc` release and compares it with your compiler's version.
   If yours is older, a notification offers **Update** (downloads it, makes it
-  the compiler path) or **Skip this version**. A development build (`0.0.0-dev`)
-  is not compared and never nagged. **Tools → Check for BWSL Compiler Update**
-  asks right away and says what it found
+  the compiler path) or **Skip this version**. A development build (`0.0.0-dev`,
+  or `dev-<date>-<commit>` for the dev build) is not compared and never nagged,
+  and with **Latest dev build** chosen there is no check. **Tools → Check for
+  BWSL Compiler Update** asks right away and says what it found
 - **Module paths** — the directories passed to `bwslc` as `-modules`
 - **Output format** — SPIR-V, all formats, Metal, HLSL, GLSL 450 or GLSL ES /
   WebGL
@@ -509,8 +513,9 @@ Not implemented yet:
 
 After installing the plugin, point it at the compiler:
 
-**Settings → BWSL → Compiler path** — select the `bwslc` executable, or press
-**Download Latest…** to fetch one.
+**Settings → BWSL → Compiler path** — select the `bwslc` executable, or choose
+a release or the dev build under **Download** and press **Download…** to fetch
+one.
 
 Add any directories you import modules from under **Module paths**, or list them
 in a `bwsl.json` in the project root (see [Project index](#project-index)).
@@ -547,9 +552,12 @@ file to test.
 ```
 
 `--rerun-tasks` is required: without it Gradle often skips the tests. The tests
-run the real `bwslc` compiler. By default Gradle downloads one into
-`build/bwslc`; to use your own build, set `bwslc=<path to bwslc>` in the
-gitignored `local.properties` (for example `bwslc=C:/path/to/bwslc.exe`).
+run the real `bwslc` compiler. By default Gradle downloads the latest dev
+build into `build/bwslc/dev` (once; delete it to get a newer one), as CI does;
+`-PbwslcChannel=release` takes the latest release instead, into
+`build/bwslc/release`. To use your own
+build, set `bwslc=<path to bwslc>` in the gitignored `local.properties` (for
+example `bwslc=C:/path/to/bwslc.exe`).
 
 ## Code generation
 

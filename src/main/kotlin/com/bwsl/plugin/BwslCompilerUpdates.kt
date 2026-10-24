@@ -24,9 +24,11 @@ data class CompilerUpdateOffer(val currentVersion: String, val latestVersion: St
 
 /**
  * Notices a newer `bwslc` release and offers to install it. The compiler's version is what its
- * banner says (`bwslc -h`); a development build says `0.0.0-dev`, which is not comparable to a
+ * banner says (`bwslc -h`); a development build says `0.0.0-dev`, or `dev-<date>-<commit>` for the
+ * published dev build, which is not comparable to a
  * release, so it is never nagged. The newest release is asked of GitHub at most once a day, in the
- * background, and a version the user skipped is not offered again.
+ * background, and a version the user skipped is not offered again. With the dev build chosen as the
+ * download channel, releases are not offered at all.
  */
 object BwslCompilerUpdates {
 
@@ -52,11 +54,13 @@ object BwslCompilerUpdates {
 
     /**
      * Checks in the background, once a session and at most once a day, and says so if a newer release
-     * exists. Does nothing when checking is turned off or no compiler is configured.
+     * exists. Does nothing when checking is turned off, the dev build is the chosen channel, or no
+     * compiler is configured.
      */
     fun checkInBackground(project: Project) {
         val settings = BwslSettings.getInstance()
-        if (!settings.checkForCompilerUpdates || !isCheckDue(settings.lastCompilerUpdateCheck, System.currentTimeMillis())) return
+        if (!settings.checkForCompilerUpdates || settings.compilerChannel == BwslCompilerChannel.DEV) return
+        if (!isCheckDue(settings.lastCompilerUpdateCheck, System.currentTimeMillis())) return
         if (!checkedThisSession.compareAndSet(false, true)) return
         ApplicationManager.getApplication().executeOnPooledThread { runCheck(project, announceNothing = false) }
     }
@@ -73,6 +77,10 @@ object BwslCompilerUpdates {
             return
         }
         val settings = BwslSettings.getInstance()
+        if (settings.compilerChannel == BwslCompilerChannel.DEV) {
+            if (announceNothing) notify(project, describeDevChannelCheck(), NotificationType.INFORMATION)
+            return
+        }
         // An explicit check also offers a version the user skipped.
         val offer = findOffer(compilerPath, if (announceNothing) "" else settings.skippedCompilerVersion)
         settings.lastCompilerUpdateCheck = System.currentTimeMillis()
@@ -100,12 +108,12 @@ object BwslCompilerUpdates {
         }
     }
 
-    /** Downloads the latest release and makes it the configured compiler. */
+    /** Downloads the latest release (what was offered, whatever the download channel) and makes it the configured compiler. */
     private fun install(project: Project, offer: CompilerUpdateOffer) {
         object : Task.Backgroundable(project, "Downloading BWSL compiler ${offer.latestVersion}", false) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    val installed = BwslCompilerDownloader.downloadLatest()
+                    val installed = BwslCompilerDownloader.downloadLatest(BwslCompilerChannel.RELEASE)
                     BwslSettings.getInstance().compilerPath = installed.toString()
                     notify(project, "bwslc ${offer.latestVersion} is installed at $installed and is now the compiler.", NotificationType.INFORMATION)
                 } catch (e: Exception) {
@@ -132,6 +140,11 @@ internal fun describeNoUpdate(version: String?): String = when {
     else -> "bwslc $version is the latest release."
 }
 
+/** What to say when an explicit check is asked for while the dev build is the chosen download channel. */
+internal fun describeDevChannelCheck(): String =
+    "The dev build is the chosen download channel, and dev builds are not compared with releases. " +
+        "Download the newest under Settings → BWSL."
+
 /** Asks the compiler for its version: `Compiler v <version>` in the banner `bwslc -h` prints. */
 internal fun readCompilerVersion(compilerPath: String): String? =
     try {
@@ -154,7 +167,7 @@ internal fun parseCompilerVersion(bannerText: String): String? = BANNER_VERSION.
 
 /**
  * The numbers of a release version (`v0.9.0` or `0.9.0` -> [0, 9, 0]), or null for anything else: a
- * development build (`0.0.0-dev`), a pre-release, or text that is not a version.
+ * development build (`0.0.0-dev`, `dev-20261022-6e6e612`), a pre-release, or text that is not a version.
  */
 internal fun parseReleaseVersion(version: String): List<Int>? {
     val numbers = version.removePrefix("v").split('.')

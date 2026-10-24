@@ -23,12 +23,21 @@ request); the plugin repository is where work happens by default.
 ## Build / test
 
 ```powershell
-$env:JAVA_HOME = [Environment]::GetEnvironmentVariable("JAVA_HOME","User")
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ./gradlew.bat test --no-configuration-cache --rerun-tasks
 ```
-JAVA_HOME (`C:\Users\lundis\.jdks\corretto-21.0.9`) is set persistently at User level but is **not**
-inherited by fresh shell sessions started by tools — always export it first.
+The IDE runs on Java 25, and so does the build: `build.gradle.kts` asks Gradle for a Java 25 toolchain (found in `~/.jdks`)
+for compiling and testing, and `JAVA_HOME` (the JetBrains Runtime 25) runs Gradle itself. Run the command as it is,
+without setting `JAVA_HOME` first.
+
+**Deprecated and internal API.** Any Kotlin warning (a deprecated API first among them) fails `compileKotlin`
+(`allWarningsAsErrors`), so a green `test` has none. What the Kotlin compiler cannot see - a platform method the plugin
+overrides or calls that is deprecated, scheduled for removal, internal or override-only in the IDE the plugin is built
+for - is found by the Plugin Verifier (`verifyPlugin`, against the IDEs the plugin's build range covers; it fails on the
+default levels - compatibility problems, internal and override-only API - and on deprecated and scheduled-for-removal
+API (which the plugin does not fail on by itself), an invalid plugin, a missing dependency and a descriptor warning; the IDE download and the analysis take minutes). **Do not run it locally**: `check` does not, to stay quick, and CI runs
+`check verifyPlugin` on every PR, which is where those findings are caught. Kotlin must compile with
+`jvmDefault = NO_COMPATIBILITY`, or it copies the platform interfaces' deprecated default methods into the plugin's
+classes and the verifier reports them as overridden.
 
 **`--rerun-tasks` is required, not optional.** Gradle's up-to-date checks are unreliable in this
 project (most likely the IntelliJ Platform Gradle Plugin's sandbox-install step not correctly
@@ -251,7 +260,8 @@ is wrapped at 80 characters.
   diagnostic runs.
 - Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
   its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
-  does not exist). A development build says `0.0.0-dev`, and `parseReleaseVersion` returns null for
+  does not exist). A development build says `0.0.0-dev` (the published dev build `dev-<date>-<commit>`,
+  e.g. `dev-20261022-6e6e612`), and `parseReleaseVersion` returns null for
   that, a pre-release or anything non-numeric, so such a compiler is never "out of date".
   `BwslCompilerDownloader.findLatestReleaseTag` reads GitHub's `releases/latest`; `decideUpdate`
   offers a newer tag unless it is the one in `skippedCompilerVersion`. The check runs in the
@@ -259,6 +269,12 @@ is wrapped at 80 characters.
   (`checkForCompilerUpdates`), and **Tools → Check for BWSL Compiler Update** asks at once and also
   offers a skipped version. **Update** downloads to the plugin's install path and sets it as the
   compiler path. The version reader and tag lookup are injectable for tests.
+  `compilerChannel` (a `BwslCompilerChannel`, the settings page's **Download** combo) picks what
+  **Download…** fetches: the latest release through the `releases/latest` API (release asset names
+  end in the version), or the dev build at its stable URL
+  `releases/download/dev/bwslc-<platform>-<arch>[.exe]`. With the dev channel there is no release
+  update check. The Gradle `fetchBwslCompiler` task, which supplies the tests' compiler (also in
+  CI), takes the dev build unless `-PbwslcChannel=release`.
 - Standard-library sources (`BwslStdlibSources.kt`). The compiler embeds its standard modules: the
   AST gives them `sourceFile` `stdlib://modules/<file>.bwsl` and a `sourceUrl`
   (`https://github.com/<owner>/<repo>/blob/<ref>/modules/<file>`, `<ref>` the release tag, or

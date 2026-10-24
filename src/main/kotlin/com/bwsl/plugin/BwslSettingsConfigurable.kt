@@ -12,9 +12,11 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.toNullableProperty
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import javax.swing.DefaultListModel
 import javax.swing.JComponent
@@ -99,10 +101,16 @@ class BwslSettingsConfigurable : Configurable {
                 field.component.textField.document.addDocumentListener(object : DocumentAdapter() {
                     override fun textChanged(e: DocumentEvent) = refreshPreview()
                 })
-                button("Download Latest...") {
+            }
+            row("Download:") {
+                val channelCombo = comboBox(BwslCompilerChannel.entries, textListCellRenderer("") { it.displayName })
+                    .bindItem(settings::compilerChannel.toNullableProperty())
+                button("Download...") {
+                    // The channel shown, even before Apply.
+                    val channel = channelCombo.component.selectedItem as? BwslCompilerChannel ?: BwslCompilerChannel.RELEASE
                     val installed = try {
                         ProgressManager.getInstance().runProcessWithProgressSynchronously<java.nio.file.Path, Exception>(
-                            { BwslCompilerDownloader.downloadLatest() },
+                            { BwslCompilerDownloader.downloadLatest(channel) },
                             "Downloading BWSL Compiler",
                             true,
                             project
@@ -111,9 +119,10 @@ class BwslSettingsConfigurable : Configurable {
                         Messages.showErrorDialog(project, "Failed to download bwslc: ${e.message}", "BWSL")
                         return@button
                     }
-                    field.component.text = installed.toString()
+                    compilerField?.text = installed.toString()
                 }
-            }
+            }.rowComment("Downloads bwslc for this machine and sets it as the compiler path. The dev build is the newest " +
+                "build of the compiler's master branch; update checks only compare releases.")
             row {
                 checkBox("Check for a newer compiler release on startup")
                     .bindSelected(settings::checkForCompilerUpdates)
