@@ -20,6 +20,28 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - **File icons** — `.bwsl` files get one icon for pipeline files and another for
   module files
 
+### Live templates
+
+Type the abbreviation and press Tab; Tab moves between the fields to fill in.
+Each is offered only where it fits, and is indented to where it is typed.
+
+| Abbreviation | Where | Expands to |
+|---|---|---|
+| `mod` | top level | `module Name { }` |
+| `pipe` | top level | a pipeline with an attribute and a pass with a vertex and a fragment stage |
+| `pass` | in a pipeline | a pass with a vertex and a fragment stage |
+| `fn` | in a module, pipeline, pass or struct | `name :: (float x) -> float { return x; }` |
+| `fori` | in a body | `for (int i = 0; i < count; i++) { }` |
+| `forr` | in a body | `for (i in 0..count) { }` |
+| `fore` | in a body | `for (item in values) { }` |
+| `forxy` | in a body | `foreach (x in 0..width, y in 0..height) { }` |
+| `loopn` | in a body | `loop (count) { }` |
+| `loopu` | in a body | `loop { } until (done);` |
+| `wh` | in a body | `while (condition) { }` |
+
+They are under Settings | Editor | Live Templates | BWSL, where they can be
+changed or added to.
+
 ### Extend Selection and Smart Enter
 
 - **Extend Selection** (Ctrl+W, and Ctrl+Shift+W to shrink) grows from the
@@ -522,10 +544,6 @@ Aliases and imports are read from the text, so they are current.
 ## Roadmap
 
 Not implemented yet:
-
-**Refactoring and editing**
-- [ ] Live templates and snippets for common shapes (`pipeline`, `pass`,
-      functions, loops)
 
 **Code insight**
 - [ ] Ctrl+click on `@centroid` to its documentation, once the site documents

@@ -526,6 +526,14 @@ is wrapped at 80 characters.
   whose id equals the info string (`CodeFenceLanguageGuesser`), so the plugin registers nothing for it. The tests add
   `testBundledPlugin("org.intellij.plugins.markdown")` (`BwslMarkdownFenceTest`); the plugin does not depend on it. The
   external annotators (compile, diagnostics) do not run on an injected fragment.
+- Live templates (`BwslLiveTemplates.kt`, `liveTemplates/BWSL.xml`, `defaultLiveTemplates` + `liveTemplateContext` in plugin.xml):
+  contexts `BWSL` and, under it, `BWSL_TOP_LEVEL` (`mod`, `pipe`), `BWSL_PIPELINE` (`pass`), `BWSL_DECLARATION` (`fn`: module,
+  pipeline, pass and struct bodies) and `BWSL_STATEMENT` (the loops). `findTemplateScope` reads the tokens: the innermost
+  open `{` and the first token of the statement it ends (`module`/`pipeline`/`pass`/`struct`; an entry-list keyword such as
+  `attributes` is no scope; anything else, a function signature or a stage, is a body; a block in a body is a body); none
+  inside a comment (a line comment includes its end) or a string. Templates are `toReformat`, so the formatter indents
+  them. `BwslLiveTemplatesTest` expands each one with its defaults and compiles the result with bwslc (`fn` has a
+  `return` because a non-void function without one is an error).
 - Editor support that needs only tokens (`BwslEditing.kt`, `BwslFolding.kt`): `BwslCommenter`
   (`//`, `/* */`), `BwslBraceMatcher` (`{}` structural, `()` and `[]`; `<`/`>` deliberately not a
   pair, and a closing bracket is only auto-inserted before whitespace, a comment, the end or

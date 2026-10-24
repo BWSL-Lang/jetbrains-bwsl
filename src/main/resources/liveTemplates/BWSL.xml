@@ -1,0 +1,80 @@
+<templateSet group="BWSL">
+  <template name="mod" value="module $NAME$ {&#10;    $END$&#10;}" description="module" toReformat="true" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_TOP_LEVEL" value="true" />
+    </context>
+  </template>
+  <template name="pipe" value="pipeline $NAME$ {&#10;    attributes {&#10;        position: float4&#10;    }&#10;&#10;    pass &quot;$PASS$&quot; {&#10;        use attributes { position }&#10;        outputs { color: float4 }&#10;&#10;        vertex {&#10;            output.position = attributes.position;&#10;        }&#10;&#10;        fragment {&#10;            output.color = float4(1.0);$END$&#10;        }&#10;    }&#10;}" description="pipeline with a vertex and fragment pass" toReformat="true" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Name&quot;" alwaysStopAt="true" />
+    <variable name="PASS" expression="" defaultValue="&quot;Main&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_TOP_LEVEL" value="true" />
+    </context>
+  </template>
+  <template name="pass" value="pass &quot;$NAME$&quot; {&#10;    use attributes { $ATTRIBUTES$ }&#10;    outputs { color: float4 }&#10;&#10;    vertex {&#10;        $END$&#10;    }&#10;&#10;    fragment {&#10;        output.color = float4(1.0);&#10;    }&#10;}" description="pass with a vertex and fragment stage" toReformat="true" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;Main&quot;" alwaysStopAt="true" />
+    <variable name="ATTRIBUTES" expression="" defaultValue="&quot;position&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_PIPELINE" value="true" />
+    </context>
+  </template>
+  <template name="fn" value="$NAME$ :: ($PARAMETERS$) -&gt; $TYPE$ {&#10;    $END$&#10;    return $RESULT$;&#10;}" description="function" toReformat="true" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true" />
+    <variable name="PARAMETERS" expression="" defaultValue="&quot;float x&quot;" alwaysStopAt="true" />
+    <variable name="TYPE" expression="" defaultValue="&quot;float&quot;" alwaysStopAt="true" />
+    <variable name="RESULT" expression="" defaultValue="&quot;x&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_DECLARATION" value="true" />
+    </context>
+  </template>
+  <template name="fori" value="for (int $I$ = 0; $I$ &lt; $COUNT$; $I$++) {&#10;    $END$&#10;}" description="for loop with an index" toReformat="true" toShortenFQNames="false">
+    <variable name="I" expression="" defaultValue="&quot;i&quot;" alwaysStopAt="true" />
+    <variable name="COUNT" expression="" defaultValue="&quot;count&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="forr" value="for ($I$ in $FROM$..$TO$) {&#10;    $END$&#10;}" description="for loop over a range" toReformat="true" toShortenFQNames="false">
+    <variable name="I" expression="" defaultValue="&quot;i&quot;" alwaysStopAt="true" />
+    <variable name="FROM" expression="" defaultValue="&quot;0&quot;" alwaysStopAt="true" />
+    <variable name="TO" expression="" defaultValue="&quot;count&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="fore" value="for ($ITEM$ in $VALUES$) {&#10;    $END$&#10;}" description="for loop over the elements of an array" toReformat="true" toShortenFQNames="false">
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true" />
+    <variable name="VALUES" expression="" defaultValue="&quot;values&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="forxy" value="foreach ($X$ in 0..$WIDTH$, $Y$ in 0..$HEIGHT$) {&#10;    $END$&#10;}" description="foreach over two ranges" toReformat="true" toShortenFQNames="false">
+    <variable name="X" expression="" defaultValue="&quot;x&quot;" alwaysStopAt="true" />
+    <variable name="WIDTH" expression="" defaultValue="&quot;width&quot;" alwaysStopAt="true" />
+    <variable name="Y" expression="" defaultValue="&quot;y&quot;" alwaysStopAt="true" />
+    <variable name="HEIGHT" expression="" defaultValue="&quot;height&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="loopn" value="loop ($COUNT$) {&#10;    $END$&#10;}" description="loop a number of times" toReformat="true" toShortenFQNames="false">
+    <variable name="COUNT" expression="" defaultValue="&quot;count&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="loopu" value="loop {&#10;    $END$&#10;} until ($CONDITION$);" description="loop until a condition holds" toReformat="true" toShortenFQNames="false">
+    <variable name="CONDITION" expression="" defaultValue="&quot;done&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+  <template name="wh" value="while ($CONDITION$) {&#10;    $END$&#10;}" description="while loop" toReformat="true" toShortenFQNames="false">
+    <variable name="CONDITION" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true" />
+    <context>
+      <option name="BWSL_STATEMENT" value="true" />
+    </context>
+  </template>
+</templateSet>

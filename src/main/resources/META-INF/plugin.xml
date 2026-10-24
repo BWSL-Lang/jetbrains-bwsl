@@ -109,6 +109,13 @@
 
         <fileEditorProvider implementation="com.bwsl.plugin.BwslSplitEditorProvider"/>
 
+        <defaultLiveTemplates file="/liveTemplates/BWSL.xml"/>
+        <liveTemplateContext contextId="BWSL" implementation="com.bwsl.plugin.BwslAnyTemplateContext"/>
+        <liveTemplateContext contextId="BWSL_TOP_LEVEL" baseContextId="BWSL" implementation="com.bwsl.plugin.BwslTopLevelTemplateContext"/>
+        <liveTemplateContext contextId="BWSL_PIPELINE" baseContextId="BWSL" implementation="com.bwsl.plugin.BwslPipelineTemplateContext"/>
+        <liveTemplateContext contextId="BWSL_DECLARATION" baseContextId="BWSL" implementation="com.bwsl.plugin.BwslDeclarationTemplateContext"/>
+        <liveTemplateContext contextId="BWSL_STATEMENT" baseContextId="BWSL" implementation="com.bwsl.plugin.BwslStatementTemplateContext"/>
+
         <callHierarchyProvider
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslCallHierarchyProvider"/>
