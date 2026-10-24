@@ -1,5 +1,6 @@
 package com.bwsl.plugin
 
+import com.intellij.execution.filters.OpenFileHyperlinkInfo
 import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.execution.ui.ConsoleViewContentType
@@ -10,6 +11,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.ToolWindowManager
@@ -67,12 +69,66 @@ fun runCompilerProcess(command: List<String>, workingDirectory: String, timeoutS
     return CompilerRun(command, workingDirectory, output.get(), process.exitValue(), elapsed())
 }
 
+/** A file the compiler's output names for an error: where in the output the path is, and the error's 1-based line and column. */
+data class OutputLocation(val range: IntRange, val path: String, val line: Int, val column: Int)
+
+private val ERROR_POSITION = Regex("""at line (\d+), column (\d+)""")
+private val ERROR_FILE = Regex("""File: (.*\S)""")
+
+/**
+ * The locations of the errors in the compiler's [output], whose report of one reads `┌─ Error[…] at line 2, column 47`
+ * and on the next line `│ File: C:\…\shader.bwsl`: each `File:` path that follows a line and column.
+ */
+fun collectOutputLocations(output: String): List<OutputLocation> {
+    val locations = ArrayList<OutputLocation>()
+    var position: Pair<Int, Int>? = null
+    var lineStart = 0
+    for (line in output.split('\n')) {
+        val at = ERROR_POSITION.find(line)
+        val file = ERROR_FILE.find(line)
+        if (at != null) {
+            position = at.groupValues[1].toInt() to at.groupValues[2].toInt()
+        } else if (file != null && position != null) {
+            val path = file.groups[1]!!
+            locations += OutputLocation((lineStart + path.range.first)..(lineStart + path.range.last), path.value, position.first, position.second)
+            position = null
+        }
+        lineStart += line.length + 1
+    }
+    return locations
+}
+
 /** The first line of the compiler's output that says something, for a notification; the rest is in the build output. */
 fun summariseFailure(run: CompilerRun): String = when {
     run.startFailure != null -> "Failed to start the compiler: ${run.startFailure}"
     run.didTimeOut -> "The compiler did not finish in time."
     else -> run.output.lineSequence().map { it.trim() }.firstOrNull { it.contains("Error", ignoreCase = true) || it.contains("error") }
         ?: "Compilation failed (exit ${run.exitCode})."
+}
+
+/**
+ * Prints [run] into [console], after what is there: where and what was run, what it printed (the file each error names
+ * as a link to the error's line and column in it), and how it ended.
+ */
+internal fun printRun(console: ConsoleView, project: Project, run: CompilerRun) {
+    if (console.contentSize > 0) console.print("\n", ConsoleViewContentType.NORMAL_OUTPUT)
+    console.print("Working directory: ${run.workingDirectory}\n", ConsoleViewContentType.SYSTEM_OUTPUT)
+    console.print("$ ${formatCommandLine(run.command)}\n", ConsoleViewContentType.SYSTEM_OUTPUT)
+    if (run.output.isNotBlank()) {
+        val output = run.output.trimEnd() + "\n"
+        val type = if (run.isSuccess) ConsoleViewContentType.NORMAL_OUTPUT else ConsoleViewContentType.ERROR_OUTPUT
+        var printed = 0
+        for (location in collectOutputLocations(output)) {
+            val path = File(location.path).let { if (it.isAbsolute) it else File(run.workingDirectory, location.path) }
+            val file = LocalFileSystem.getInstance().findFileByIoFile(path) ?: continue
+            console.print(output.substring(printed, location.range.first), type)
+            console.printHyperlink(output.substring(location.range), OpenFileHyperlinkInfo(project, file, location.line - 1, location.column - 1))
+            printed = location.range.last + 1
+        }
+        console.print(output.substring(printed), type)
+    }
+    val ending = describeRun(run.copy(output = "")).lines().last { it.isNotBlank() }
+    console.print(ending + "\n", if (run.isSuccess) ConsoleViewContentType.SYSTEM_OUTPUT else ConsoleViewContentType.ERROR_OUTPUT)
 }
 
 /** The text of the build output for [run]: what was run and where, what it printed, and how it ended. */
@@ -104,14 +160,7 @@ class BwslBuildConsole(private val project: Project) : Disposable {
     fun show(run: CompilerRun, reveal: Boolean) {
         ApplicationManager.getApplication().invokeLater {
             if (project.isDisposed) return@invokeLater
-            if (console.contentSize > 0) console.print("\n", ConsoleViewContentType.NORMAL_OUTPUT)
-            console.print("Working directory: ${run.workingDirectory}\n", ConsoleViewContentType.SYSTEM_OUTPUT)
-            console.print("$ ${formatCommandLine(run.command)}\n", ConsoleViewContentType.SYSTEM_OUTPUT)
-            if (run.output.isNotBlank()) {
-                console.print(run.output.trimEnd() + "\n", if (run.isSuccess) ConsoleViewContentType.NORMAL_OUTPUT else ConsoleViewContentType.ERROR_OUTPUT)
-            }
-            val ending = describeRun(run.copy(output = "")).lines().last { it.isNotBlank() }
-            console.print(ending + "\n", if (run.isSuccess) ConsoleViewContentType.SYSTEM_OUTPUT else ConsoleViewContentType.ERROR_OUTPUT)
+            printRun(console, project, run)
             if (reveal) reveal()
         }
     }

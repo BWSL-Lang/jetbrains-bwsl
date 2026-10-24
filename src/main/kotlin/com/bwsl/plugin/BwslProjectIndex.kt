@@ -1,6 +1,7 @@
 package com.bwsl.plugin
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
@@ -79,6 +80,11 @@ class BwslProjectIndex(private val project: Project) : Disposable {
 
     private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
 
+    init {
+        // A compiler path or module path set in the settings changes what every file compiles to.
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(BwslSettingsListener.TOPIC, BwslSettingsListener { scheduleRefresh(0) })
+    }
+
     /** Refreshes the index in the background after [delayMillis]; a request made meanwhile replaces this one. */
     fun scheduleRefresh(delayMillis: Int = 1000) {
         alarm.cancelAllRequests()
@@ -87,6 +93,8 @@ class BwslProjectIndex(private val project: Project) : Disposable {
                 object : Task.Backgroundable(project, "Checking BWSL files", true) {
                     override fun run(indicator: ProgressIndicator) {
                         refreshNow(indicator, includeStandardModules = true)
+                        // The compiler's errors in the indexed files, for the Problems view, follow the same changes.
+                        BwslProjectProblems.getInstance(project).refreshNow()
                     }
                 }.queue()
             }

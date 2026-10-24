@@ -125,7 +125,13 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - The **BWSL Build** tool window shows, for each compile, the working
   directory, the exact command line (paste it into a shell to reproduce a
   failure) and everything the compiler printed. A failed compile opens it, and
-  the error notification has a **Show build output** action
+  the error notification has a **Show build output** action. The file each
+  error names is a link to the error's line and column
+- The **Problems** tool window lists the errors of the open file (its **File**
+  tab), and its **Project Errors** tab the compiler's errors in every indexed
+  file, opened or not (see [Project index](#project-index): the module files,
+  the files that import a module, and the open ones). They are checked in one
+  compiler run whenever the index is refreshed, from the saved files
 
 ### Compiled output preview
 
@@ -522,7 +528,6 @@ Not implemented yet:
       functions, loops)
 
 **Code insight**
-- [ ] Unresolved-reference highlighting
 - [ ] Ctrl+click on `@centroid` to its documentation, once the site documents
       it
 
@@ -531,7 +536,6 @@ Not implemented yet:
       inspections and the hints too (completion and the diagnostics already do)
 - [ ] Completion while a syntax error is open (needs a partial AST from the
       compiler on parse errors)
-- [ ] Problems tool window entries and compiler output with clickable locations
 - [ ] Run configurations and compile-on-save
 - [ ] Per-project compiler path (module paths can already be set per project in
       `bwsl.json`)

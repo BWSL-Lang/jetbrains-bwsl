@@ -1,6 +1,10 @@
 package com.bwsl.plugin
 
+import com.intellij.execution.filters.OpenFileHyperlinkInfo
+import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.impl.ConsoleViewImpl
+import com.intellij.execution.impl.EditorHyperlinkSupport
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -102,5 +106,46 @@ class BwslBuildOutputTest : BasePlatformTestCase() {
         assertTrue(text, text.contains("all good"))
         assertTrue(text, text.contains("Error: broken"))
         assertTrue(text, text.contains("Finished with exit code 1 in 34 ms"))
+    }
+    private val twoErrors = "pipeline P {\n    helper :: (float x) -> float { return x * scale; }\n    attributes { position: float4 }\n    pass \"Main\" {\n        use attributes { position }\n        outputs { color: float4 }\n        vertex { output.position = attributes.position; }\n        fragment { output.color = float4(helpr(1.0)); }\n    }\n}\n"
+
+    fun testEachErrorsFileIsALocationWithItsLineAndColumn() {
+        val source = writeSource(twoErrors)
+        val run = runCompilerProcess(buildCompileCommand(compiler, source.path, BwslOutputFormat.SPIRV_ONLY, false, emptyList()), directory.path)
+
+        val locations = collectOutputLocations(run.output)
+
+        assertEquals(listOf(2 to 47, 8 to 42), locations.map { it.line to it.column })
+        for (location in locations) {
+            assertEquals(source.path, location.path)
+            assertEquals("the range is the path in the output", source.path, run.output.substring(location.range))
+        }
+    }
+
+    fun testAFileNameWithoutALineBeforeItIsNoLocation() {
+        assertEquals(emptyList<OutputLocation>(), collectOutputLocations("  | File: C:/a.bwsl\nDone\n"))
+    }
+
+    fun testTheConsoleLinksEachErrorToItsLineInTheFile() {
+        val source = writeSource(twoErrors)
+        val run = runCompilerProcess(buildCompileCommand(compiler, source.path, BwslOutputFormat.SPIRV_ONLY, false, emptyList()), directory.path)
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(source)
+        // A console of its own: the project's build console is shared by the tests, and another one disposes it.
+        val console = TextConsoleBuilderFactory.getInstance().createBuilder(project).console as ConsoleViewImpl
+        console.component
+
+        printRun(console, project, run)
+        console.flushDeferredText()
+        try {
+            val text = console.text
+            val hyperlinks = console.getHyperlinks()!!
+            val links = hyperlinks.getAllHyperlinks(0, text.length).map { text.substring(it.startOffset, it.endOffset) to EditorHyperlinkSupport.getHyperlinkInfo(it) }
+
+            assertEquals(listOf(source.path, source.path), links.map { it.first })
+            val first = links.first().second as OpenFileHyperlinkInfo
+            assertEquals("the link opens the file at the error", twoErrors.indexOf("scale;"), first.descriptor!!.offset)
+        } finally {
+            com.intellij.openapi.util.Disposer.dispose(console)
+        }
     }
 }

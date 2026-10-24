@@ -286,6 +286,14 @@ is wrapped at 80 characters.
   output and the exit code to the console of the "BWSL Build" tool window; a failure reveals the window and its
   notification has a "Show build output" action. Only the Compile action is logged, not the editor's own AST and
   diagnostic runs.
+- Project errors (`BwslProjectProblems.kt`): after every refresh of the project index (and so on settings changes too,
+  which `BwslProjectIndex` follows through `BwslSettingsListener`), one batch run `bwslc -manifest <list> -errors-json
+  -no-validate -check` over the indexed files on disk; `parseBatchErrors` takes the `error` diagnostics (a manifest of one
+  file prints a single compile's report, with no `files` list). Each is a `BwslCompilerProblem` (`FileProblem`, and
+  `HighlightingDuplicateProblem` so an open file's own highlighting replaces it) handed to `ProblemsCollector` as
+  appeared/disappeared against the previous set; that collector feeds the Problems view's Project Errors tab.
+  The build console links each error: `collectOutputLocations` pairs a report's `at line N, column M` with the `File:` line
+  after it, and `printRun` prints that path with `printHyperlink`/`OpenFileHyperlinkInfo`.
 - Compiler updates (`BwslCompilerUpdates.kt`). The compiler's version is the `Compiler v <x>` line of
   its `-h` banner (`readCompilerVersion`; `-errors-json` also has a `version` field, `--version`
   does not exist). A development build says `0.0.0-dev` (the published dev build `dev-<date>-<commit>`,
