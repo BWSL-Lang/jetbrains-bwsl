@@ -1,5 +1,6 @@
 package com.bwsl.plugin
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.progress.ProgressManager
@@ -178,6 +179,7 @@ class BwslSettingsConfigurable : Configurable {
         com.intellij.openapi.project.ProjectManager.getInstance().openProjects.forEach { project ->
             com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.getInstance(project).restart("BWSL settings changed")
         }
+        ApplicationManager.getApplication().messageBus.syncPublisher(BwslSettingsListener.TOPIC).onSettingsChanged()
     }
 
     override fun reset() {

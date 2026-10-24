@@ -5,6 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.util.messages.Topic
 
 @State(name = "BwslSettings", storages = [Storage("bwsl.xml")])
 @Service(Service.Level.APP)
@@ -76,5 +77,16 @@ class BwslSettings : PersistentStateComponent<BwslSettings.State> {
     companion object {
         fun getInstance(): BwslSettings =
             ApplicationManager.getApplication().getService(BwslSettings::class.java)
+    }
+}
+
+/** Told when the BWSL settings are applied, so what depends on them (the compiler path, the module paths) can redo its work. */
+fun interface BwslSettingsListener {
+    fun onSettingsChanged()
+
+    companion object {
+        @JvmField
+        @Topic.AppLevel
+        val TOPIC: Topic<BwslSettingsListener> = Topic(BwslSettingsListener::class.java, Topic.BroadcastDirection.NONE)
     }
 }

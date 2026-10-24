@@ -265,6 +265,21 @@ is wrapped at 80 characters.
   next to `bwslc.path`; skipped if absent) and requires that no token changed and that a second
   pass changes nothing; before shipping a change to the rules run it with every file (all 1,045
   passed, 663 unchanged).
+- Compiled output preview (`BwslOutputPreview.kt`). `BwslSplitEditorProvider` (`fileEditorProvider`, policy
+  `HIDE_DEFAULT_EDITOR`) opens a BWSL file in the platform's public `TextEditorWithPreview` (layout `SHOW_EDITOR` by default)
+  with `BwslOutputPreviewEditor` as the preview; `TextEditorWithPreviewProvider` would be simpler but is internal API.
+  The preview compiles only while `panel.isShowing` (a hierarchy listener catches it being shown; a document listener
+  schedules a compile `TYPING_DELAY_MILLIS` after the last change, through an `Alarm` on a pooled thread).
+  `compilePreview` runs `buildPreviewCommand` (`--stdin --source-file <path> -o <temp dir> -all -spv -bindings`, plus
+  `-debug-names` and `-modules`) through `runCompilerProcess` (which takes the text as `stdinText`), sorts the files the
+  compiler wrote into tabs by name (`classifyOutputFile`: `.spv`, `.glsl.`, `.gles.`, `.hlsl`, `.metal`, `.bindings.json`
+  and the `.gles.*.json` reflection), disassembles the SPIR-V with `spirv-dis` when `findSpirvDisassembler` finds it, and
+  runs `readAstJsonText` for the AST tab (JSON tabs are pretty-printed). A tab's highlighter is `createOutputHighlighter`:
+  the one for a `LightVirtualFile` named `preview.<ext>`, not for the extension's file type, because the TextMate plugin
+  claims its files per file (`FileTypeIdentifiableByVirtualFile`), which a lookup by extension never finds. A tab with no text in a compile keeps the
+  previous one (`mergePreviewTexts`), so a failed compile leaves the output in place. A file with several passes is
+  written per pass (`<name>_<Pass>.vert.spv`). In the light test fixture the editor manager does not use providers, so
+  the tests call the provider directly.
 - Build output (`BwslBuildOutput.kt`). The Compile action runs `runCompilerProcess` (stdout and stderr merged
   and read concurrently; a failed start or a timeout is reported in the `CompilerRun`, never thrown) and
   `BwslBuildConsole` (project service) prints the working directory, `formatCommandLine` of the command, the

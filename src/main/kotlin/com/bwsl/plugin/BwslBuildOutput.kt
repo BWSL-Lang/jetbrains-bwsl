@@ -45,9 +45,10 @@ fun formatCommandLine(command: List<String>): String = command.joinToString(" ")
 /**
  * Runs [command] in [workingDirectory] and waits up to [timeoutSeconds]. Standard output and standard error are read
  * together while the process runs (a compile with many errors fills the pipe and would otherwise block it).
- * Never throws: a process that cannot be started or does not finish says so in the result.
+ * Never throws: a process that cannot be started or does not finish says so in the result. [stdinText] is the
+ * compiler's standard input, for `--stdin`.
  */
-fun runCompilerProcess(command: List<String>, workingDirectory: String, timeoutSeconds: Long = 30): CompilerRun {
+fun runCompilerProcess(command: List<String>, workingDirectory: String, timeoutSeconds: Long = 30, stdinText: String? = null): CompilerRun {
     val started = System.nanoTime()
     fun elapsed() = (System.nanoTime() - started) / 1_000_000
     val process = try {
@@ -55,7 +56,8 @@ fun runCompilerProcess(command: List<String>, workingDirectory: String, timeoutS
     } catch (e: Exception) {
         return CompilerRun(command, workingDirectory, "", null, elapsed(), startFailure = e.message ?: e.javaClass.simpleName)
     }
-    process.outputStream.close()
+    // The text (for `--stdin`) is written while the output is read, so neither side waits for the other.
+    CompletableFuture.runAsync { process.outputStream.use { if (stdinText != null) it.write(stdinText.toByteArray(Charsets.UTF_8)) } }
     val output = CompletableFuture.supplyAsync { process.inputStream.readBytes().toString(Charsets.UTF_8) }
     if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
         process.destroyForcibly()

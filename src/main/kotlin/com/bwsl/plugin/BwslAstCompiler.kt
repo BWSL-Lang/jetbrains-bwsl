@@ -38,6 +38,23 @@ internal fun compileAst(
     modulePaths: List<String>,
     stdinText: String? = null
 ): CompiledAst? {
+    val json = readAstJsonText(compilerPath, filePath, modulePaths, stdinText) ?: return null
+    val compiled = parseAstJson(json)
+    if (compiled == null) {
+        log.warn("bwslc -ast-json returned invalid JSON for $filePath: ${json.take(200)}")
+        return null
+    }
+    log.warn("bwslc -ast-json parsed for $filePath: modules=${compiled.root.modules.size} pipelines=${compiled.root.pipelines.size}")
+    return compiled
+}
+
+/** What `bwslc <filePath> -ast-json` printed, decoded, or null when it printed nothing. Throws [IOException] like [compileAst]. */
+internal fun readAstJsonText(
+    compilerPath: String,
+    filePath: String,
+    modulePaths: List<String>,
+    stdinText: String? = null
+): String? {
     val moduleArgs = modulePaths.flatMap { listOf("-modules", it) }
     val input = if (stdinText == null) listOf(filePath) else listOf("--stdin", "--source-file", filePath)
     val process = ProcessBuilder(listOf(compilerPath) + input + "-ast-json" + moduleArgs).start()
@@ -64,14 +81,7 @@ internal fun compileAst(
     }
     // Detect encoding: UTF-16 LE output starts with BOM bytes FF FE
     val hasUtf16Bom = rawBytes.size >= 2 && rawBytes[0] == 0xFF.toByte() && rawBytes[1] == 0xFE.toByte()
-    val json = if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)
-    val compiled = parseAstJson(json)
-    if (compiled == null) {
-        log.warn("bwslc -ast-json returned invalid JSON for $filePath: ${json.take(200)}")
-        return null
-    }
-    log.warn("bwslc -ast-json parsed for $filePath: modules=${compiled.root.modules.size} pipelines=${compiled.root.pipelines.size}")
-    return compiled
+    return if (hasUtf16Bom) String(rawBytes, Charsets.UTF_16) else String(rawBytes, Charsets.UTF_8)
 }
 
 /**

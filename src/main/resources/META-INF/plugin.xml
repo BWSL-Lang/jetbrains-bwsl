@@ -107,6 +107,8 @@
 
         <typeDeclarationProvider implementation="com.bwsl.plugin.BwslTypeDeclarationProvider"/>
 
+        <fileEditorProvider implementation="com.bwsl.plugin.BwslSplitEditorProvider"/>
+
         <callHierarchyProvider
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslCallHierarchyProvider"/>

@@ -127,6 +127,30 @@ That means the compiler has to be configured (see [Setup](#setup)).
   failure) and everything the compiler printed. A failed compile opens it, and
   the error notification has a **Show build output** action
 
+### Compiled output preview
+
+- A BWSL file opens with a preview of what it compiles to beside it, hidden
+  until you show it with the **Editor / Editor and Preview / Preview** buttons
+  at the top right of the editor, as with a Markdown preview
+- A tab per target: **SPIR-V**, **GLSL**, **GLSL ES**, **HLSL**, **Metal**,
+  and the **Bindings** and the **AST** as JSON. A tab lists the outputs of
+  every pass and stage, each under its file name
+- Each tab is highlighted the way a file of its kind would be, by whatever is
+  installed for it: a language plugin, or a TextMate grammar (Settings | Editor
+  | TextMate Bundles). JSON is built in; with nothing installed for a kind, its
+  tab is plain text
+- The SPIR-V is shown disassembled when `spirv-dis` is installed (the Vulkan
+  SDK, found through `VULKAN_SDK` or the `PATH`); without it the tab lists the
+  SPIR-V files and their sizes
+- It compiles only while it is showing: when it is shown, and again a moment
+  after you stop typing. It compiles the text in the editor, so it follows
+  unsaved edits, with the module paths and the **Emit debug names** setting of
+  the Compile action. Nothing is written next to the file
+- A compile that fails (a syntax error while you type, say) keeps the last
+  output and says why at the top
+- With no compiler configured it says so, with a link to the settings; it
+  compiles as soon as the settings are applied
+
 ### Inspections and quick fixes
 
 Read from the compiler's reference index of the last compile, in the files that
@@ -511,8 +535,6 @@ Not implemented yet:
 - [ ] Run configurations and compile-on-save
 - [ ] Per-project compiler path (module paths can already be set per project in
       `bwsl.json`)
-- [ ] Show the compiled output (SPIR-V disassembly, GLSL, HLSL, Metal) next to
-      the source
 - [ ] Shader variant selection in the compile action
 
 ## Prerequisites
