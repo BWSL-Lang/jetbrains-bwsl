@@ -510,7 +510,6 @@ Not implemented yet:
 
 **Platform and ecosystem**
 - [ ] BWSL code blocks highlighted inside Markdown
-- [ ] A Language Server (LSP) front end for other editors
 - [ ] Debugger integration
 
 ## Prerequisites
