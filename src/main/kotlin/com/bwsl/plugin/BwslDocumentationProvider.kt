@@ -51,28 +51,35 @@ private fun renderIntrinsicDoc(name: String, hasReceiver: Boolean): String? {
 }
 
 /**
- * Formats an interpolation qualifier for display ("DEFAULT" → null, "FLAT" → "@flat", etc.).
+ * The qualifiers a stage value was written with, as they are written (`@flat`, `@centroid @noperspective`), or null for
+ * none. The AST keeps `@centroid` (its `sampling`) apart from the interpolation.
  */
-private fun formatInterpolationLabel(interp: String): String? = when (interp) {
-    "FLAT"           -> "@flat"
-    "NO_PERSPECTIVE" -> "@noperspective"
-    else             -> null
+private fun formatQualifierLabel(interpolation: String?, sampling: String?): String? {
+    val qualifiers = listOfNotNull(
+        "@centroid".takeIf { sampling == "CENTROID" },
+        when (interpolation) {
+            "FLAT" -> "@flat"
+            "NO_PERSPECTIVE" -> "@noperspective"
+            else -> null
+        }
+    )
+    return qualifiers.joinToString(" ").ifEmpty { null }
 }
 
 /** A value the vertex stage writes with `output.<name> = ...`, as the compiler typed it. */
-private data class StageValue(val name: String, val type: String, val interpolation: String)
+private data class StageValue(val name: String, val type: String, val qualifiers: String?)
 
 /**
  * The values [pass]'s vertex stage writes for the fragment stage: the pass's stage-interface
- * symbols, in the compiler's order. The type is the compiler's own; the interpolation qualifier is
- * on the first assignment that defines the value.
+ * symbols, in the compiler's order. The type is the compiler's own; the qualifiers are those of
+ * the first assignment that defines the value.
  */
 private fun collectStageValues(index: BwslAstIndex, pass: AstNodePos): List<StageValue> =
     index.symbolsById.values
         .filter { it.kind == "stage-interface" && it.owner == pass.id }
         .map { symbol ->
-            val interpolation = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it]?.interpolation } ?: "DEFAULT"
-            StageValue(symbol.name, symbol.type.ifBlank { "?" }, interpolation)
+            val definition = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it] }
+            StageValue(symbol.name, symbol.type.ifBlank { "?" }, formatQualifierLabel(definition?.interpolation, definition?.sampling))
         }
 
 /** The attributes [pass] lists in its `use attributes { ... }`, in that order, as the compiler resolved them. */
@@ -88,7 +95,7 @@ private fun collectUsedAttributes(index: BwslAstIndex, pass: AstNodePos): List<A
 private fun renderOutputListHtml(outputs: List<StageValue>): String {
     if (outputs.isEmpty()) return "(none)"
     return outputs.joinToString("<br/>") { vo ->
-        val interp = formatInterpolationLabel(vo.interpolation)?.let { " &nbsp;<i>$it</i>" } ?: ""
+        val interp = vo.qualifiers?.let { " &nbsp;<i>$it</i>" } ?: ""
         "<code><b>${vo.type}</b> ${vo.name}</code>$interp"
     }
 }
@@ -151,8 +158,8 @@ private fun renderShaderMemberDoc(element: PsiElement): String? {
     return when (symbol.kind) {
         "attribute" -> renderDoc("attributes.$member", "$type $member", "Pipeline vertex attribute")
         "stage-interface" -> {
-            val interpolation = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it]?.interpolation }
-                ?.let { formatInterpolationLabel(it) }
+            val definition = symbol.definitions.firstNotNullOfOrNull { index.nodesById[it] }
+            val interpolation = formatQualifierLabel(definition?.interpolation, definition?.sampling)
             val details = buildString {
                 append("Vertex output attribute")
                 if (interpolation != null) append(", interpolated as <code>$interpolation</code>")

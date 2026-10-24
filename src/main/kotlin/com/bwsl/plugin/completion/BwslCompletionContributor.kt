@@ -80,6 +80,7 @@ private val DECORATORS = listOf(
     "bounds" to "range of a value: @bounds(>=0, <=1)",
     "flat" to "no interpolation",
     "noperspective" to "no perspective correction",
+    "centroid" to "evaluated inside the primitive (MSAA)",
     "branch" to "before an if: a real branch",
     "flatten" to "before an if: evaluate both sides"
 )

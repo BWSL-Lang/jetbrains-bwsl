@@ -232,9 +232,11 @@ class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
                     output.n = attributes.uv * 2.0;
                     output.unit = normalize(attributes.uv);
                     @flat output.index = attributes.id;
+                    @centroid output.tile = attributes.uv;
+                    @centroid @noperspective output.edge = attributes.uv;
                 }
                 fragment {
-                    output.result = float4(input.n, input.unit);
+                    output.result = float4(input.n, input.unit) + float4(input.tile, input.edge);
                 }
             }
         }
@@ -269,6 +271,23 @@ class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
         assertTrue("Expected the @flat qualifier, got: $doc", doc.contains("@flat"))
     }
 
+    fun testACentroidStageValueShowsItsQualifierAlsoWithNoperspective() {
+        configureAndCache(stageIoSource.replace("output.tile =", "output.ti<caret>le ="))
+        val tile = generateDocAt(myFixture.caretOffset)!!
+        assertTrue("Expected @centroid, got: $tile", tile.contains("interpolated as <code>@centroid</code>"))
+
+        configureAndCache(stageIoSource.replace("output.edge =", "output.ed<caret>ge ="))
+        val edge = generateDocAt(myFixture.caretOffset)!!
+        assertTrue("Expected both qualifiers, got: $edge", edge.contains("interpolated as <code>@centroid @noperspective</code>"))
+    }
+
+    fun testAStageValueWithNoQualifierShowsNone() {
+        configureAndCache(stageIoSource.replace("output.n =", "output.<caret>n ="))
+
+        val doc = generateDocAt(myFixture.caretOffset)!!
+        assertFalse(doc, doc.contains("interpolated as"))
+    }
+
     fun testFragmentOutputMemberIsDocumentedAsAFragmentOutput() {
         configureAndCache(stageIoSource.replace("output.result", "output.res<caret>ult"))
 
@@ -286,6 +305,7 @@ class BwslDocumentationProviderTest : BwslAstFixtureTestCase() {
         assertTrue("Expected float2 n listed, got: $doc", doc!!.contains("<b>float2</b> n"))
         assertTrue("Expected int index listed, got: $doc", doc.contains("<b>int</b> index"))
         assertTrue("Expected the @flat qualifier next to index, got: $doc", doc.contains("@flat"))
+        assertTrue("Expected the centroid qualifiers listed, got: $doc", doc.contains("<b>float2</b> tile</code> &nbsp;<i>@centroid</i>") && doc.contains("<b>float2</b> edge</code> &nbsp;<i>@centroid @noperspective</i>"))
     }
 
     fun testOutputQualifierInTheVertexStageListsTheVertexOutputs() {

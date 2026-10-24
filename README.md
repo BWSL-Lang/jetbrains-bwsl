@@ -335,8 +335,8 @@ is exactly the compiler's:
   compiler lowers to several instructions, or whose table names none, shows no
   SPIR-V line
 - **`attributes`, `input` and `output`** — the attributes used in the pass, the
-  vertex outputs and their interpolation (`@flat`, `@noperspective`), with the
-  types the compiler inferred
+  vertex outputs and their qualifiers (`@flat`, `@noperspective`, `@centroid`),
+  with the types the compiler inferred
 - **`attributes.x`, `input.x`, `output.x` members** — type and kind (vertex
   attribute, vertex output, fragment output)
 
@@ -353,7 +353,7 @@ is exactly the compiler's:
   `vertex`/`fragment`/`compute` in a pass, statements in function and stage
   bodies
 - **Decorators** after an `@`: `bounds` (with its parentheses), `flat`,
-  `noperspective`, `branch` and `flatten`
+  `noperspective`, `centroid`, `branch` and `flatten`
 - **Types** and **intrinsics**, in the places they are valid
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type
@@ -479,6 +479,8 @@ Not implemented yet:
 
 **Code insight**
 - [ ] Unresolved-reference highlighting
+- [ ] Ctrl+click on `@centroid` to its documentation, once the site documents
+      it
 
 **Navigation and search**
 - [ ] Call hierarchy

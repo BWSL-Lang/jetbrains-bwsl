@@ -39,6 +39,8 @@ data class AstNodePos(
     val endColumn: Int? = null,
     /** Present on ASSIGNMENT only: `DEFAULT`, `FLAT` or `NO_PERSPECTIVE`. */
     val interpolation: String? = null,
+    /** Present on ASSIGNMENT only: `CENTROID` for a stage value written `@centroid`, independent of [interpolation]. */
+    val sampling: String? = null,
     /**
      * The file this node was written in: its own `sourceFile`, or the nearest enclosing one. Its
      * line/column are relative to that file. Null for nodes below the level that records one.
@@ -300,6 +302,7 @@ private fun collectNodes(
                     endLine = obj.get("endLine")?.asIntOrNull(),
                     endColumn = obj.get("endColumn")?.asIntOrNull(),
                     interpolation = obj.get("interpolation")?.asStringOrNull(),
+                    sampling = obj.get("sampling")?.asStringOrNull(),
                     sourceFile = objFile,
                     sourceUrl = objUrl
                 )

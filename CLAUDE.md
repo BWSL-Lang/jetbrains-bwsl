@@ -534,7 +534,8 @@ Schema `bwsl.ast.v3`, from `bwslc <file> -ast-json [-modules <dir>]` (may be UTF
   `attribute`, `import`, `using`. `type` and `return-type` describe what a declaration declares;
   they are not what a caret on the declaration's own name navigates to.
 - **Stage IO.** A vertex `output.x = ...` and a fragment `input.x` reference the same
-  `PASS:n/interface:x` symbol (roles `output` and `input`). A stage interface value has no
+  `PASS:n/interface:x` symbol (roles `output` and `input`). The assignment carries `interpolation` (`DEFAULT`, `FLAT`,
+  `NO_PERSPECTIVE`) and, apart from it, `sampling` (`CENTROID` for `@centroid`, which combines with `@noperspective`). A stage interface value has no
   declaration; its assignment is its definition. A fragment output is declared by an entry in the
   pass's `outputs { name: type }` block, and `output.x` in the fragment stage has an `output` edge
   to that declaration.

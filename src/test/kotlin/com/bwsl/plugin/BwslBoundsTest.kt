@@ -63,7 +63,7 @@ class BwslBoundsTest : BasePlatformTestCase() {
     fun testDecoratorNamesCompleteAfterAnAt() {
         val names = completeAfter("pipeline P {\n    struct S {\n        @<caret> float x;\n    }\n}\n")
 
-        assertEquals(setOf("bounds", "flat", "noperspective", "branch", "flatten"), names.toSet())
+        assertEquals(setOf("bounds", "flat", "noperspective", "centroid", "branch", "flatten"), names.toSet())
     }
 
     fun testBoundsCompletesWithItsParenthesesAndTheCaretInsideThem() {
