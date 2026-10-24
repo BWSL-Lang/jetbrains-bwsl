@@ -5,6 +5,7 @@ import com.intellij.lang.parameterInfo.CreateParameterInfoContext
 import com.intellij.lang.parameterInfo.ParameterInfoHandler
 import com.intellij.lang.parameterInfo.ParameterInfoUIContext
 import com.intellij.lang.parameterInfo.UpdateParameterInfoContext
+import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -16,13 +17,13 @@ class BwslParameterInfoHandler : ParameterInfoHandler<PsiElement, BwslFunctionSi
     override fun findElementForParameterInfo(context: CreateParameterInfoContext): PsiElement? {
         val callExpr = findEnclosingCallExpression(context.file, context.offset)
         if (callExpr == null) {
-            log.warn("findElementForParameterInfo: no enclosing CALL_EXPRESSION at offset ${context.offset}")
+            log.debug { "findElementForParameterInfo: no enclosing CALL_EXPRESSION at offset ${context.offset}" }
             return null
         }
         val nameToken = callExpr.firstChild?.firstChild ?: return null
         val hasReceiver = findPreviousNonWhitespace(callExpr)?.node?.elementType == BwslTokenTypes.DOT
         val signatures = collectSignaturesFor(nameToken, hasReceiver)
-        log.warn("findElementForParameterInfo: name=${nameToken.text} tokenType=${nameToken.node.elementType} signatures=${signatures.size}")
+        log.debug { "findElementForParameterInfo: name=${nameToken.text} tokenType=${nameToken.node.elementType} signatures=${signatures.size}" }
         if (signatures.isEmpty()) return null
         context.itemsToShow = signatures.toTypedArray()
         return callExpr

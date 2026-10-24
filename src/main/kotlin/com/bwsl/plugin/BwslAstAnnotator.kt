@@ -4,8 +4,12 @@ import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiFile
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val log = logger<BwslAstAnnotator>()
+
+/** Whether the missing compiler has been logged since a compiler was last configured. */
+private val hasWarnedOfNoCompiler = AtomicBoolean(false)
 
 /**
  * What the compile of one file needs, taken when it is collected: [candidateInputs] is the saved text
@@ -34,9 +38,13 @@ class BwslAstAnnotator : ExternalAnnotator<AstCollectedInfo, Unit>() {
         val virtualFile = file.virtualFile ?: return null
         val compilerPath = resolveCompilerPath()
         if (compilerPath == null) {
-            log.warn("bwslc compiler path is not set; skipping AST collection for ${virtualFile.path}")
+            // Once, not on every highlighting pass; again only after a compiler was set and is gone.
+            if (hasWarnedOfNoCompiler.compareAndSet(false, true)) {
+                log.warn("bwslc compiler path is not set; skipping AST collection (first for ${virtualFile.path})")
+            }
             return null
         }
+        hasWarnedOfNoCompiler.set(false)
         val modulePaths = collectModulePaths(file.project)
         val inputs = snapshotCandidateInputs(virtualFile, modulePaths)
         val text = file.text

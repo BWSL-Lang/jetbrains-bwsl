@@ -4,7 +4,8 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonSyntaxException
 import com.google.gson.JsonObject
-import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.debug
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.impl.LoadTextUtil
 import com.intellij.openapi.project.ProjectManager
@@ -14,7 +15,9 @@ import java.io.IOException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-private val log = logger<BwslProjectConfig>()
+// What every compile does is logged at debug level only: the editor compiles on every pause in typing, and the
+// project index every file it holds, so anything louder floods the IDE log. Only what should not happen is a warning.
+private val log = Logger.getInstance("#com.bwsl.plugin.BwslAstCompiler")
 
 /** What `bwslc -ast-json` printed for one file, as the typed model and as a generic JSON tree. */
 data class CompiledAst(val root: AstRoot, val rawJson: JsonObject)
@@ -44,7 +47,7 @@ internal fun compileAst(
         log.warn("bwslc -ast-json returned invalid JSON for $filePath: ${json.take(200)}")
         return null
     }
-    log.warn("bwslc -ast-json parsed for $filePath: modules=${compiled.root.modules.size} pipelines=${compiled.root.pipelines.size}")
+    log.debug { "bwslc -ast-json parsed for $filePath: modules=${compiled.root.modules.size} pipelines=${compiled.root.pipelines.size}" }
     return compiled
 }
 
@@ -73,10 +76,10 @@ internal fun readAstJsonText(
     val rawBytes = stdout.get()
     val stderrText = stderr.get()
     if (stderrText.isNotBlank()) {
-        log.warn("bwslc -ast-json stderr for $filePath: $stderrText")
+        log.debug { "bwslc -ast-json stderr for $filePath: $stderrText" }
     }
     if (rawBytes.isEmpty()) {
-        log.warn("bwslc -ast-json produced no output for $filePath (exit code ${process.exitValue()})")
+        log.debug { "bwslc -ast-json produced no output for $filePath (exit code ${process.exitValue()})" }
         return null
     }
     // Detect encoding: UTF-16 LE output starts with BOM bytes FF FE
