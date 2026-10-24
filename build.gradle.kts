@@ -28,6 +28,16 @@ if (localPropertiesFile.exists()) {
     localProperties.forEach { key, value -> extra.set(key as String, value) }
 }
 
+// The IDE the plugin is built against, and whose sources fetchPlatformSources unpacks.
+val platformVersion = "2026.2"
+
+// The platform's sources, for reading its API (what a class offers, what is deprecated) while working on the plugin.
+val platformSources = configurations.dependencyScope("platformSources")
+val platformSourcesFiles = configurations.resolvable("platformSourcesFiles") {
+    extendsFrom(platformSources.get())
+    isTransitive = false
+}
+
 repositories {
     mavenCentral()
     intellijPlatform {
@@ -37,7 +47,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdea("2026.2")
+        intellijIdea(platformVersion)
         bundledPlugin("intellij.libraries.misc.plugin")
         bundledModule("intellij.spellchecker")
         // The typo inspection lives in the Natural Languages plugin (bundled in the IDEs); only the tests need it.
@@ -46,6 +56,8 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
     }
+
+    "platformSources"("com.jetbrains.intellij.idea:ideaIU:$platformVersion:sources")
 
     testCompileOnly("org.junit.jupiter:junit-jupiter-api:6.1.3")
     testImplementation("junit:junit:4.13.2")
@@ -160,6 +172,21 @@ tasks.test {
     // detect the tampering and refuse to reuse the cache entry, breaking subsequent builds).
     // idea.log.config.file lets us point the platform at our copy instead.
     systemProperty("idea.log.config.file", layout.projectDirectory.file("src/test/resources/test-log.properties").asFile.absolutePath)
+}
+
+// Unpacks the platform's sources into build/platform-sources, once per platform version (about 200 MB to download).
+// Local builds do it before compiling; CI never reads them, so it does not.
+val fetchPlatformSources = tasks.register<Sync>("fetchPlatformSources") {
+    val directory = layout.buildDirectory.dir("platform-sources")
+    val marker = directory.map { it.file(".version-$platformVersion") }
+    onlyIf { !marker.get().asFile.exists() }
+    from(platformSourcesFiles.map { configuration -> configuration.files.map { zipTree(it) } })
+    into(directory)
+    doLast { marker.get().asFile.writeText(platformVersion) }
+}
+
+if (!providers.environmentVariable("CI").isPresent) {
+    tasks.named("classes") { dependsOn(fetchPlatformSources) }
 }
 
 tasks.buildSearchableOptions {

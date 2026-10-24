@@ -39,6 +39,14 @@ API (which the plugin does not fail on by itself), an invalid plugin, a missing 
 `jvmDefault = NO_COMPATIBILITY`, or it copies the platform interfaces' deprecated default methods into the plugin's
 classes and the verifier reports them as overridden.
 
+**Platform sources.** The IntelliJ Platform's sources (the IDE the plugin builds against, `platformVersion` in
+`build.gradle.kts`) are unpacked in **`build/platform-sources/`**, laid out by package: `CallHierarchyBrowserBase` is
+`build/platform-sources/com/intellij/ide/hierarchy/CallHierarchyBrowserBase.java`. Read them (Grep/Glob/Read) to see
+what a platform class offers and what is deprecated, instead of searching the Gradle cache or decompiling jars. The
+`fetchPlatformSources` task unpacks them on any local build (`classes` depends on it), once per platform version
+(about 200 MB to download, 500 MB unpacked; the `.version-<version>` marker in the directory records which); CI skips
+it. If the directory is missing (after `clean`, say), run `./gradlew.bat fetchPlatformSources --no-configuration-cache`.
+
 **`--rerun-tasks` is required, not optional.** Gradle's up-to-date checks are unreliable in this
 project (most likely the IntelliJ Platform Gradle Plugin's sandbox-install step not correctly
 tracking its inputs) - without `--rerun-tasks`, `./gradlew test` frequently reports `BUILD
