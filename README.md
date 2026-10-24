@@ -243,6 +243,19 @@ is exactly the compiler's:
   including files you have never opened. It waits for any file that is not up to
   date before it searches (see [Project index](#project-index))
 
+### Call Hierarchy (Ctrl+Alt+H)
+
+- On a function or method: from a call to it, its name, or anywhere in its
+  body
+- **Callers**: the functions, methods and stages that call it, each with the
+  number of calls it makes, expanding to their own callers. They are found
+  like Find Usages, across the indexed files
+- **Callees**: the functions, methods and intrinsics it calls, expanding to
+  what those call. A module function is listed in its own file; an intrinsic
+  has nothing below it
+- A recursive function is listed once under itself and goes no deeper
+- Opening a row goes to the call
+
 ### Project index
 
 - When a project opens, the plugin compiles the BWSL files in the project and
@@ -481,9 +494,6 @@ Not implemented yet:
 - [ ] Unresolved-reference highlighting
 - [ ] Ctrl+click on `@centroid` to its documentation, once the site documents
       it
-
-**Navigation and search**
-- [ ] Call hierarchy
 
 **Compiler integration**
 - [ ] Use the editor's unsaved text for navigation, documentation, the

@@ -107,6 +107,10 @@
 
         <typeDeclarationProvider implementation="com.bwsl.plugin.BwslTypeDeclarationProvider"/>
 
+        <callHierarchyProvider
+            language="BWSL"
+            implementationClass="com.bwsl.plugin.BwslCallHierarchyProvider"/>
+
         <lang.psiStructureViewFactory
             language="BWSL"
             implementationClass="com.bwsl.plugin.BwslStructureViewFactory"/>

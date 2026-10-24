@@ -206,6 +206,11 @@ is wrapped at 80 characters.
   (`setName` throws; Rename edits the text itself). `self.field` and `self.method()` count since the compiler (BWSL#123) gives them `member`/`call`
   edges (and `self` a `type` edge to the struct, which the plugin does not follow: `self` is a keyword token
   with no reference).
+- Call Hierarchy (`BwslCallHierarchy.kt`, `callHierarchyProvider`, over the platform's `CallHierarchyBrowserBase`):
+  `findCallHierarchyTarget` is the function called at the caret, named there, or the caret is in. The callers are
+  `findUsagesOf` grouped by the `FUNCTION` (or `VERTEX_STAGE`/`FRAGMENT_STAGE`/`COMPUTE_STAGE`) each reference is inside; the
+  callees are the `call` edges from own nodes inside the function's body range, resolved with `resolveDeclarationPosition`
+  (a `builtin:` target is an intrinsic row with no children). A row already above itself (recursion) does not expand.
 - Rename (`BwslRename.kt`) builds on Find Usages. The PSI has no named elements, so the platform's
   default rename can't edit it: `BwslRenameProcessor` takes the declaration and the usages the
   reference search found and replaces each occurrence's text itself, last-to-first within a file.
