@@ -506,8 +506,8 @@ Not implemented yet:
 | Tool          | Version             |
 |---------------|---------------------|
 | IntelliJ IDEA | 2026.2+             |
-| JDK           | 21+                 |
-| Gradle        | 9.5.1 (via wrapper) |
+| JDK           | 25                  |
+| Gradle        | 9.8.1 (via wrapper) |
 
 ## Setup
 
