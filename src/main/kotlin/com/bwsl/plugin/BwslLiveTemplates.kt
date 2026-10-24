@@ -40,13 +40,21 @@ fun findTemplateScope(file: PsiFile, offset: Int): BwslTemplateScope? {
     }
 
     val scopes = ArrayList<BwslTemplateScope>()
+    // The `(` and `[` still open in the innermost block: in an argument list or an index no template belongs.
+    var openGroups = 0
     for ((index, leaf) in leaves.withIndex()) {
         if (leaf.range.startOffset >= offset) break
         when (leaf.type) {
-            BwslTokenTypes.LBRACE -> scopes += classifyBlock(leaves, index, scopes.lastOrNull())
+            BwslTokenTypes.LBRACE -> {
+                scopes += classifyBlock(leaves, index, scopes.lastOrNull())
+                openGroups = 0
+            }
             BwslTokenTypes.RBRACE -> if (scopes.isNotEmpty()) scopes.removeAt(scopes.size - 1)
+            BwslTokenTypes.LPAREN, BwslTokenTypes.LBRACKET -> openGroups++
+            BwslTokenTypes.RPAREN, BwslTokenTypes.RBRACKET -> openGroups = (openGroups - 1).coerceAtLeast(0)
         }
     }
+    if (openGroups > 0) return null
     return scopes.lastOrNull() ?: BwslTemplateScope.TOP_LEVEL
 }
 

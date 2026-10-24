@@ -44,7 +44,7 @@ internal sealed interface Step {
 }
 
 /**
- * What the expression ending at [receiverEnd] (the token before a `.`) can be followed by: a struct's
+ * What the expression before the `.` at [dotOffset] in [file] can be followed by: a struct's
  * fields and methods, a vector's swizzles, an array's `length`. [typedPrefix] is what has been typed
  * after the dot: a swizzle in progress (`xy`) is offered with each component that can follow it.
  *
@@ -218,6 +218,57 @@ private fun findStruct(context: ReceiverContext, typeName: String): JsonObject? 
     return containers.asSequence().flatMap { it.getObjectsOrEmpty("structs").asSequence() }
         .firstOrNull { it.getStringOrNull("name") == name }
 }
+
+/**
+ * An integer value that can be written from a name in scope: its [text] (`lights[0].count`, `box.size()`), its [type],
+ * and the parameters of the method it ends in, if it does (the caret then goes between its parentheses).
+ */
+data class IntegerPath(val text: String, val type: String, val callParameters: List<String> = emptyList())
+
+private val INTEGER_SCALARS = setOf("int", "uint")
+
+/** How many `.`, `[0]` and calls a path takes at most, so that a large struct graph does not flood the list. */
+private const val MAX_PATH_STEPS = 4
+
+/**
+ * Every integer value that can be written starting from [name], of [type]: the value itself if it is an `int` or
+ * `uint`; through an array its element `[0]`; a component of an integer vector; and through a struct, its fields and
+ * the results of its methods, again and again. A method with parameters can only end a path.
+ */
+internal fun collectIntegerPaths(name: String, type: ReceiverType, context: ReceiverContext): List<IntegerPath> {
+    val paths = ArrayList<IntegerPath>()
+    fun visit(text: String, type: ReceiverType, steps: Int, callParameters: List<String>) {
+        if (type.isArray) {
+            if (steps < MAX_PATH_STEPS) visit("$text[0]", ReceiverType(type.name), steps + 1, emptyList())
+            return
+        }
+        if (type.name in INTEGER_SCALARS) {
+            paths += IntegerPath(text, type.name, callParameters)
+            return
+        }
+        if (steps >= MAX_PATH_STEPS) return
+        VECTOR_TYPE.matchEntire(type.name)?.let { match ->
+            val scalar = match.groupValues[1]
+            if (scalar in INTEGER_SCALARS) POSITION_COMPONENTS.take(match.groupValues[2].toInt()).forEach { paths += IntegerPath("$text.$it", scalar) }
+            return
+        }
+        val struct = findStruct(context, type.name) ?: return
+        for (field in describeFieldsOf(struct)) {
+            parseReceiverType(field.type)?.let { visit("$text.${field.name}", it, steps + 1, emptyList()) }
+        }
+        for (method in describeMethodsOf(struct)) {
+            val result = parseReceiverType(method.type) ?: continue
+            val parameters = method.parameters.orEmpty()
+            if (parameters.isNotEmpty() && result.name !in INTEGER_SCALARS) continue
+            visit("$text.${method.name}()", result, steps + 1, parameters)
+        }
+    }
+    visit(name, type, 0, emptyList())
+    return paths.distinctBy { it.text }
+}
+
+/** The type a declaration's type text names: `float[4]` is an array of `float`. */
+internal fun parseDeclaredType(type: String?): ReceiverType? = parseReceiverType(type)
 
 // --- reading the expression before the dot ------------------------------------------------------------
 

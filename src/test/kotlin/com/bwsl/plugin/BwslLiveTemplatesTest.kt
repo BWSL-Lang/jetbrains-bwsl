@@ -85,5 +85,7 @@ class BwslLiveTemplatesTest : BasePlatformTestCase() {
         assertEquals(loops, collectApplicable("pipeline P {\n    pass \"Main\" {\n        vertex {\n            if (true) {\n                <caret>\n            }\n        }\n    }\n}\n"))
         assertEquals(emptySet<String>(), collectApplicable("pipeline P {\n    attributes {\n        <caret>\n    }\n}\n"))
         assertEquals(emptySet<String>(), collectApplicable("// a comment <caret>\nmodule M { }\n"))
+        assertEquals("not in an index", emptySet<String>(), collectApplicable(inBody.replace("<caret>", "float v = values[<caret>0];")))
+        assertEquals("not in an argument list", emptySet<String>(), collectApplicable(inBody.replace("<caret>", "float v = cos(<caret>1.0);")))
     }
 }

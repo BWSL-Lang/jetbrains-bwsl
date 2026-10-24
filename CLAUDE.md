@@ -445,6 +445,13 @@ is wrapped at 80 characters.
   `length` intrinsic is always there and the array member is told apart by its `int` type text.
   Fields and methods of the enclosing struct are also added to `collectNamesVisibleAt` (a struct's
   range holds its methods' bodies).
+- Completion short cuts in the contributor, before anything else: a caret right after a `NUMBER_LIT` (`isTypingNumber`: the
+  IDE's placeholder name follows the digits, so the prefix is empty and everything would match) gets nothing, and a
+  caret right after `[` gets only `collectIndexCandidates`: the functions returning `int`/`uint`, and for every local, constant
+  and field the paths to an integer through it (`collectIntegerPaths` in `BwslReceiverTypes.kt`: `[0]` of an array, a
+  component of an integer vector, a struct's fields and methods, at most `MAX_PATH_STEPS` deep; a method with
+  parameters only ends a path, and choosing it puts the caret between its parentheses). Live
+  templates are offered nowhere inside an open `(` or `[` (`findTemplateScope` returns null).
 - Expected types (`BwslExpectedTypes.kt`). `collectExpectedTypesAt` reads the tokens before the
   caret: it drops a word ending at the caret (being typed), skips back over a member chain or
   `Module::` (`skipBackOverMemberAccess`, via `parseReceiver(...).startIndex`, so `float t = l.|`

@@ -427,6 +427,11 @@ is exactly the compiler's:
 - **Decorators** after an `@`: `bounds` (with its parentheses), `flat`,
   `noperspective`, `centroid`, `branch` and `flatten`
 - **Types** and **intrinsics**, in the places they are valid
+- In an **index** (`values[|]`) only integers: the integer variables,
+  parameters, constants and fields in scope, the functions returning one, and
+  every integer reachable through a struct, an array or an integer vector in
+  scope (`top.count`, `top.size()`, `top.nested[0].count`, `p.x`; an array
+  element is written `[0]`). Nothing while a **number** is being typed
 - **Locals, parameters, constants and loop variables** that are in scope, sorted
   first, with their type
 - **Functions, structs, enums and imported modules**, sorted after the locals:

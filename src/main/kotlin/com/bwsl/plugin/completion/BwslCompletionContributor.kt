@@ -173,6 +173,54 @@ private fun buildLookupElementFor(name: DeclaredName, expectedTypes: Set<String>
     return PrioritizedLookupElement.withPriority(element, NAME_PRIORITY + if (doesTypeMatch(name.valueType(), expectedTypes)) TYPE_MATCH_BONUS else 0.0)
 }
 
+/** The types an index can have. */
+private val INTEGER_TYPES = setOf("int", "uint")
+
+/**
+ * What can be written as an index right after a `[`: the integer values in scope, each local, parameter, loop
+ * variable, constant and field followed through its arrays (`[0]`), integer vectors and struct fields and methods
+ * down to every integer in it (`top.nested[0].count`, `top.size()`), and the functions returning an integer. Nothing
+ * that is not an integer: no float, no keyword, no intrinsic.
+ */
+private fun collectIndexCandidates(parameters: CompletionParameters, ast: CompletionAst): List<LookupElement> {
+    val context = buildReceiverContext(parameters, ast)
+    val elements = LinkedHashMap<String, LookupElement>()
+    fun addPaths(name: String, type: String?, isArray: Boolean, plain: () -> LookupElement) {
+        val declared = parseDeclaredType(type)?.let { if (isArray) ReceiverType(it.name, isArray = true) else it } ?: return
+        for (path in collectIntegerPaths(name, declared, context)) {
+            elements.getOrPut(path.text) { if (path.text == name) plain() else buildIntegerPathLookupElement(path) }
+        }
+    }
+    for (local in collectVisibleLocals(parameters)) addPaths(local.name, local.type, local.isArray) { buildLocalLookupElement(local, emptySet()) }
+    for (name in collectNamesVisibleAt(ast.root, ast.raw, ast.line, ast.column)) {
+        when (name.kind) {
+            DeclaredName.Kind.CONSTANT, DeclaredName.Kind.FIELD -> addPaths(name.name, name.type, false) { buildLookupElementFor(name) }
+            DeclaredName.Kind.FUNCTION -> if (name.type in INTEGER_TYPES) elements.getOrPut(name.name) { buildLookupElementFor(name) }
+            else -> {}
+        }
+    }
+    return elements.values.toList()
+}
+
+/** A path to an integer through a struct or an array (`top.nested[0].count`), after the plain names in the list. */
+private fun buildIntegerPathLookupElement(path: IntegerPath): LookupElement {
+    var element = LookupElementBuilder.create(path.text).withTypeText(path.type)
+    if (path.callParameters.isNotEmpty()) {
+        element = element.withTailText(" (" + path.callParameters.joinToString(", ") + ")", true)
+            .withInsertHandler { context, _ -> context.editor.caretModel.moveToOffset(context.tailOffset - 1) }
+    }
+    return PrioritizedLookupElement.withPriority(element, LOCAL_PRIORITY - 1)
+}
+
+/**
+ * Whether the caret is in a number being typed (`4|`, `1.5|`): the IDE puts its placeholder name right after the
+ * digits, so the prefix it finds is empty and everything would be offered. A number is completed by nothing.
+ */
+private fun isTypingNumber(parameters: CompletionParameters): Boolean {
+    val previous = PsiTreeUtil.prevLeaf(parameters.position) ?: return false
+    return previous.elementType == BwslTokenTypes.NUMBER_LIT && previous.textRange.endOffset == parameters.position.textRange.startOffset
+}
+
 /** A suggestion that stands for a value, with the type it has (null when not known). */
 private class TypedCandidate(val element: LookupElement, val type: String?)
 
@@ -210,15 +258,20 @@ private fun buildImportingLookupElement(importable: ImportableName, qualify: Boo
         .withTypeText(name.type?.takeIf { it.isNotEmpty() } ?: name.kind.label)
         .withTailText((if (name.kind == DeclaredName.Kind.FUNCTION) "(${name.parameters.orEmpty().joinToString(", ")})" else "") +
             " ${importable.module} (import)", true)
-        .withInsertHandler(InsertHandler<LookupElement> { context, item ->
+        .withInsertHandler { context, item ->
             val start = context.startOffset
             if (qualify) context.document.insertString(start, "${importable.module}::")
             if (name.kind == DeclaredName.Kind.FUNCTION) {
                 ParenthesesInsertHandler.getInstance(name.parameters.orEmpty().isNotEmpty()).handleInsert(context, item)
             }
             PsiDocumentManager.getInstance(context.project).commitDocument(context.document)
-            findImportInsertion(context.file, start, importable.module)?.let { context.document.insertString(it.offset, it.text) }
-        })
+            findImportInsertion(context.file, start, importable.module)?.let {
+                context.document.insertString(
+                    it.offset,
+                    it.text
+                )
+            }
+        }
     return PrioritizedLookupElement.withPriority(base, IMPORTABLE_PRIORITY)
 }
 
@@ -284,6 +337,7 @@ class BwslCompletionContributor : CompletionContributor() {
             PlatformPatterns.psiElement().withElementType(NAME_TOKENS),
             object : CompletionProvider<CompletionParameters>() {
                 override fun addCompletions(parameters: CompletionParameters, context: ProcessingContext, result: CompletionResultSet) {
+                    if (isTypingNumber(parameters)) return result.stopHere()
                     val ast = findCompletionAst(parameters) ?: return
                     val expected = collectExpectedTypesAt(parameters.originalFile, parameters.offset, buildReceiverContext(parameters, ast))
                     for (candidate in collectTypedCandidates(parameters, ast, result.prefixMatcher.prefix)) {
@@ -303,6 +357,12 @@ class BwslCompletionContributor : CompletionContributor() {
                     context: ProcessingContext,
                     result: CompletionResultSet
                 ) {
+                    if (isTypingNumber(parameters)) return result.stopHere()
+                    // An index (`values[|]`): only what can be one, the integer values in scope.
+                    if (PsiTreeUtil.prevCodeLeaf(parameters.position)?.elementType == BwslTokenTypes.LBRACKET) {
+                        findCompletionAst(parameters)?.let { ast -> result.addAllElements(collectIndexCandidates(parameters, ast)) }
+                        return result.stopHere()
+                    }
                     val prevSibling = parameters.position.parent?.let { findPreviousNonWhitespace(it) }
                     val beforeDot = if (prevSibling?.elementType == BwslTokenTypes.DOT) findPreviousNonWhitespace(prevSibling) else null
                     if (prevSibling?.elementType == BwslTokenTypes.DOT &&
