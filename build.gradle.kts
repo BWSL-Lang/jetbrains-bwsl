@@ -52,6 +52,8 @@ dependencies {
         bundledModule("intellij.spellchecker")
         // The typo inspection lives in the Natural Languages plugin (bundled in the IDEs); only the tests need it.
         testBundledPlugin("tanvd.grazi")
+        // BWSL code fences in Markdown are the Markdown plugin's own injection (it finds a language by its id); only the tests need it.
+        testBundledPlugin("org.intellij.plugins.markdown")
         testFramework(TestFrameworkType.JUnit5)
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()

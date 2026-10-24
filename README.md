@@ -61,6 +61,13 @@ That means the compiler has to be configured (see [Setup](#setup)).
 - A small bundled dictionary knows the vocabulary of shaders and the compiler
   (`bwslc`, `SPIRV`, `GLSL`, `swizzle`, `Fresnel`, `GGX`, ...)
 
+### Markdown code blocks
+
+- A fenced code block marked `bwsl` (in any case) in a Markdown file is
+  highlighted as BWSL. The Markdown plugin provides this for any language whose
+  name the fence gives; the plugin adds nothing. The compiler does not check a
+  code block, so its errors are not shown there
+
 ### Formatting (Ctrl+Alt+L)
 
 - **Reformat Code** for a file or a selection. It re-indents every line by how
@@ -507,10 +514,6 @@ Not implemented yet:
 - [ ] Show the compiled output (SPIR-V disassembly, GLSL, HLSL, Metal) next to
       the source
 - [ ] Shader variant selection in the compile action
-
-**Platform and ecosystem**
-- [ ] BWSL code blocks highlighted inside Markdown
-- [ ] Debugger integration
 
 ## Prerequisites
 

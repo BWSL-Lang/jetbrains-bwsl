@@ -499,6 +499,10 @@ is wrapped at 80 characters.
 - Reading a process: **read stdout and stderr at the same time** (`compileAst`, the test helper).
   Reading one to its end first deadlocks when a file with many errors fills the other pipe, and the
   15 s timeout never starts because it comes after the reads.
+- Markdown code fences: ```bwsl (any case) is the Markdown plugin's own injection, which picks the registered language
+  whose id equals the info string (`CodeFenceLanguageGuesser`), so the plugin registers nothing for it. The tests add
+  `testBundledPlugin("org.intellij.plugins.markdown")` (`BwslMarkdownFenceTest`); the plugin does not depend on it. The
+  external annotators (compile, diagnostics) do not run on an injected fragment.
 - Editor support that needs only tokens (`BwslEditing.kt`, `BwslFolding.kt`): `BwslCommenter`
   (`//`, `/* */`), `BwslBraceMatcher` (`{}` structural, `()` and `[]`; `<`/`>` deliberately not a
   pair, and a closing bracket is only auto-inserted before whitespace, a comment, the end or
