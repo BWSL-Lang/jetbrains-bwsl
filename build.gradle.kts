@@ -6,8 +6,8 @@ import java.util.Properties
 plugins {
     java
     id("org.jetbrains.kotlin.jvm") version "2.4.21"
-    id("org.jetbrains.intellij.platform") version "2.19.0"
-    id("org.jetbrains.intellij.platform.grammarkit") version "2.19.0"
+    id("org.jetbrains.intellij.platform") version "2.20.0"
+    id("org.jetbrains.intellij.platform.grammarkit") version "2.20.0"
 }
 
 // The IDE runs on Java 25, so the plugin is compiled, tested and run on it.
